@@ -73,20 +73,21 @@ def _nice_step(span, target=5):
 
 
 class _Panel:
-    def __init__(self, surface, fonts, rect, x_max, y_min, y_max, title):
+    def __init__(self, surface, fonts, rect, x_max, y_min, y_max, title, ticks=None):
         self.s, self.f, self.r = surface, fonts, pygame.Rect(rect)
         self.x_max, self.y_min, self.y_max = x_max, y_min, y_max
         self.plot = pygame.Rect(self.r.left + 64, self.r.top + 34, self.r.width - 84, self.r.height - 64)
         pygame.draw.rect(surface, _c(PANEL), self.r, border_radius=8)
         _text(surface, fonts["label"], title, (self.r.left + 16, self.r.top + 8))
-        # grille horizontale + graduations
-        step = _nice_step(y_max - y_min)
-        v = np.ceil(y_min / step) * step
-        while v <= y_max + 1e-9:
+        # grille horizontale + graduations (ticks = [(valeur, étiquette)] pour une échelle non linéaire)
+        if ticks is None:
+            step = _nice_step(y_max - y_min)
+            first = np.ceil(y_min / step) * step
+            ticks = [(v, f"{v:g}") for v in np.arange(first, y_max + 1e-9, step)]
+        for v, label in ticks:
             y = self.y(v)
             pygame.draw.line(surface, _c(GRID), (self.plot.left, y), (self.plot.right, y), 1)
-            _text(surface, fonts["small"], f"{v:g}", (self.plot.left - 8, y), TEXT_DIM, "midright")
-            v += step
+            _text(surface, fonts["small"], label, (self.plot.left - 8, y), TEXT_DIM, "midright")
         xstep = _nice_step(x_max, 10)
         g = 0.0
         while g <= x_max + 1e-9:
@@ -171,6 +172,43 @@ def evolution_chart(rows, title, size=(1280, 1080), x_max=None):
     return surface
 
 
+def diversity_chart(rows, title, size=(1280, 1080), x_max=None):
+    """Trois panneaux : ancêtres distincts de la gén. 0 (log), écart-type de la période, part au sol."""
+    surface = pygame.Surface(size)
+    surface.fill(_c(BG))
+    fonts = _fonts()
+    w, h = size
+    gens = [r["gen"] for r in rows]
+    x_max = x_max or max(max(gens), 30)
+    _text(surface, fonts["title"], title, (24, 18))
+    _text(surface, fonts["small"], "Diversité de la population. Cercles creux : repères du §9. Une échelle par graphe.",
+          (24, 52), TEXT_DIM)
+    panel_h = (h - 100) // 3
+    top = 84
+
+    anc = [np.log10(max(r["ancestors"], 1)) for r in rows]
+    ticks = [(np.log10(v), f"{v:g}") for v in (1, 2, 5, 10, 20, 50, 100, 200, 500, 1000)]
+    a = _Panel(surface, fonts, (16, top, w - 32, panel_h - 12), x_max, 0.0, 3.0,
+               "Ancêtres distincts de la génération 0 parmi la population (échelle log)", ticks)
+    y20 = a.y(np.log10(20))
+    for x0 in range(a.plot.left, a.plot.right, 12):  # seuil de 20 en pointillés
+        pygame.draw.line(surface, _c(NEUTRAL), (x0, y20), (min(x0 + 6, a.plot.right), y20), 1)
+    a.end_label(a.line(gens, anc, NEUTRAL), f"{int(rows[-1]['ancestors'])}")
+
+    std = [r["period_std"] for r in rows]
+    sp = _Panel(surface, fonts, (16, top + panel_h, w - 32, panel_h - 12), x_max, 0.0, max(1.5, max(std) * 1.1),
+                "Écart-type de la période d'horloge dans la population (s)")
+    sp.end_label(sp.line(gens, std, CYAN), f"{std[-1]:.2f} s")
+
+    frac = [100.0 * r["fallen_frac"] for r in rows]
+    fp = _Panel(surface, fonts, (16, top + 2 * panel_h, w - 32, panel_h - 12), x_max, 0.0,
+                max(50.0, max(frac) * 1.1), "Part de la population au sol à 10 s (%)")
+    fp.references([(0, 45.0, "≈ 450 / 1000"), (1, 20.0, "≈ 200"), (200, 3.0, "≈ 30")])
+    fp.end_label(fp.line(gens, frac, GREEN), f"{frac[-1]:.1f} %")
+    _text(surface, fonts["small"], "génération", (w - 40, h - 14), TEXT_DIM, "bottomright")
+    return surface
+
+
 def histogram_chart(row, title, size=(1280, 720), stats_lines=(), reference=None):
     """Histogramme §7.2 : barres de 1 m de −10 à 40 m, axe Y 0–500 (agrandi si besoin)."""
     from evo.evolution import HIST_COLUMNS, HIST_EDGES
@@ -235,6 +273,10 @@ def export_run(run_dir, out_dir=None, gens=None, curves=True):
         path = os.path.join(out_dir, "courbes.png")
         pygame.image.save(evolution_chart(rows, f"Run {seed} : {int(rows[-1]['gen'])} générations"), path)
         paths.append(path)
+        if all("ancestors" in r for r in rows):  # runs d'avant l'étape 3 : pas de lignée complète
+            path = os.path.join(out_dir, "diversite.png")
+            pygame.image.save(diversity_chart(rows, f"Run {seed} : diversité"), path)
+            paths.append(path)
     last = int(rows[-1]["gen"])
     for g in gens if gens is not None else sorted({0, min(1, last), last}):
         row = rows[g]
