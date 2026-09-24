@@ -254,3 +254,94 @@ MASS_SCHEMA_COLORS = [
 # [≈] §5.3 — polices : on prend la première disponible, sinon la police par défaut de pygame
 FONT_SANS = ["avenirnext", "nunitosans", "montserrat", "dejavusans", "freesans"]
 FONT_MONO = ["dejavusansmono", "liberationmono", "freemono"]
+
+# ---------------------------------------------------------------------------
+# Rendu jungle (§5, phase 4), fenêtre WINDOW_SIZE = 1280×720
+# ---------------------------------------------------------------------------
+# Caméra [DÉDUIT] images 03 à 06 : 20.2 px/m (cf. BODY_SCALE), tronc centré, haut de l'herbe
+# (y = GROUND_Y) à 548 px. Le départ (point de référence à START_HEIGHT) est donc à
+# 548 − 10.3 × 20.2 ≈ 340 px ; c'est la hauteur écran que la caméra garde quand elle suit
+# (image 06 : lézard à +10 m sur la ligne « 10 m », y 336 px, sol hors champ). Elle ne descend
+# jamais sous le cadrage de départ (image 04 : créature au sol, cadrage inchangé).
+SCENE_SCALE = 20.2
+SCENE_GROUND_PX = 548
+CAMERA_LERP = 0.08            # [CHOIX] §5.6 « lerp doux » : part de l'écart rattrapée par frame
+# [CHOIX] §5.6 — parallaxe de chaque couche (0 = fixe à l'écran, 1 = plan de la créature)
+PARALLAX = {"ciel": 0.0, "tres_lointain": 0.1, "lointain": 0.25, "mi_proche": 0.5,
+            "plan": 1.0, "premier_plan": 1.2}
+SCENE_LAYERS = ("ciel", "plan")   # [CHOIX] couches construites (phase 4a-1 : ciel + plan)
+SCENE_SEED = 5                # [CHOIX] graine du décor procédural
+DECOR_TOP_HUD = 50.0          # [CHOIX] ≥ 45 m (§5.6) : haut du décor en hauteur HUD ; la caméra s'y arrête
+SCENE_SUPERSAMPLE = 2         # [CHOIX] décor dessiné ×2 puis réduit (anticrénelage sans jointures ; puissance de 2)
+SCENE_CACHE_DIR = "cache/scene"   # [CHOIX] couches pré-rendues (non versionné)
+
+# Ciel (§5.2) : dégradé fixe à l'écran [DÉDUIT] images 03 et 09 (même haut d'écran #7BBA77 malgré
+# 23 m d'écart de caméra). Arrêts (ligne en px du cadrage standard, couleur) : les couleurs du §5.2
+# (#9CC484, #C4CC8C, #DCD494, #E4D49C) placées aux lignes où les images les montrent ; le haut de
+# l'écran (#7BBA77, mesuré) est plus vert que le « haut du ciel » du §5.2.
+SKY_STOPS = ((0, "#7BBA77"), (95, "#9CC484"), (230, "#C4CC8C"), (310, "#DCD494"), (360, "#E4D49C"))
+CLOUD_COLOR = "#FCF4D4"       # [VU] §5.2
+# [DÉDUIT] images 03 et 05 : traits plats (x gauche, x droit, y haut, épaisseur) en px du cadrage standard
+CLOUDS = ((228, 400, 266, 18), (846, 1040, 222, 16))
+
+# Tronc (§5.2, §5.6) : facettes low-poly, les plus claires à gauche (lumière de la gauche).
+TRUNK_COLORS = ("#9C5434", "#945434", "#944C2C", "#8C4C2C",
+                "#844C2C", "#7C442C", "#74442C", "#6C3C2C")   # [VU] §5.2, de gauche (clair) à droite
+TRUNK_FACET = (4.1, 5.2)      # [DÉDUIT] images 01 et 03 : 3 facettes en largeur, ~100 px de haut (largeur, hauteur en m)
+TRUNK_JITTER = 0.38           # [CHOIX] décalage aléatoire des sommets (fraction de facette)
+TRUNK_SHADE_JITTER = 0.7      # [CHOIX] ± crans de teinte au hasard autour de l'éclairage de gauche
+TRUNK_FLARE = (3.8, 0.95)     # [DÉDUIT] image 03 : base évasée sur 3.8 m, +0.95 m de chaque côté au sol
+BRANCH_COLOR = "#74442C"      # [VU] §5.2
+BRANCH_FACET = "#844C2C"      # [VU] §5.2
+# [DÉDUIT] images 03, 06, 09 et 40 : branches en L du tronc, qui porteront les canopées du premier
+# plan (phase 4a-2) : (départ en hauteur HUD m, côté ±1, avancée m, montée m, poteau m, épaisseur m)
+BRANCHES = ((12.0, 1, 4.9, 5.4, 6.0, 1.7), (31.0, -1, 4.6, 5.0, 6.0, 1.6), (43.0, 1, 4.9, 5.4, 6.0, 1.7))
+
+# Sol (§5.2) : herbe dentelée, terre low-poly, rochers, touffes.
+GRASS_COLORS = ("#8C9C04", "#748404")   # [VU] bande claire du haut, bande sombre du dessous
+GRASS_BANDS = (1.0, 2.1, 0.45)          # [DÉDUIT] image 03 : bande claire 1.0 m, bord dentelé à 2.1 m (dents ±0.45 m)
+GRASS_TEETH = (3.0, 7.0)                # [CHOIX] m entre deux pointes du bord dentelé
+DIRT_COLORS = ("#74442C", "#6C3C24")    # [VU] terre, facettes et liseré sombre sous l'herbe
+DIRT_FACETS = (3.0, 9.0)                # [CHOIX] largeur (m) des facettes verticales de la terre
+TRUNK_SHADOW = (9.5, 0.9)               # [DÉDUIT] image 03 : ombre du tronc sur l'herbe, à droite (longueur, épaisseur m)
+ROCK_COLORS = ("#C47C4C", "#9C5434", "#744424")  # [VU] facettes : claire (haut gauche), moyenne, ombre
+ROCKS = ((-25.2, 2.2), (12.6, 2.0), (21.8, 0.8))   # [DÉDUIT] images 01 et 03 : (x m, largeur m ; 45 et 40 px)
+TUFT_COLORS = ("#748404", "#A4B41C", "#34442C")   # [VU] touffes d'herbe
+TUFTS = ((-2.9, 1.3), (5.9, 1.6), (-7.1, 0.9), (-12.4, 1.1), (19.2, 1.2), (27.5, 0.9))  # [DÉDUIT] image 03 : (x m, hauteur m)
+
+# Repères de hauteur (§5.6) : ligne blanche fine sur la largeur du tronc, libellé à gauche.
+MARKER_STEP = 10.0            # [VU] §5.6 — en hauteur HUD (depuis le départ) [DÉDUIT] image 03 sans ligne à 10 m du sol
+MARKER_COLOR = "#FCFCFC"      # [VU]
+MARKER_FONT_PX = 46           # [DÉDUIT] image 06 : chiffres de 34 px de haut
+MARKER_LABEL_GAP_PX = 24      # [DÉDUIT] image 06 : libellé aligné à droite, 24 px à gauche du tronc
+MARKER_LINE_PX = 1            # [DÉDUIT] image 06
+
+# Cadrage de l'image 01 (t = 8:02), plus serré : pour la comparaison côte à côte uniquement.
+COMPARE_T8M02_FRAMING = (28.4, 570)   # [DÉDUIT] image 01 : tronc de 349 px (px/m), haut de l'herbe à 570 px
+
+# Lézard (§5.4), recalculé à chaque frame depuis les points.
+LIZARD_LIGHT = "#5CAC24"      # [VU] §5.2 — moitié gauche (côté des points L_*, [CHOIX] côté anatomique)
+LIZARD_DARK = "#4CA40C"       # [VU] §5.2 — moitié droite
+# [DÉDUIT] image 02 : membres un cran plus sombres que la moitié de torse du même côté, ce qui garde la
+# jonction épaule / torse lisible (§5.4 écrit #5CAC24 à gauche, #4CA40C à droite).
+LIZARD_LIMB_COLORS = ("#4CA40C", "#489C0C")
+LIZARD_FINGER = "#D4FC7C"     # [VU] rayons des doigts
+LIZARD_PAD = "#5C9C3C"        # [VU ≈] disques au bout des doigts
+LIZARD_EYE_COLOR = "#040404"  # [VU]
+LIZARD_SUPERSAMPLE = 2        # [CHOIX] lézard dessiné ×2 puis réduit (puissance de 2 : smoothscale exact ; ×3 perd 2 niveaux de couleur et d'alpha)
+LIZARD_LIMB_WIDTH = 0.11      # [DÉDUIT] image 01 : humérus / fémur ≈ 1/3 de la largeur des hanches (× colonne de référence)
+LIZARD_DISTAL_RATIO = 0.7     # [VU] §5.4 — avant-bras et tibia ≈ 70 % de l'humérus et du fémur
+# [DÉDUIT] image 02 : demi-largeur du torse aux épaules (× clavicule), aux hanches (× bassin) et à la
+# taille (× la plus grande des deux) ; torse ovoïde lissé entre ces largeurs, le long de la colonne
+LIZARD_TORSO = (0.9, 1.0, 0.82)
+LIZARD_TAIL_BASE = 0.5        # [DÉDUIT] image 01 : demi-largeur de la queue au bassin (× demi-largeur des hanches)
+LIZARD_TAIL_TAPER = 1.15      # [CHOIX] exposant de l'effilage de la queue (1 = linéaire)
+LIZARD_HEAD = (0.85, 1.55)    # [DÉDUIT] image 02 : demi-largeur (× celle des épaules), longueur / largeur
+# [DÉDUIT] image 02 : œil = ellipse noire centrée à 55 % de la tête depuis le cou, demi-axes 0.11 × longueur
+# de tête (le long) et 0.14 × demi-largeur de tête (en travers), centre à 0.97 × la demi-largeur locale (il dépasse)
+LIZARD_EYE = (0.55, 0.11, 0.14, 0.97)
+# [DÉDUIT] 5 rayons à −100, −50, 0, 50, 100° de l'axe de l'avant-bras (image 02) ; longueur jusqu'au centre
+# du disque, épaisseur, diamètre du disque et de la paume, en × largeur de l'avant-bras, mesurés sur la
+# scène (image 01 : rayons ≈ 2×, disques ≈ 1.3×) et un peu réduits (gros plan 02 : 0.9× et 0.65× ;
+# §5.4 : disque ≈ 30 %)
+LIZARD_FINGERS = ((-100.0, -50.0, 0.0, 50.0, 100.0), 1.6, 0.4, 1.15, 0.9)

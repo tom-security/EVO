@@ -10,6 +10,9 @@
     python main.py train --generations 200 --pop 1000 --seed 42 [--set TORQUE_SCALE=0.3 …]
     python main.py graphs --seed 42               # courbes + histogrammes du run en PNG
     python main.py histogram --seed 42 --gen 0
+    python main.py replay --seed 2 --gen 200 --rank 1   # rejoue une créature dans la jungle (§5, §8)
+    python main.py replay --seed 2 --gen 200 --rank 1 --export out/phase4
+    python main.py replay --seed 2 --gen 200 --rank 1 --fps-report   # vérifie les 60 fps en fenêtre
 """
 import argparse
 
@@ -56,6 +59,16 @@ def main(argv=None):
     hist.add_argument("--gen", type=int, default=0)
     hist.add_argument("--out", default=None)
 
+    replay = sub.add_parser("replay", help="rejoue une créature sauvegardée dans le décor jungle (§5, §8)")
+    replay.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
+    replay.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    replay.add_argument("--gen", type=int, default=None, help="génération (défaut : la dernière sauvegardée)")
+    replay.add_argument("--rank", type=int, default=1, help="rang au classement (1 = meilleure)")
+    replay.add_argument("--export", metavar="DIR", help="sans écran : PNG à t = 0, 2, …, 10 s, planche, comparaisons")
+    replay.add_argument("--no-cache", action="store_true", help="régénère le décor au lieu de relire le cache")
+    replay.add_argument("--fps-report", action="store_true",
+                        help="joue le replay une fois à vitesse normale puis affiche le fps moyen et minimum")
+
     args = parser.parse_args(argv)
     if args.command == "debug-physics":
         if args.calibrate:
@@ -93,6 +106,20 @@ def main(argv=None):
         gens = [args.gen] if args.command == "histogram" else None
         for path in charts.export_run(run_dir, args.out, gens=gens, curves=args.command == "graphs"):
             print(path)
+    elif args.command == "replay":
+        import sys
+        from evo import evolution, replay as rp
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        r = rp.Replay(run_dir, gen=args.gen, rank=args.rank)
+        if args.export:
+            paths, _ = rp.export(r, args.export, use_cache=not args.no_cache)
+            for path in paths:
+                print(path)
+        else:
+            rp.run_interactive(r, use_cache=not args.no_cache, fps_report=args.fps_report)
+        if not r.ok:
+            print("ALERTE : la hauteur rejouée diffère de la hauteur stockée")
+            sys.exit(1)
     elif args.command == "debug-creature":
         from evo import debug_creature
         if args.export:
