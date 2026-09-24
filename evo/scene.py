@@ -147,6 +147,9 @@ class Scene:
                 self._save()
         if log:
             log(f"décor {'construit' if self.built else 'relu du cache'} ({self.cache_path})")
+        # nombre de pixels non transparents par ligne du premier plan (mesure des frames avec canopée)
+        self._front_rows = {n: (pygame.surfarray.array_alpha(self.layers[n][0]) > 0).sum(axis=0)
+                            for n in FRONT_LAYERS if n in self.layers}
         if pygame.display.get_init() and pygame.display.get_surface() is not None:
             self.layers = {n: (s.convert() if n == "ciel" else _rle(s.convert_alpha()), p, o)
                            for n, (s, p, o) in self.layers.items()}
@@ -163,24 +166,33 @@ class Scene:
             if name in self.layers:
                 self._blit(surface, name, shift)
 
-    def draw_markers(self, surface, shift, reached_hud):
-        """Repères de hauteur (§5.6) atteints par le lézard : ligne blanche sur le tronc, libellé à gauche.
-
-        [DÉDUIT] images 06, 08 et 09 : la vidéo ne montre jamais un repère au-dessus du lézard ; on ne
-        dessine donc un repère qu'une fois que la hauteur HUD du lézard l'a atteint.
-        """
+    def draw_markers(self, surface, shift, alphas):
+        """Repères de hauteur (§5.6) : ligne blanche sur le tronc et libellé à gauche, avec l'opacité
+        de chaque repère (`alphas` : hauteur HUD → opacité 0–1, cf. marker_alpha)."""
         f = self.framing
         h = f.size[1]
         base = config.GROUND_Y + config.START_HEIGHT
-        for hud in self.markers:
-            if hud > reached_hud:
-                break
+        for hud, alpha in alphas.items():
+            if alpha <= 0.0 or hud not in self._marker_labels:
+                continue
             y = int(round(f.y_px(base + hud, shift)))
             label = self._marker_labels[hud]
             if -label.get_height() < y < h + label.get_height():
-                surface.fill(self._marker_color, (self._marker_left, y - config.MARKER_LINE_PX // 2,
-                                                  self._marker_right - self._marker_left, config.MARKER_LINE_PX))
+                a = int(round(255 * min(alpha, 1.0)))
+                self._marker_line.set_alpha(a)
+                label.set_alpha(a)
+                surface.blit(self._marker_line, (self._marker_left, y - config.MARKER_LINE_PX // 2))
                 surface.blit(label, label.get_rect(midright=(self._marker_label_x, y)))
+
+    def front_coverage(self, shift):
+        """Part des pixels de l'écran couverts par le premier plan pour ce décalage de caméra."""
+        total = 0
+        w, h = self.framing.size
+        for name, rows in self._front_rows.items():
+            _, p, offset = self.layers[name]
+            top = int(round(offset - p * min(max(shift, 0.0), self.max_shift)))
+            total += int(rows[max(top, 0):max(top + h, 0)].sum())
+        return total / float(w * h)
 
     def _prepare_markers(self):
         f = self.framing
@@ -190,6 +202,8 @@ class Scene:
         self._marker_labels = {hud: font.render(f"{hud:g} m", True, self._marker_color) for hud in self.markers}
         self._marker_left = int(round(f.x_px(config.TRUNK_X - config.TRUNK_WIDTH / 2)))
         self._marker_right = int(round(f.x_px(config.TRUNK_X + config.TRUNK_WIDTH / 2)))
+        self._marker_line = pygame.Surface((self._marker_right - self._marker_left, config.MARKER_LINE_PX))
+        self._marker_line.fill(self._marker_color)
         self._marker_label_x = int(round(self._marker_left - config.MARKER_LABEL_GAP_PX * f.scale / config.SCENE_SCALE))
 
     def draw_front(self, surface, shift):
@@ -333,6 +347,15 @@ class Scene:
             meta["layers"][name] = {"parallax": p, "offset": offset, "size": list(surf.get_size())}
         with open(os.path.join(self.cache_path, "manifest.json"), "w") as fh:
             json.dump(meta, fh, indent=1)
+
+
+def marker_alpha(dt):
+    """Opacité d'un repère `dt` secondes après son premier franchissement (négatif : pas encore)."""
+    if dt < 0:
+        return 0.0
+    if dt <= config.MARKER_SHOW_S:
+        return 1.0
+    return max(0.0, 1.0 - (dt - config.MARKER_SHOW_S) / config.MARKER_FADE_S)
 
 
 def _rle(surf):
@@ -555,73 +578,123 @@ def _hills(cv, rng, x0, x1, base, amp, bottom, color, n=6):
     cv.poly([(x0 - 5, bottom)] + list(zip(xs, ys)) + [(x1 + 5, bottom)], color)
 
 
-def _blob(rng, cx, bottom, width, height, n=11, jitter=0.16):
-    """Contour low-poly d'une canopée : dessus bosselé, dessous presque plat (sens trigonométrique)."""
+def _round_blob(rng, cx, cy, width, height, n=None, jitter=0.12):
+    """Blob arrondi irrégulier (silhouettes lointaines) : 11 à 14 sommets autour d'une ellipse complète."""
+    n = int(rng.integers(11, 15)) if n is None else n
     pts = []
     for k in range(n):
-        a = math.pi * (k + rng.uniform(-0.3, 0.3)) / (n - 1)          # 0 → π : dessus, de droite à gauche
+        a = 2 * math.pi * (k + rng.uniform(-0.3, 0.3)) / n
         r = 1.0 + rng.uniform(-jitter, jitter)
-        pts.append((cx + 0.5 * width * r * math.cos(a), bottom + 0.35 * height + 0.65 * height * r * math.sin(a)))
-    for k in range(1, 4):                                              # dessous : quelques sommets bas
-        x = cx - 0.5 * width + width * k / 4 + rng.uniform(-0.08, 0.08) * width
-        pts.append((x, bottom + rng.uniform(0.0, 0.18) * height))
+        pts.append((cx + 0.5 * width * r * math.cos(a), cy + 0.5 * height * r * math.sin(a)))
     return pts
 
 
+def _canopy_parts(rng, cx, bottom, width, height):
+    """Contour low-poly irrégulier d'une canopée (images 06 et 09) : (pointe gauche, dessus de gauche à
+    droite, pointe droite, dessous de droite à gauche). 8 à 12 sommets : dessus bosselé de 5 à 7 sommets,
+    dessous en zigzag de 2 ou 3 sommets. Le dessus reste au-dessus de 58 % de la hauteur sur les 70 %
+    centraux de la largeur (le lézard qui passe dessous reste masqué)."""
+    n_top, n_bot = int(rng.integers(5, 8)), int(rng.integers(2, 4))
+    left = (cx - 0.5 * width, bottom + height * rng.uniform(0.38, 0.52))
+    right = (cx + 0.5 * width, bottom + height * rng.uniform(0.35, 0.55))
+    us = np.sort(rng.uniform(-0.44, 0.44, n_top))
+    us = np.clip(us + np.linspace(-0.05, 0.05, n_top), -0.46, 0.46)       # évite deux sommets confondus
+    top = []
+    for k, u in enumerate(us):
+        envelope = 0.62 + 0.38 * math.sqrt(max(0.0, 1.0 - (2.0 * u) ** 2))
+        v = envelope * rng.uniform(0.8, 1.0) * (0.9 if k % 2 else 1.0)   # bosses et marches
+        if abs(u) <= 0.35:
+            v = max(v, 0.6)
+        top.append((cx + u * width, bottom + v * height))
+    low = []
+    for k, u in enumerate(np.sort(rng.uniform(-0.4, 0.4, n_bot))[::-1]):
+        low.append((cx + u * width, bottom + height * (rng.uniform(0.0, 0.04) if k % 2 == 0 else rng.uniform(0.07, 0.13))))
+    return left, top, right, low
+
+
+def _canopy_outline(rng, cx, bottom, width, height):
+    left, top, right, low = _canopy_parts(rng, cx, bottom, width, height)
+    return [left] + top + [right] + low
+
+
 def _canopy(cv, rng, cx, bottom, width, height, colors, vines=False):
-    """Canopée low-poly (§5.2) : base, facettes éclairées en haut à gauche, dessous sombre, lianes."""
+    """Canopée low-poly (§5.2, images 06 et 09) : dessous en deux tons (bande sombre tout en bas, bande
+    moyenne sous le corps), corps, 2 ou 3 facettes claires, 1 ou 2 petits triangles sombres, lianes."""
     base, lit, under, shade = colors
-    outline = _blob(rng, cx, bottom, width, height)
-    top = outline[:11]
-    low = sorted(outline[11:], key=lambda p: p[0])
-    lower = [top[-1]] + low + [top[0]]                 # bord inférieur, de gauche à droite
+    left, top, right, low = _canopy_parts(rng, cx, bottom, width, height)
+    outline = [left] + top + [right] + low
+    lower = [left] + low[::-1] + [right]                              # bord inférieur du corps, de gauche à droite
+
+    def band(edge, lo, hi):
+        """Bord décalé vers le bas d'une épaisseur tirée entre lo et hi (× h), amincie vers les pointes."""
+        out = []
+        for k, (x, y) in enumerate(edge):
+            taper = 0.35 if k in (0, len(edge) - 1) else 1.0
+            out.append((x + rng.uniform(-0.02, 0.02) * width, y - taper * rng.uniform(lo, hi) * height))
+        return out
+
+    mid_edge = band(lower, 0.10, 0.14)
+    low_edge = band(mid_edge, 0.08, 0.12)
     if vines:
-        for x in rng.uniform(cx - 0.42 * width, cx + 0.42 * width, int(width // 3)):
+        for x in rng.uniform(cx - 0.4 * width, cx + 0.4 * width, int(width // 3)):
+            y_top = float(np.interp(x, [p[0] for p in low_edge], [p[1] for p in low_edge])) + 0.3
             length = rng.uniform(1.5, 0.45 * height)
             w = rng.uniform(0.18, 0.3)
-            cv.poly([(x - w, bottom + 1.0), (x + w, bottom + 1.0), (x + w, bottom - length), (x - w, bottom - length)],
-                    config.VINE_COLOR)
-    drop = 0.08 * height
-    cv.poly([(x, y - drop) for x, y in lower] + lower[::-1], shade)          # ombre sous la canopée
+            cv.poly([(x - w, y_top), (x + w, y_top), (x + w, y_top - length), (x - w, y_top - length)], config.VINE_COLOR)
+    cv.poly(low_edge + mid_edge[::-1], shade)       # dessous, ton sombre (tout en bas)
+    cv.poly(mid_edge + lower[::-1], under)          # dessous, ton moyen (sous le corps)
     cv.poly(outline, base)
-    cv.poly(lower + [(x, y + 0.22 * height) for x, y in lower[::-1]], under)  # dessous
-    cv.poly(outline[3:11] + [(cx - 0.05 * width, bottom + 0.62 * height)], base)
-    # facettes éclairées : deux pans le long du bord supérieur gauche (lumière de la gauche)
-    for k0, k1, depth in ((6, 8, 0.22), (8, 10, 0.3)):
-        edge = top[k0:k1 + 1]
-        inward = [(cx + (x - cx) * (1 - depth), bottom + 0.45 * height + (y - bottom - 0.45 * height) * (1 - depth))
-                  for x, y in edge[::-1]]
-        cv.poly(edge + inward, lit)
-    # quelques triangles d'ombre au milieu
+    # facettes claires : pan le long du bord supérieur gauche, pan en haut à droite, petit quadrilatère intérieur
+    down = lambda p, d: (p[0] + rng.uniform(-0.01, 0.03) * width, p[1] - d * height)   # noqa: E731
+    k_left = max(1, len(top) // 3)
+    facets = [[left] + top[:k_left + 1] + [down(top[k_left], 0.26)] + [down(q, 0.22) for q in top[:k_left][::-1]]
+              + [(left[0] + 0.08 * width, left[1] - 0.04 * height)]]
+    choices = []
+    if len(top) >= 3:
+        k0 = len(top) - 3
+        seg = top[k0:k0 + 2]
+        choices.append(seg + [down(q, rng.uniform(0.12, 0.2)) for q in seg[::-1]])
+    qx, qy = cx - rng.uniform(0.2, 0.3) * width, bottom + rng.uniform(0.42, 0.55) * height
+    qw, qh = rng.uniform(0.07, 0.11) * width, rng.uniform(0.12, 0.18) * height
+    choices.append([(qx - qw, qy), (qx + 0.2 * qw, qy + qh), (qx + qw, qy + 0.1 * qh), (qx + 0.3 * qw, qy - 0.7 * qh)])
+    keep = rng.permutation(len(choices))[:int(rng.integers(1, len(choices) + 1))]
+    facets += [choices[i] for i in sorted(keep)]
+    for poly in facets:
+        cv.poly(poly, lit)
+    # petits triangles sombres, plutôt à droite
     for _ in range(int(rng.integers(1, 3))):
-        x = cx + rng.uniform(-0.25, 0.3) * width
-        y = bottom + rng.uniform(0.4, 0.62) * height
+        x = cx + rng.uniform(0.05, 0.32) * width
+        y = bottom + rng.uniform(0.38, 0.55) * height
         sz = rng.uniform(0.05, 0.08) * width
-        cv.poly([(x, y), (x + sz, y + 0.35 * sz), (x + 0.6 * sz, y - 0.45 * sz)], under)
+        cv.poly([(x - sz, y + 0.1 * sz), (x + 0.4 * sz, y + 0.45 * sz), (x + 0.2 * sz, y - 0.5 * sz)], under)
 
 
 def _tree_silhouette(cv, rng, x, bottom, height, width, color):
-    """Arbre en silhouette (une couleur) : tronc, branches en L, canopée en blobs, lianes."""
+    """Arbre en silhouette (une couleur, images 06 et 09) : tronc fin, branches fines en L, canopée en
+    nuage de 2 à 4 blobs arrondis irréguliers, lianes."""
     g = config.GROUND_Y
-    tw = rng.uniform(0.09, 0.14) * width
-    crown = g + height - 0.45 * width
+    tw = rng.uniform(0.4, 0.7)
+    crown = g + height - 0.32 * width
     cv.poly([(x - tw / 2, bottom), (x + tw / 2, bottom), (x + tw / 2, crown), (x - tw / 2, crown)], color)
     for side in (-1, 1):
-        if rng.random() < 0.7:
-            y0 = g + rng.uniform(0.35, 0.6) * height
-            reach = rng.uniform(0.25, 0.45) * width
-            bw = 0.6 * tw
-            cv.poly([(x, y0), (x + side * reach, y0 + 0.4 * reach), (x + side * reach, y0 + 0.4 * reach + bw), (x, y0 + bw)], color)
-            cv.poly([(x + side * reach - side * bw, y0 + 0.4 * reach), (x + side * reach, y0 + 0.4 * reach),
+        if rng.random() < 0.6:
+            y0 = g + rng.uniform(0.4, 0.65) * height
+            reach = rng.uniform(0.22, 0.4) * width
+            bw = rng.uniform(0.3, 0.45)
+            cv.poly([(x, y0), (x + side * reach, y0 + 0.35 * reach), (x + side * reach, y0 + 0.35 * reach + bw), (x, y0 + bw)],
+                    color)
+            cv.poly([(x + side * reach - side * bw, y0 + 0.35 * reach), (x + side * reach, y0 + 0.35 * reach),
                      (x + side * reach, crown), (x + side * reach - side * bw, crown)], color)
-    for k in range(int(rng.integers(2, 4))):
-        bx = x + rng.uniform(-0.3, 0.3) * width
-        bw = width * rng.uniform(0.55, 0.85)
-        bb = crown + rng.uniform(-0.1, 0.25) * width
-        cv.poly(_blob(rng, bx, bb, bw, 0.55 * bw, n=9, jitter=0.2), color)
+    blobs = [(x, crown, width, 0.62 * width)]
+    for _ in range(int(rng.integers(1, 4))):
+        bw = width * rng.uniform(0.45, 0.7)
+        blobs.append((x + rng.uniform(-0.35, 0.35) * width, crown + rng.uniform(-0.18, 0.2) * width, bw, 0.6 * bw))
+    for bx, by, bw, bh in blobs:
+        cv.poly(_round_blob(rng, bx, by, bw, bh), color)
         for vx in rng.uniform(bx - 0.35 * bw, bx + 0.35 * bw, int(rng.integers(1, 4))):
-            length = rng.uniform(0.1, 0.3) * height
-            cv.poly([(vx - 0.1, bb + 0.5), (vx + 0.1, bb + 0.5), (vx + 0.1, bb - length), (vx - 0.1, bb - length)], color)
+            y_top = by - 0.3 * bh
+            length = rng.uniform(0.1, 0.28) * height
+            cv.poly([(vx - 0.1, y_top), (vx + 0.1, y_top), (vx + 0.1, y_top - length), (vx - 0.1, y_top - length)], color)
 
 
 def _leaf(center, angle, length, width, droop, teeth=0):

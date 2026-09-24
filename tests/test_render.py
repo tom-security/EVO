@@ -83,7 +83,7 @@ def test_all_layers_are_built_and_front_canopy_hides_the_lizard(tmp_cache):
     hud, side, dx, dy, post, th = config.BRANCHES[0]
     off, width, height = config.FG_CANOPIES[0]
     y_mid = config.GROUND_Y + config.START_HEIGHT + hud + dy + config.FG_CANOPY_LIFT + 0.45 * height
-    pos = c.world.pos + (np.array([config.TRUNK_X + side * 0.2 * off, y_mid]) - c.reference_point())
+    pos = c.world.pos + (np.array([config.TRUNK_X + side * 4.5, y_mid]) - c.reference_point())
     cam = sc.Camera(scene.framing)
     cam.update(y_mid, snap=True)
     surf = pygame.Surface(config.WINDOW_SIZE)
@@ -100,15 +100,38 @@ def test_all_layers_are_built_and_front_canopy_hides_the_lizard(tmp_cache):
     assert visible > 500 and hidden < 0.1 * visible
 
 
-def test_markers_appear_only_once_reached(tmp_cache):
+def test_markers_flash_once_at_first_upward_crossing(tmp_cache):
+    # opacité : pleine pendant MARKER_SHOW_S, puis fondu sur MARKER_FADE_S
+    assert sc.marker_alpha(-0.01) == 0.0 and sc.marker_alpha(0.0) == 1.0 and sc.marker_alpha(0.5) == 1.0
+    assert sc.marker_alpha(0.65) == pytest.approx(0.5) and sc.marker_alpha(0.8) == 0.0 and sc.marker_alpha(3.0) == 0.0
+    # franchissement détecté sur la hauteur HUD : atteint 10 m à la frame 4, redescend, repasse vers la frame 60
+    heights = np.concatenate([np.linspace(8, 10.5, 6), np.linspace(10.5, 8, 30), np.linspace(8, 12, 30)])
+    cross = rp.crossing_frames(heights, [10.0, 20.0])
+    assert cross == {10.0: 4, 20.0: None}
+    # dessin : la ligne n'apparaît qu'avec une opacité > 0
     scene = sc.Scene()
     surf = pygame.Surface(config.WINDOW_SIZE)
     row = int(round(scene.framing.y_px(config.GROUND_Y + config.START_HEIGHT + 10.0)))
     x = scene.framing.size[0] // 2
-    for reached, visible in ((9.9, False), (10.0, True), (15.0, True)):
+    white = tuple(pygame.Color(config.MARKER_COLOR))[:3]
+    for frame, visible in ((3, False), (4, True), (4 + int(0.5 / config.DT), True), (62, False)):
+        dt = (frame - cross[10.0]) * config.DT
         scene.draw_back(surf, 0.0)
-        scene.draw_markers(surf, 0.0, reached)
-        assert (tuple(surf.get_at((x, row)))[:3] == tuple(pygame.Color(config.MARKER_COLOR))[:3]) == visible
+        scene.draw_markers(surf, 0.0, {10.0: sc.marker_alpha(dt)})
+        assert (tuple(surf.get_at((x, row)))[:3] == white) == visible
+
+
+def test_canopy_outlines_are_irregular_and_varied():
+    shapes = []
+    for seed in range(6):
+        outline = sc._canopy_outline(np.random.default_rng(seed), 0.0, 0.0, 20.0, 10.0)
+        assert 8 <= len(outline) <= 12
+        xs, ys = np.array(outline).T
+        central = np.abs(xs) <= 0.35 * 20.0
+        assert ys[central].max() >= 0.58 * 10.0                 # le dessus couvre le lézard qui passe dessous
+        shapes.append(np.interp(np.linspace(-9, 9, 19), *zip(*sorted((x, y) for x, y in outline if y > 3.0))))
+    diffs = [np.abs(a - b).max() for i, a in enumerate(shapes) for b in shapes[i + 1:]]
+    assert min(diffs) > 0.3                                     # pas deux fois la même forme
 
 
 def test_visual_tail_is_longer_than_physics_and_stays_above_ground():

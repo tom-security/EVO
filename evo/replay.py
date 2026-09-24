@@ -20,6 +20,10 @@ from evo import creature as cr
 from evo import evolution as ev
 
 H = config.DT / config.SUBSTEPS
+# mesure des temps : une canopée du premier plan est « à l'écran » quand elle couvre au moins 5 % de
+# l'image (les lianes seules, visibles dès le départ comme sur l'image 03, ne comptent pas)
+CANOPY_COVERAGE = 0.05
+BIG_CANOPY_COVERAGE = 0.20
 REFERENCE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "reference")
 
 
@@ -95,6 +99,26 @@ class Replay:
         return f"graine {self.seed}, gén. {self.gen}, rang {self.rank}"
 
 
+def frame_stats(arr):
+    """Statistiques de temps (ms) : colonnes décor, lézard."""
+    if not len(arr):
+        return {"frames": 0}
+    total = arr.sum(axis=1)
+    return {"frames": int(len(arr)), "decor_ms_mean": float(arr[:, 0].mean()), "decor_ms_max": float(arr[:, 0].max()),
+            "lizard_ms_mean": float(arr[:, 1].mean()), "lizard_ms_max": float(arr[:, 1].max()),
+            "total_ms_mean": float(total.mean()), "total_ms_p95": float(np.percentile(total, 95)),
+            "total_ms_max": float(total.max()), "over_budget": float(np.mean(total > 1000.0 / 60))}
+
+
+def crossing_frames(heights, markers):
+    """Pour chaque repère : première frame où la hauteur HUD l'atteint (None s'il n'est jamais atteint)."""
+    out = {}
+    for hud in markers:
+        idx = np.nonzero(np.asarray(heights) >= hud)[0]
+        out[hud] = int(idx[0]) if len(idx) else None
+    return out
+
+
 class JungleView:
     """Décor + caméra + lézard pour un replay."""
 
@@ -107,7 +131,13 @@ class JungleView:
         self.framing = self.scene.framing
         self.camera = scene.Camera(self.framing)
         self.lizard = render_lizard.LizardShape(replay.skel)
-        self.reached = np.maximum.accumulate(replay.height)   # hauteur HUD maximale atteinte à chaque frame
+        # repères : frame du premier franchissement vers le haut de la hauteur HUD (jamais redéclenché)
+        self.crossings = crossing_frames(replay.height, self.scene.markers)
+
+    def marker_alphas(self, frame):
+        from evo.scene import marker_alpha
+        return {hud: marker_alpha((frame - f0) * config.DT) for hud, f0 in self.crossings.items()
+                if f0 is not None and frame >= f0}
 
     def reset_camera(self):
         self.camera.update(self.replay.ref_y[0], snap=True)
@@ -115,14 +145,14 @@ class JungleView:
     def draw(self, surface, frame, timings=None):
         t0 = time.perf_counter()
         self.scene.draw_back(surface, self.camera.shift)
-        self.scene.draw_markers(surface, self.camera.shift, self.reached[frame])
+        self.scene.draw_markers(surface, self.camera.shift, self.marker_alphas(frame))
         t1 = time.perf_counter()
         self.lizard.draw(surface, self.replay.pos[frame], self.camera.origin(), self.framing.scale)
         t2 = time.perf_counter()
         self.scene.draw_front(surface, self.camera.shift)
         t3 = time.perf_counter()
         if timings is not None:
-            timings.append(((t1 - t0) + (t3 - t2), t2 - t1))
+            timings.append(((t1 - t0) + (t3 - t2), t2 - t1, self.scene.front_coverage(self.camera.shift)))
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +169,7 @@ def run_interactive(replay, use_cache=True, fps_report=False):
     view.reset_camera()
     clock = pygame.time.Clock()
     frame_f, paused, slow = 0.0, False, False
-    stamps, durations, fps_windows = [], [], []
+    stamps, durations, fps_windows, canopy = [], [], [], []
     last_caption = time.perf_counter()
     running = True
     while running:
@@ -166,6 +196,7 @@ def run_interactive(replay, use_cache=True, fps_report=False):
         now = time.perf_counter()
         if stamps:
             durations.append(now - stamps[-1])
+            canopy.append(view.scene.front_coverage(view.camera.shift) >= CANOPY_COVERAGE)
         stamps.append(now)
         while stamps and now - stamps[0] > 1.0:
             stamps.pop(0)
@@ -185,10 +216,15 @@ def run_interactive(replay, use_cache=True, fps_report=False):
                 frame_f = float(replay.n_frames - 1)
     pygame.quit()
     if durations:
-        d = np.array(durations[config.FPS:] or durations)
+        skip = config.FPS if len(durations) > 2 * config.FPS else 0
+        d, on = np.array(durations[skip:]), np.array(canopy[skip:], bool)
         print(f"fps moyen {1.0 / d.mean():.1f} ; fps minimum sur une fenêtre de 1 s : "
               f"{min(fps_windows) if fps_windows else float('nan'):.0f} ; frames > 16.7 ms : "
               f"{100.0 * np.mean(d > 1 / 60 + 1e-3):.1f} % ; frame la plus longue {1000 * d.max():.1f} ms")
+        if on.any():
+            dc = d[on]
+            print(f"frames avec une canopée à l'écran (≥ {CANOPY_COVERAGE:.0%} de l'image, {len(dc)}) : fps moyen {1.0 / dc.mean():.1f} ; "
+                  f"frames > 16.7 ms : {100.0 * np.mean(dc > 1 / 60 + 1e-3):.1f} % ; la plus longue {1000 * dc.max():.1f} ms")
 
 
 # ---------------------------------------------------------------------------
@@ -306,17 +342,25 @@ def export(replay, out_dir, times=(0, 2, 4, 6, 8, 10), compare=tuple(COMPARISONS
         pygame.image.save(board, path)
         paths.append(path)
 
-    arr = np.array(timings) * 1000.0
-    stats = {"frames": len(arr), "decor_ms_mean": float(arr[:, 0].mean()), "decor_ms_max": float(arr[:, 0].max()),
-             "lizard_ms_mean": float(arr[:, 1].mean()), "lizard_ms_max": float(arr[:, 1].max()),
-             "total_ms_mean": float(arr.sum(axis=1).mean()), "total_ms_p95": float(np.percentile(arr.sum(axis=1), 95)),
-             "total_ms_max": float(arr.sum(axis=1).max()), "decor_built": view.scene.built,
-             "replay_ok": bool(replay.ok), "height_replay": replay.height_replay, "height_stored": replay.stored["height"]}
+    t = np.array(timings)
+    arr, coverage = t[:, :2] * 1000.0, t[:, 2]
+    stats = {"frames": len(arr), "decor_built": view.scene.built, "replay_ok": bool(replay.ok),
+             "height_replay": replay.height_replay, "height_stored": replay.stored["height"]}
+    classes = (("toutes", np.ones(len(arr), bool)), ("canopee", coverage >= CANOPY_COVERAGE),
+               ("grande_canopee", coverage >= BIG_CANOPY_COVERAGE))
+    for key, mask in classes:
+        stats[key] = frame_stats(arr[mask])
+        stats[key]["coverage_max"] = float(coverage[mask].max()) if mask.any() else 0.0
     with open(os.path.join(out_dir, f"temps_{tag}.json"), "w") as fh:
         json.dump(stats, fh, indent=1)
-    log(f"temps par frame (conteneur, sans affichage, {stats['frames']} frames) : décor {stats['decor_ms_mean']:.2f} ms "
-        f"(max {stats['decor_ms_max']:.2f}), lézard {stats['lizard_ms_mean']:.2f} ms (max {stats['lizard_ms_max']:.2f}), "
-        f"total {stats['total_ms_mean']:.2f} ms (p95 {stats['total_ms_p95']:.2f}, max {stats['total_ms_max']:.2f}) "
-        f"pour 16.7 ms à 60 fps")
+    for key, label in (("toutes", "toutes les frames"),
+                       ("canopee", f"frames avec une canopée à l'écran (premier plan ≥ {CANOPY_COVERAGE:.0%} de l'image)"),
+                       ("grande_canopee", f"frames où le premier plan couvre ≥ {BIG_CANOPY_COVERAGE:.0%} de l'image")):
+        st = stats[key]
+        if st["frames"]:
+            log(f"temps par frame, {label} ({st['frames']} frames ; conteneur, sans affichage) : décor {st['decor_ms_mean']:.2f} ms "
+                f"(max {st['decor_ms_max']:.2f}), lézard {st['lizard_ms_mean']:.2f} ms (max {st['lizard_ms_max']:.2f}), total "
+                f"{st['total_ms_mean']:.2f} ms (p95 {st['total_ms_p95']:.2f}, max {st['total_ms_max']:.2f}), "
+                f"> 16.7 ms : {st['over_budget'] * 100:.1f} %")
     pygame.quit()
     return paths, stats

@@ -327,17 +327,18 @@ COCONUT_COLORS = ("#A87848", "#542C2C")    # [DÉDUIT] image 03 : noix éclairé
 FERN_COLORS = ("#38481C", "#546020", "#98A030")   # [DÉDUIT] image 03 : feuilles d'agave sombre, moyenne, éclairée
 CANOPY_COLORS = ("#A4B41C", "#C4D41C", "#6C7C14", "#4C5424")   # [VU] base, facettes éclairées, dessous, ombre
 VINE_COLOR = "#6C7C14"                     # [VU] lianes (rectangles fins)
-# [CHOIX] nombres d'éléments procéduraux : (arbres, palmiers) très lointains, (arbres, palmiers) lointains
-FAR_COUNTS = (9, 8)
-DISTANT_COUNTS = (5, 5)
+# [CHOIX] nombres d'éléments procéduraux : (arbres, palmiers) très lointains, (arbres, palmiers) lointains ;
+# images 06 et 09 : beaucoup de palmiers en silhouette, peu de gros arbres
+FAR_COUNTS = (6, 16)
+DISTANT_COUNTS = (3, 12)
 # [DÉDUIT] images 03, 05, 06, 09 : gros arbres kaki (x m, hauteur m, largeur de canopée m)
 DISTANT_TREES = ((-11.5, 17.5, 10.0), (26.0, 31.0, 16.0), (-25.0, 24.0, 11.0), (9.0, 13.0, 8.0))
 SIDE_TREE = (-28.6, 4.2, 9.0)             # [DÉDUIT] image 03 : arbre latéral (x m, largeur m, écart entre canopées m)
 SIDE_CANOPY_SIZE = ((11.0, 20.0), (4.0, 6.5))   # [DÉDUIT] images 03 et 09 : largeur, hauteur des canopées de l'arbre latéral (m)
 MID_PALMS = ((-13.0, 9.5, -6.0), (-7.8, 8.3, 9.0), (16.5, 8.6, 22.0), (-19.5, 7.0, -12.0))   # [DÉDUIT] image 03 : (x, hauteur, inclinaison °)
-MID_FERNS = ((9.5, 3.8), (15.2, 2.8), (28.0, 4.6), (-22.5, 3.2), (4.0, 2.4))    # [DÉDUIT] image 03 : (x, hauteur)
+MID_FERNS = ((9.5, 4.9), (15.2, 3.6), (28.0, 5.9), (-22.5, 4.2), (4.0, 3.1))    # [DÉDUIT] images 03 et 06 : (x, hauteur)
 PLANE_PALMS = ((24.6, 16.2, 3.0, 15.5),)  # [DÉDUIT] image 03 : grand palmier au sol (x, hauteur, inclinaison °, envergure m)
-PLANE_FERNS = ((-17.2, 7.6, 10.5), (-10.5, 3.2, 4.0))   # [DÉDUIT] image 03 : agaves au sol (x, hauteur, largeur)
+PLANE_FERNS = ((-17.2, 8.6, 11.5), (-10.5, 3.8, 4.8), (28.8, 6.2, 7.2))   # [DÉDUIT] images 03 et 06 : agaves au sol (x, hauteur, largeur)
 # [DÉDUIT] images 06, 08, 09 : canopée du premier plan portée par chaque branche de BRANCHES
 # (centre à cette distance de l'axe du tronc, du côté de la branche ; largeur ; hauteur, en m).
 # Image 09 : x 570–1110 px, soit de −3.5 à +23.5 m : elle couvre la moitié droite du tronc.
@@ -345,12 +346,16 @@ FG_CANOPIES = ((10.0, 27.0, 12.0), (8.0, 22.0, 10.0), (10.0, 25.0, 11.0))
 FG_CANOPY_LIFT = 2.6                       # [DÉDUIT] image 09 : bas de la canopée 2.6 m au-dessus du pied du poteau
 
 # Repères de hauteur (§5.6) : ligne blanche fine sur la largeur du tronc, libellé à gauche.
-# [DÉDUIT] images 06, 08, 09 : un repère n'apparaît qu'une fois atteint par le lézard (jamais au-dessus de lui)
 MARKER_STEP = 10.0            # [VU] §5.6 — en hauteur HUD (depuis le départ) [DÉDUIT] image 03 sans ligne à 10 m du sol
 MARKER_COLOR = "#FCFCFC"      # [VU]
 MARKER_FONT_PX = 46           # [DÉDUIT] image 06 : chiffres de 34 px de haut
 MARKER_LABEL_GAP_PX = 24      # [DÉDUIT] image 06 : libellé aligné à droite, 24 px à gauche du tronc
 MARKER_LINE_PX = 1            # [DÉDUIT] image 06
+# [DÉDUIT] images 06, 08, 09 : un repère n'est visible qu'au franchissement (image 09 : plus de ligne 20 m
+# 3.1 m ≈ 0.9 s après). Affiché au premier franchissement vers le haut de la hauteur HUD (point de
+# référence), jamais redéclenché, puis estompé.
+MARKER_SHOW_S = 0.5           # [CHOIX] durée à pleine opacité (s)
+MARKER_FADE_S = 0.3           # [CHOIX] durée du fondu (s)
 
 # Cadrage de l'image 01 (t = 8:02), plus serré : pour la comparaison côte à côte uniquement.
 COMPARE_T8M02_FRAMING = (28.4, 570)   # [DÉDUIT] image 01 : tronc de 349 px (px/m), haut de l'herbe à 570 px
@@ -383,6 +388,5 @@ LIZARD_HEAD = (0.85, 1.55)    # [DÉDUIT] image 02 : demi-largeur (× celle des 
 LIZARD_EYE = (0.55, 0.11, 0.14, 0.97)
 # [DÉDUIT] 5 rayons à −100, −50, 0, 50, 100° de l'axe de l'avant-bras (image 02) ; longueur jusqu'au centre
 # du disque, épaisseur, diamètre du disque et de la paume, en × largeur de l'avant-bras, mesurés sur la
-# scène (image 01 : rayons ≈ 2×, disques ≈ 1.3×) et un peu réduits (gros plan 02 : 0.9× et 0.65× ;
-# §5.4 : disque ≈ 30 %)
-LIZARD_FINGERS = ((-100.0, -50.0, 0.0, 50.0, 100.0), 1.6, 0.4, 1.15, 0.9)
+# scène (image 01 : rayons ≈ 2×) ; disques 1.15 → 0.8 (−30 %, vers le §5.4 : disque ≈ 30 % ; gros plan 02 : 0.65×)
+LIZARD_FINGERS = ((-100.0, -50.0, 0.0, 50.0, 100.0), 1.6, 0.4, 0.8, 0.9)
