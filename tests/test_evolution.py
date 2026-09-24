@@ -99,6 +99,14 @@ def test_run_is_deterministic_resumable_and_replayable(tmp_path):
     assert sum(int(rows[0][col]) for col in ev.HIST_COLUMNS) == 40
     assert len(ev.HIST_COLUMNS) == 50
 
+    # lignée : root (ancêtre de gén. 0) = remontée des parents ; ancêtres distincts, part au sol
+    root = ev.load_generation(c, 3)[2]["root"]
+    np.testing.assert_array_equal(root, ev.roots_from_parents(c, 3))
+    assert int(rows[0]["ancestors"]) == 40 and int(rows[3]["ancestors"]) == np.unique(root).size <= 20
+    pop3, results3, _, _ = ev.load_generation(c, 3)
+    assert float(rows[3]["fallen_frac"]) == pytest.approx(results3["fallen"].mean(), abs=1e-6)
+    assert float(rows[3]["period_std"]) == pytest.approx(pop3.period.std(), rel=1e-5)
+
     # une créature relue et rejouée avec le moteur scalaire retrouve son score
     pop, results, _, _ = ev.load_generation(c, 3)
     for i in (0, 25):

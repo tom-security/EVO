@@ -6,7 +6,8 @@
   muté (§3.3) ; seuls les enfants sont évalués.
 - Graine par génération : default_rng([seed, g]) ; la reprise d'un run redonne donc
   exactement les mêmes générations.
-- runs/<seed>/gen_XXXX.npz (génomes, résultats, lignée, stats), stats.csv, config.json,
+- runs/<seed>/gen_XXXX.npz (génomes, résultats, lignée : parent, is_child, root = ancêtre de
+  génération 0, stats), stats.csv, config.json,
   audit.csv (audit d'énergie du champion toutes les AUDIT_EVERY générations).
 """
 import csv
@@ -145,8 +146,9 @@ def next_generation(pop, results, rng, n_survivors=None):
 HIST_EDGES = np.arange(config.HIST_RANGE[0], config.HIST_RANGE[1] + 1, 1.0)
 HIST_COLUMNS = [f"h{int(e):+d}" for e in HIST_EDGES[:-1]]
 STAT_COLUMNS = ["gen", "n", "height_mean", "height_median", "height_min", "height_max",
-                "period_mean", "muscle_mean", "energy_mean", "energy_median", "energy_max", "score_mean", "score_max",
-                "fallen", "best_index", "best_height", "best_period", "best_energy", "best_muscle",
+                "period_mean", "period_std", "muscle_mean", "energy_mean", "energy_median", "energy_max",
+                "score_mean", "score_max", "fallen", "fallen_frac", "ancestors",
+                "best_index", "best_height", "best_period", "best_energy", "best_muscle",
                 "eval_seconds"] + HIST_COLUMNS
 
 
@@ -156,17 +158,22 @@ def histogram(heights):
     return np.histogram(clipped, bins=HIST_EDGES)[0]
 
 
-def generation_stats(gen, pop, results, eval_seconds=0.0):
+def generation_stats(gen, pop, results, eval_seconds=0.0, root=None):
+    """Une ligne de stats.csv. `root` : ancêtre de génération 0 de chaque créature (lignée)."""
     h = results["height"]
     best = int(ranking(results["score"])[0])
-    row = {"gen": gen, "n": len(pop),
+    n = len(pop)
+    fallen = int(results["fallen"].sum())
+    row = {"gen": gen, "n": n,
            "height_mean": float(h.mean()), "height_median": float(np.median(h)),
            "height_min": float(h.min()), "height_max": float(h.max()),
-           "period_mean": float(pop.period.mean()), "muscle_mean": float(results["muscle_mass"].mean()),
+           "period_mean": float(pop.period.mean()), "period_std": float(pop.period.std()),
+           "muscle_mean": float(results["muscle_mass"].mean()),
            "energy_mean": float(results["energy"].mean()), "energy_median": float(np.median(results["energy"])),
            "energy_max": float(results["energy"].max()),
            "score_mean": float(results["score"].mean()), "score_max": float(results["score"][best]),
-           "fallen": int(results["fallen"].sum()), "best_index": best,
+           "fallen": fallen, "fallen_frac": fallen / n,
+           "ancestors": n if root is None else int(np.unique(root).size), "best_index": best,
            "best_height": float(h[best]), "best_period": float(pop.period[best]),
            "best_energy": float(results["energy"][best]), "best_muscle": float(results["muscle_mass"][best]),
            "eval_seconds": float(eval_seconds)}
@@ -197,9 +204,19 @@ def load_generation(run_dir, gen):
     with np.load(gen_path(run_dir, gen)) as data:
         pop = Population(*(data[f].copy() for f in Population.FIELDS))
         results = {k: data[k].copy() for k in RESULT_KEYS}
-        lineage = {k: data[k].copy() for k in ("parent", "is_child")}
+        lineage = {k: data[k].copy() for k in ("parent", "is_child", "root") if k in data.files}
         stats = json.loads(str(data["stats"]))
     return pop, results, lineage, stats
+
+
+def roots_from_parents(run_dir, gen):
+    """Ancêtre de génération 0 de chaque créature, reconstruit en remontant les `parent`."""
+    root = None
+    for g in range(gen + 1):
+        with np.load(gen_path(run_dir, g)) as data:
+            parent = data["parent"].copy()
+        root = np.arange(len(parent)) if g == 0 else root[parent]
+    return root
 
 
 def saved_generations(run_dir):
@@ -324,7 +341,8 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
         for key, old, new in apply_config(saved, strict=False):
             log(f"  reprise : {key} = {new!r} (config du run ; config.py a {old!r})")
         start = done[-1]
-        pop, results, _, _ = load_generation(run_dir, start)
+        pop, results, lineage, _ = load_generation(run_dir, start)
+        root = lineage["root"] if "root" in lineage else roots_from_parents(run_dir, start)
         rows = read_stats(run_dir)[:start + 1]  # réécrites à l'identique (même format %.6g)
         log(f"reprise du run {run_dir} à la génération {start}")
     else:
@@ -337,8 +355,9 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
         t0 = time.perf_counter()
         pop = random_population(np.random.default_rng([seed, 0]), n)
         results = evaluate(pop)
-        lineage = {"parent": np.full(n, -1), "is_child": np.zeros(n, bool)}
-        stats = generation_stats(0, pop, results, time.perf_counter() - t0)
+        root = np.arange(n)  # chaque créature de la génération 0 est sa propre racine
+        lineage = {"parent": np.full(n, -1), "is_child": np.zeros(n, bool), "root": root}
+        stats = generation_stats(0, pop, results, time.perf_counter() - t0, root)
         save_generation(run_dir, 0, pop, results, lineage, stats)
         rows = [stats]
         _write_stats(run_dir, rows)
@@ -350,7 +369,9 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
     for gen in range(start + 1, generations + 1):
         t0 = time.perf_counter()
         pop, results, lineage = next_generation(pop, results, np.random.default_rng([seed, gen]))
-        stats = generation_stats(gen, pop, results, time.perf_counter() - t0)
+        root = root[lineage["parent"]]
+        lineage["root"] = root
+        stats = generation_stats(gen, pop, results, time.perf_counter() - t0, root)
         save_generation(run_dir, gen, pop, results, lineage, stats)
         rows.append(stats)
         _write_stats(run_dir, rows)
@@ -363,4 +384,5 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
 def _log_row(s, log):
     log(f"gén. {s['gen']:4d} | hauteur moy {s['height_mean']:+6.2f} max {s['height_max']:+6.2f} | "
         f"période {s['period_mean']:.2f} s | muscle {s['muscle_mean']:5.2f} | énergie {s['energy_mean']:5.1f} | "
-        f"au sol {s['fallen']:4d} | meilleure {s['best_height']:+6.2f} m ({s['eval_seconds']:.1f} s)")
+        f"au sol {s['fallen']:4d} | ancêtres {s['ancestors']:4d} | meilleure {s['best_height']:+6.2f} m "
+        f"({s['eval_seconds']:.1f} s)")
