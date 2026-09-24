@@ -13,6 +13,7 @@
     python main.py replay --seed 2 --gen 200 --rank 1   # rejoue une créature dans la jungle (§5, §8)
     python main.py replay --seed 2 --gen 200 --rank 1 --export out/phase4
     python main.py replay --seed 2 --gen 200 --rank 1 --fps-report   # vérifie les 60 fps en fenêtre
+    python main.py replay --seed 2 --gen 0 --creature 1 --title-card "Le commencement" --speed 4
 """
 import argparse
 
@@ -64,6 +65,10 @@ def main(argv=None):
     replay.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
     replay.add_argument("--gen", type=int, default=None, help="génération (défaut : la dernière sauvegardée)")
     replay.add_argument("--rank", type=int, default=1, help="rang au classement (1 = meilleure)")
+    replay.add_argument("--creature", type=int, default=None, metavar="I",
+                        help="rejoue la créature n°I de la génération (1 = première, HUD « Créature: I ») au lieu d'un rang")
+    replay.add_argument("--speed", type=float, default=1.0, help="vitesse du replay (> 1 : accéléré, icône ⏩)")
+    replay.add_argument("--title-card", default=None, metavar="TEXTE", help="sous-titre du carton de génération")
     replay.add_argument("--export", metavar="DIR", help="sans écran : PNG à t = 0, 2, …, 10 s, planche, comparaisons")
     replay.add_argument("--no-cache", action="store_true", help="régénère le décor au lieu de relire le cache")
     replay.add_argument("--fps-report", action="store_true",
@@ -110,13 +115,15 @@ def main(argv=None):
         import sys
         from evo import evolution, replay as rp
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
-        r = rp.Replay(run_dir, gen=args.gen, rank=args.rank)
+        index = None if args.creature is None else args.creature - 1
+        r = rp.Replay(run_dir, gen=args.gen, rank=args.rank, index=index)
         if args.export:
-            paths, _ = rp.export(r, args.export, use_cache=not args.no_cache)
+            paths, _ = rp.export(r, args.export, use_cache=not args.no_cache, subtitle=args.title_card)
             for path in paths:
                 print(path)
         else:
-            rp.run_interactive(r, use_cache=not args.no_cache, fps_report=args.fps_report)
+            rp.run_interactive(r, use_cache=not args.no_cache, fps_report=args.fps_report, speed=args.speed,
+                               subtitle=args.title_card)
         if not r.ok:
             print("ALERTE : la hauteur rejouée diffère de la hauteur stockée")
             sys.exit(1)

@@ -196,8 +196,8 @@ class Scene:
 
     def _prepare_markers(self):
         f = self.framing
-        pygame.font.init()
-        font = pygame.font.SysFont(config.FONT_SANS, int(round(config.MARKER_FONT_PX * f.scale / config.SCENE_SCALE)))
+        from evo import fonts
+        font = fonts.load(config.HUD_FONT, int(round(config.MARKER_FONT_PX * f.scale / config.SCENE_SCALE)))
         self._marker_color = _rgb(config.MARKER_COLOR)
         self._marker_labels = {hud: font.render(f"{hud:g} m", True, self._marker_color) for hud in self.markers}
         self._marker_left = int(round(f.x_px(config.TRUNK_X - config.TRUNK_WIDTH / 2)))

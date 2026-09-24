@@ -251,7 +251,13 @@ MASS_SCHEMA_COLORS = [
     ("#CE52C3", "#DB72D1"),   # magenta
 ]
 
-# [≈] §5.3 — polices : on prend la première disponible, sinon la police par défaut de pygame
+# §5.3 — polices libres (OFL) versionnées dans assets/fonts/ (voir assets/fonts/README.md) ; repli sur
+# FONT_SANS puis sur la police par défaut de pygame si un fichier manque (evo/fonts.py).
+FONT_FILES = {
+    "questrial": "assets/fonts/Questrial-Regular.ttf",       # HUD, cartons, repères (≈ Century Gothic)
+    "nunito_semibold": "assets/fonts/NunitoSans-SemiBold.ttf",  # titres des slides (≈ Avenir Next Demi Bold)
+}
+# [≈] §5.3 — polices du système (graphes, schémas, repli) : la première disponible, sinon celle de pygame
 FONT_SANS = ["avenirnext", "nunitosans", "montserrat", "dejavusans", "freesans"]
 FONT_MONO = ["dejavusansmono", "liberationmono", "freemono"]
 
@@ -348,7 +354,7 @@ FG_CANOPY_LIFT = 2.6                       # [DÉDUIT] image 09 : bas de la cano
 # Repères de hauteur (§5.6) : ligne blanche fine sur la largeur du tronc, libellé à gauche.
 MARKER_STEP = 10.0            # [VU] §5.6 — en hauteur HUD (depuis le départ) [DÉDUIT] image 03 sans ligne à 10 m du sol
 MARKER_COLOR = "#FCFCFC"      # [VU]
-MARKER_FONT_PX = 46           # [DÉDUIT] image 06 : chiffres de 34 px de haut
+MARKER_FONT_PX = 50           # [DÉDUIT] image 06 : « 10 m » de 34 × 98 px d'encre → Questrial 50 (34 × 100)
 MARKER_LABEL_GAP_PX = 24      # [DÉDUIT] image 06 : libellé aligné à droite, 24 px à gauche du tronc
 MARKER_LINE_PX = 1            # [DÉDUIT] image 06
 # [DÉDUIT] images 06, 08, 09 : un repère n'est visible qu'au franchissement (image 09 : plus de ligne 20 m
@@ -390,3 +396,37 @@ LIZARD_EYE = (0.55, 0.11, 0.14, 0.97)
 # du disque, épaisseur, diamètre du disque et de la paume, en × largeur de l'avant-bras, mesurés sur la
 # scène (image 01 : rayons ≈ 2×) ; disques 1.15 → 0.8 (−30 %, vers le §5.4 : disque ≈ 30 % ; gros plan 02 : 0.65×)
 LIZARD_FINGERS = ((-100.0, -50.0, 0.0, 50.0, 100.0), 1.6, 0.4, 0.8, 0.9)
+
+# ---------------------------------------------------------------------------
+# HUD de simulation (§6, phase 5a) — positions en px d'une fenêtre 1280×720
+# ---------------------------------------------------------------------------
+# Tailles de police Questrial calées sur la hauteur et la largeur d'encre mesurées (images 03, 09, 39).
+HUD_FONT = "questrial"
+HUD_BADGE_FONT_PX = 22        # [DÉDUIT] images 03/09 : « 1.3 s » 15 × 41 px d'encre (Questrial 22 : 14 × 40)
+HUD_TEXT_FONT_PX = 28         # [DÉDUIT] image 03 : « Génération: 0 » 19 × 173 px (Questrial 28 : 19 × 166)
+HUD_LABEL_FONT_PX = 29        # [DÉDUIT] image 09 : « 23.1 m » 20 × 82 px (Questrial 29 : 20 × 82)
+HUD_BG = ("#2C242C", 217)     # [VU] §5.2 — badges : fond à ~85 % d'opacité
+HUD_TEXT = "#FCFCFC"          # [VU]
+# [DÉDUIT] images 03, 05, 09 : badges empilés x 14–107, hauteur 34, pas de 40 (y 14, 54, 94), coins ≈ 5 px,
+# centres des icônes à x 30.5 (horloge 17–44), 31.5 (éclair 23–40), 34.5 (muscle 18–51), texte à x 54
+HUD_BADGES = {"x": 14, "y": 14, "pitch": 40, "w": 94, "h": 34, "radius": 5, "icon_x": (30.5, 31.5, 34.5), "text_x": 54}
+HUD_ICON_COLORS = {"horloge": "#54E4DC", "energie": "#F4D41C", "muscle": "#FC5464"}   # [VU] §5.2
+# [DÉDUIT] images 03 et 09 : 3 lignes alignées à droite sur x 1264–1265, haut de l'encre à y 20, 60 et 101
+HUD_TEXT_RIGHT = 1265
+HUD_TEXT_TOPS = (20, 60, 101)
+# [DÉDUIT] images 03, 05, 09 : étiquette de hauteur x 406–540 (h 40, coins ≈ 6), pointe de 540 à 553
+# (base 26 px), soit 36 px sur le bord gauche du tronc ; centrée 4 px au-dessus du point de référence ;
+# chevrons de 18 × 34 px à x 418, valeur à x 448
+HUD_LABEL = {"w": 134, "h": 40, "radius": 6, "tip": 13, "tip_base": 26, "tip_on_trunk": 36, "dy": -4,
+             "icon_x": 12, "text_x": 42}
+HUD_LABEL_ICON = "#80D989"    # [DÉDUIT] images 03/05/09 : chevrons verts (médiane #80D989)
+# Carton de génération (§6). [DÉDUIT] image 39 : la scène est délavée vers le clair (et non assombrie
+# comme l'écrit le §6) : tronc #8F4E2E → #C4AEA9, ciel #CCCD8F → #E3E1C4, soit ≈ #F0ECE0 à ~60 %.
+TITLE_CARD_VEIL = ("#F0ECE0", 150)
+TITLE_CARD_FONT_PX = (104, 32)    # [DÉDUIT] image 39 : « Génération 0 » 73 × 587 px, sous-titre 21 × 286 px
+TITLE_CARD_TOPS = (105, 202)      # [DÉDUIT] image 39 : haut de l'encre du titre et du sous-titre (centrés en x)
+TITLE_CARD_HOLD_S = 1.5           # [CHOIX] durée à pleine opacité en début de replay (image 39 : entier à 0.5 s)
+TITLE_CARD_FADE_S = 0.5           # [CHOIX] fondu de sortie
+# Replay accéléré (§6) : icône ⏩ (deux triangles blancs) en bas à gauche
+FAST_SPEED = 4                    # [CHOIX] vitesse de la touche F
+FAST_ICON = (20, 686, 34, 20)     # [CHOIX] x, y, largeur, hauteur de l'icône (aucune image de référence)
