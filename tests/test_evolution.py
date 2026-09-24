@@ -113,4 +113,4 @@ def test_audit_of_champion_writes_report(tmp_path):
         rows = list(csv.DictReader(f))
     assert len(rows) == 1 and rows[0]["gen"] == "0"
     assert float(rows[0]["height"]) == pytest.approx(float(rows[0]["height_replay"]), abs=1e-6)
-    assert float(rows[0]["created_J"]) < config.AUDIT_MAX_CREATED * float(rows[0]["fall_energy_J"])
+    assert float(rows[0]["created_height_m"]) < config.AUDIT_MAX_CREATED_HEIGHT

@@ -218,12 +218,17 @@ def config_snapshot():
     return snap
 
 
-def apply_config(values):
-    """Applique des valeurs de config (instantané d'un run ou --set) ; renvoie les clés modifiées."""
+def apply_config(values, strict=True):
+    """Applique des valeurs de config (instantané d'un run ou --set) ; renvoie les clés modifiées.
+
+    strict=False (reprise d'un run) : un paramètre qui n'existe plus dans config.py est ignoré.
+    """
     changed = []
     for key, value in values.items():
         if not hasattr(config, key):
-            raise KeyError(f"paramètre inconnu dans config.py : {key}")
+            if strict:
+                raise KeyError(f"paramètre inconnu dans config.py : {key}")
+            continue
         current = getattr(config, key)
         if isinstance(current, tuple) and isinstance(value, list):
             value = tuple(value)
@@ -249,7 +254,7 @@ def _write_stats(run_dir, rows):
 # ---------------------------------------------------------------------------
 # Audit du champion
 # ---------------------------------------------------------------------------
-AUDIT_COLUMNS = ["gen", "index", "height", "height_replay", "created_J", "fall_energy_J", "max_speed",
+AUDIT_COLUMNS = ["gen", "index", "height", "height_replay", "created_J", "created_height_m", "max_speed",
                  "max_torso_speed", "max_length_error", "max_tail_error", "max_height", "alerts"]
 
 
@@ -258,12 +263,13 @@ def audit_champion(run_dir, gen, pop, results, log=print):
 
     best = int(ranking(results["score"])[0])
     c, ledger = audit.audit(pop.genome(best), duration=config.SIM_DURATION)
-    fall_energy = float(c.world.mass.sum() * config.G * config.START_HEIGHT)
+    weight = float(c.world.mass.sum() * config.G)
+    created_height = ledger["hors_muscles+"] / weight  # équivalent hauteur de l'énergie créée
     alerts = []
     if abs(c.height() - results["height"][best]) > 1e-9:
         alerts.append("hauteur rejouée ≠ hauteur stockée")
-    if ledger["hors_muscles+"] > config.AUDIT_MAX_CREATED * fall_energy:
-        alerts.append(f"{ledger['hors_muscles+']:.3f} J créés hors muscles")
+    if created_height > config.AUDIT_MAX_CREATED_HEIGHT:
+        alerts.append(f"{ledger['hors_muscles+']:.3f} J créés hors muscles (≈ {created_height * 100:.1f} cm)")
     if ledger["max_speed"] > config.AUDIT_MAX_SPEED:
         alerts.append(f"vitesse {ledger['max_speed']:.1f} m/s")
     if ledger["max_torso_speed"] > config.AUDIT_MAX_TORSO_SPEED:
@@ -276,7 +282,7 @@ def audit_champion(run_dir, gen, pop, results, log=print):
         alerts.append(f"erreur de longueur de la queue {ledger['max_tail_error'] * 100:.2f} %")
     row = {"gen": gen, "index": best, "height": f"{results['height'][best]:.6f}",
            "height_replay": f"{c.height():.6f}", "created_J": f"{ledger['hors_muscles+']:.6f}",
-           "fall_energy_J": f"{fall_energy:.1f}", "max_speed": f"{ledger['max_speed']:.2f}",
+           "created_height_m": f"{created_height:.5f}", "max_speed": f"{ledger['max_speed']:.2f}",
            "max_torso_speed": f"{ledger['max_torso_speed']:.2f}",
            "max_length_error": f"{ledger['max_length_error']:.5f}",
            "max_tail_error": f"{ledger['max_tail_error']:.5f}", "max_height": f"{ledger['max_height']:.3f}",
@@ -289,7 +295,8 @@ def audit_champion(run_dir, gen, pop, results, log=print):
             writer.writeheader()
         writer.writerow(row)
     status = "ALERTE : " + " ; ".join(alerts) if alerts else "ok"
-    log(f"    audit gén. {gen} (champion n°{best}) : créé hors muscles {ledger['hors_muscles+']:.4f} J, "
+    log(f"    audit gén. {gen} (champion n°{best}) : créé hors muscles {ledger['hors_muscles+']:.4f} J "
+        f"(≈ {created_height * 1000:.1f} mm), "
         f"vitesse max {ledger['max_speed']:.1f} m/s, torse {ledger['max_torso_speed']:.1f} m/s → {status}")
     return row
 
@@ -312,7 +319,9 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
             clash = {k: v for k, v in overrides.items() if saved.get(k) != (list(v) if isinstance(v, tuple) else v)}
             if clash:
                 raise ValueError(f"reprise : --set incompatible avec la config du run {sorted(clash)}")
-        for key, old, new in apply_config(saved):
+        for key in sorted(set(saved) - set(config_snapshot())):
+            log(f"  reprise : {key} n'existe plus dans config.py, ignoré")
+        for key, old, new in apply_config(saved, strict=False):
             log(f"  reprise : {key} = {new!r} (config du run ; config.py a {old!r})")
         start = done[-1]
         pop, results, _, _ = load_generation(run_dir, start)

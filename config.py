@@ -176,7 +176,9 @@ HIST_RANGE = (-10, 40)        # [VU] §7.2 — histogramme 1 m de −10 à 40 m
 
 # Audit du champion toutes les AUDIT_EVERY générations (evo/audit.py).
 AUDIT_EVERY = 25              # [CHOIX]
-AUDIT_MAX_CREATED = 1e-4      # [CHOIX] énergie créée hors muscles tolérée, en fraction de l'énergie de chute
+# [CHOIX] énergie créée hors muscles tolérée, en équivalent hauteur : énergie créée / poids (m·g).
+# (Avant : 1e-4 × énergie de chute ≈ 0.18 J, soit 0.7 mm ; alerte à 0.77 J = 3 mm, sans intérêt pour grimper.)
+AUDIT_MAX_CREATED_HEIGHT = 0.05
 AUDIT_MAX_SPEED = 80.0        # [CHOIX] m/s — point du corps (bout d'un membre de 3 m qui tourne vite)
 AUDIT_MAX_TORSO_SPEED = 20.0  # [CHOIX] m/s — torse (chute libre de 9 m : 13 m/s)
 AUDIT_MAX_HEIGHT = 50.0       # [CHOIX] m — hauteur plausible en 10 s (champion de la vidéo : 36 m)
