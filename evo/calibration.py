@@ -19,6 +19,7 @@ STABILISATIONS = [
     ("BETA seul", 0.2, 0),
     ("projection seule", 0.0, 8),
     ("les deux", 0.2, 8),
+    ("projection 12", 0.0, 12),
 ]
 
 

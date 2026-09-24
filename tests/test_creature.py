@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import config
+from evo import audit
 from evo import creature as cr
 from evo import physics
 from evo import skeleton as sk
@@ -49,9 +50,13 @@ def test_limp_creature_falls_and_lies_on_ground():
     assert c.fallen
     assert bench.min_y >= config.GROUND_Y - 1e-9
     assert -config.START_HEIGHT < c.height() < -config.START_HEIGHT + 2.0
-    # au repos : énergie cinétique < 0.1 % de l'énergie de la chute
+    # Le torse est au repos sur le sol (frottement fort : il ne glisse pas). Les bras, sans
+    # muscles et sans frottement aux articulations, peuvent continuer à osciller comme des
+    # pendules : l'énergie cinétique restante est bornée, pas nulle.
+    torso_speed = np.linalg.norm(c.world.vel[[sk.NECK, sk.PELVIS]], axis=1).max()
+    assert torso_speed < 0.1
     fall_energy = c.world.mass.sum() * config.G * config.START_HEIGHT
-    assert c.world.kinetic_energy() < 1e-3 * fall_energy
+    assert c.world.kinetic_energy() < 0.02 * fall_energy
     assert bench.max_body < 0.01
     # La queue, droite et légère, touche le sol la première à ~7 m/s : pic de compression
     # passager (~5 % pendant ~30 ms avec SUBSTEPS = 8, moitié moins avec 16), puis < 1 %.
@@ -218,3 +223,34 @@ def test_hand_written_diagonal_gait_climbs():
     assert heights[-1] > 3.0                                 # mesuré : +3.75 m en 10 s
     assert all(b > a for a, b in zip(heights, heights[1:]))  # gagne de la hauteur à chaque cycle
     assert max_err < 0.01
+
+
+# Audit d'énergie (avant la phase 3) --------------------------------------------------
+def _random_climber():
+    """La créature aléatoire n°35 de la graine 123 : elle grimpe de ~9 m dès la génération 0."""
+    rng = np.random.default_rng(123)
+    return [cr.random_genome(rng) for _ in range(36)][35]
+
+
+def test_energy_audit_replays_the_engine_exactly():
+    genome = _random_climber()
+    audited, _ = audit.audit(genome)
+    reference = cr.Creature(genome).simulate(10.0)
+    np.testing.assert_array_equal(audited.world.pos, reference.world.pos)
+    assert audited.energy == pytest.approx(reference.energy, rel=1e-12)
+
+
+@pytest.mark.parametrize("name", ["grimpeuse aléatoire", "marche écrite à la main", "inerte"])
+def test_no_mechanism_but_muscles_creates_energy(name):
+    genome = {"grimpeuse aléatoire": _random_climber,
+              "marche écrite à la main": cr.diagonal_gait_genome,
+              "inerte": cr.limp_genome}[name]()
+    c, ledger = audit.audit(genome)
+    fall_energy = c.world.mass.sum() * config.G * config.START_HEIGHT
+    # Énergie apparue dans un sous-pas au-delà de l'apport des muscles. Seul reste : la
+    # projection qui décomprime la queue à l'impact de la créature inerte (≈ 0.14 J sur 1 900 J).
+    assert ledger["hors_muscles+"] < 1e-4 * fall_energy
+    assert ledger["hold+"] == 0.0 and ledger["hold2+"] == 0.0  # prendre / lâcher ne crée rien
+    assert ledger["liens_contacts+"] < 1e-9                    # liens + contacts sol : dissipatifs
+    # tout ce qui est gagné (hauteur, vitesse) a été payé par les muscles
+    assert ledger["E_fin"] - ledger["E_debut"] <= ledger["muscles"] + ledger["hors_muscles+"]

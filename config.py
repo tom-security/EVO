@@ -14,22 +14,30 @@ G = 9.81            # [CHOIX] §1.2 — gravité en m/s² (le HUD affiche des m�
 DT = 1.0 / 60.0     # [CHOIX] §1.4 — pas d'une frame
 SUBSTEPS = 8        # [CHOIX] §1.4 — sous-pas par frame (dt_physique = 1/480 s)
 N_ITER = 30         # [CHOIX] §1.4 — passes de Gauss-Seidel sur les vitesses des liens
-BETA = 0.2          # [CHOIX] §1.4 — stabilisation de Baumgarte (biais = BETA·C/h), haut de la plage 0.1–0.2
-N_POS_ITER = 8      # [CHOIX] §1.4 — passes de projection de position après intégration (la spec suggérait 1–3)
+BETA = 0.0          # [CHOIX] §1.4 — stabilisation de Baumgarte (biais = BETA·C/h) : désactivée, voir ci-dessous
+N_POS_ITER = 12     # [CHOIX] §1.4 — passes de projection de position après intégration (la spec suggérait 1–3)
 # Choix de la stabilisation (`python main.py debug-physics --calibrate`) :
 #   banc 8 = pendu par une main 10 s ; pendule simple = 2 points, 30°, 20 s.
 #   « injecté » = somme des hausses d'énergie d'un sous-pas au suivant (la gravité est conservative).
 #
-#   config             BETA proj  corps %  queue %  E-E0 J  injecté J  dissipé J  pendule simple ΔE/E
-#   BETA seul           0.2    0    0.685    9.760  -1.992     0.5320     -2.524        +0.16 %
-#   projection seule    0.0    8    0.183    0.804  -2.820     0.0000     -2.820        -3.74 %
-#   les deux (retenu)   0.2    8    0.135    0.502  -2.490     0.0000     -2.490        -3.74 %
+#   config               BETA proj  corps %  queue %  E-E0 J  injecté J  dissipé J  pendule simple ΔE/E
+#   BETA seul             0.2    0    0.685    9.760  -1.992     0.5320     -2.524        +0.16 %
+#   projection seule      0.0    8    0.183    0.804  -2.820     0.0000     -2.820        -3.74 %
+#   les deux (phase 1)    0.2    8    0.135    0.502  -2.490     0.0000     -2.490        -3.74 %
+#   projection (retenu)   0.0   12    0.129    0.590  -2.820     0.0000     -2.820        -3.74 %
 #
-#   BETA seul injecte de l'énergie (le biais ajoute une vitesse artificielle pour rattraper l'écart) et laisse
-#   la queue s'étirer de ~10 %. Les deux ensemble ne corrigent pas deux fois la même erreur :
-#   la projection a lieu en fin de sous-pas, donc au sous-pas suivant C ≈ 0 et Baumgarte ne
-#   traite que ce que les 8 passes n'ont pas résorbé. Aucune énergie injectée, erreur la plus
-#   faible, et moins de dissipation que la projection seule.
+#   Phase 1 : « les deux » retenu, car sur ce banc la projection ramène C ≈ 0 avant le sous-pas
+#   suivant et Baumgarte ne corrige que le reste : aucune énergie injectée.
+#   Audit de la phase 3 (evo/audit.py) : ce n'est plus vrai quand l'écart dépasse ce que les
+#   passes de projection résorbent. Créature inerte lâchée à 9 m : la queue, compressée de 5 %
+#   à l'impact, reçoit du biais une vitesse qui écarte ses points, pendant que la projection
+#   corrige la même erreur → 7.7 J créés en 2 sous-pas (0.4 % de l'énergie de la chute).
+#   Énergie créée hors muscles (créature inerte / n°35 de la graine 123 / marche écrite à la main) :
+#     BETA 0.2 proj 8  : 7.689 / 0 / 0 J     BETA 0 proj 8  : 0.278 / 0 / 0 J
+#     BETA 0   proj 12 : 0.138 / 0 / 0 J     BETA 0 proj 16 : 0.051 / 0 / 0 J
+#   Retenu : projection seule, 12 passes. Corps plus précis qu'avant (0.129 % contre 0.135 %),
+#   queue < 1 %, et la seule création restante (0.14 J sur 1 800 J) vient de la projection qui
+#   décomprime la queue à l'impact. La marche écrite à la main est inchangée (+3.74 m en 10 s).
 #   Reste une dissipation d'ordre h, propre à la correction des vitesses (la vitesse
 #   tangente d'un sous-pas a une composante radiale au suivant, que Link() retire) :
 #   ~3.7 % de l'énergie d'oscillation en 20 s à 30° (1.9 % avec SUBSTEPS 16, 0.96 % avec 32).
@@ -82,7 +90,8 @@ REST_POSE_DEG = {
 # qui est impossible avec des pattes de 0.4 m. On garde les proportions du §2.5 et on met
 # tout le corps à l'échelle ×BODY_SCALE. BODY_SCALE = 1 redonne exactement les longueurs du §2.5.
 BODY_SCALE = 7.0          # [DÉDUIT] images 03–05 : lézard ≈ 7.7 m de la tête au bout de la queue
-START_HEIGHT = 8.0        # [DÉDUIT] §1.7 — hauteur du point de référence au-dessus du sol à t = 0
+START_HEIGHT = 9.0        # [DÉDUIT] §1.7 — hauteur du point de référence au-dessus du sol à t = 0 ;
+                          # à 9 m, une créature couchée affiche ≈ −8.2 m (vidéo : −7.8 à −9 m)
 TRUNK_X = 0.0             # [CHOIX] axe du tronc
 TRUNK_WIDTH = 12.3        # [DÉDUIT] image 05 : 248 px à 20.2 px/m
 FALL_CONTACT_EPS = 1e-3   # [CHOIX] m — un point du corps (hors queue) à moins de ça du sol le touche

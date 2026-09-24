@@ -247,7 +247,7 @@ def test_chosen_stabilisation_injects_no_energy():
     assert chosen["injected"] < 1e-6
     assert chosen["body"] < 0.01 and chosen["tail"] < 0.01
     # Contre-exemple documenté dans config.py : Baumgarte seul injecte de l'énergie.
-    beta_only = calibration.run_human_pendulum(config.BETA, 0)
+    beta_only = calibration.run_human_pendulum(0.2, 0)
     assert beta_only["injected"] > 0.1
 
 
