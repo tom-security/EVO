@@ -43,6 +43,9 @@ N_POS_ITER = 12     # [CHOIX] §1.4 — passes de projection de position après 
 #   ~3.7 % de l'énergie d'oscillation en 20 s à 30° (1.9 % avec SUBSTEPS 16, 0.96 % avec 32).
 DAMPING = 0.0       # [CHOIX] — amortissement global des vitesses (1/s), 0 = aucun
 USE_NUMBA = True    # [CHOIX] §4 — solveur de liens compilé ; False = référence Python pure
+# [CHOIX] §4 — créatures simulées ensemble par cœur dans l'évaluateur batché (evo/batch.py).
+# 1000 créatures × 10 s sur 4 cœurs : bloc 1 → 26.1 s, 8 → 11.6 s, 32 → 7.4 s, 64 → 4.7 s, 125 → 4.7 s.
+BATCH_BLOCK = 64
 
 # Sol (§1.7) : ligne horizontale y = GROUND_Y, collision inélastique + frottement de Coulomb.
 GROUND_Y = 0.0            # [DÉDUIT] §1.7

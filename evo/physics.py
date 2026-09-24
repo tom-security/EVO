@@ -105,13 +105,18 @@ class World:
         return float(np.max(np.abs(np.sum((self.vel[j] - self.vel[i]) * n, axis=1))))
 
     def joint_angles(self):
-        """Angle signé (rad) de rA = A−P vers rB = B−P, dans ]−π, π]."""
+        """Angle signé (rad) de rA = A−P vers rB = B−P, dans ]−π, π].
+
+        math.atan2 (bibliothèque C) plutôt que np.arctan2 : la version vectorisée de numpy
+        diffère d'un bit dans ~7 % des cas, et numba utilise la bibliothèque C. Avec la même
+        fonction, l'évaluateur batché (evo/batch.py) reproduit ce moteur au bit près.
+        """
         a, p, b = self.joints.T
         ra = self.pos[a] - self.pos[p]
         rb = self.pos[b] - self.pos[p]
         cross = ra[:, 0] * rb[:, 1] - ra[:, 1] * rb[:, 0]
         dot = np.sum(ra * rb, axis=1)
-        return np.arctan2(cross, dot)
+        return np.array([math.atan2(y, x) for y, x in zip(cross.tolist(), dot.tolist())])
 
     def joint_velocities(self):
         """Vitesse angulaire (rad/s) de l'angle signé de chaque articulation."""

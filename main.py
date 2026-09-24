@@ -6,8 +6,11 @@
     python main.py debug-physics --calibrate      # tableau stabilisation / pendule / vitesse
     python main.py debug-creature                 # créature, vue debug (§7.6, phase 2)
     python main.py debug-creature --export out/phase2
+    python main.py benchmark --pop 1000           # temps d'évaluation d'une génération (phase 3a)
 """
 import argparse
+
+import numpy as np
 
 
 def main(argv=None):
@@ -26,6 +29,10 @@ def main(argv=None):
     creature.add_argument("--seed", type=int, default=0, help="graine du mode aléatoire")
     creature.add_argument("--export", metavar="DIR", help="rendu sans écran : écrit les PNG de tous les modes dans DIR")
 
+    bench = sub.add_parser("benchmark", help="temps d'évaluation batchée d'une génération")
+    bench.add_argument("--pop", type=int, default=1000)
+    bench.add_argument("--seed", type=int, default=0)
+
     args = parser.parse_args(argv)
     if args.command == "debug-physics":
         if args.calibrate:
@@ -37,6 +44,14 @@ def main(argv=None):
             debug_physics.export(args.export)
         else:
             debug_physics.run_interactive(args.bench)
+    elif args.command == "benchmark":
+        from evo import batch
+        b = batch.benchmark(args.pop, args.seed)
+        r = b["result"]
+        print(f"{b['n']} créatures × 10 s sur {b['threads']} cœur(s) : {b['total_s']:.2f} s "
+              f"(préparation {b['pack_s']:.2f} s + simulation {b['simulate_s']:.2f} s)")
+        print(f"au sol : {int(r['fallen'].sum())}   hauteur : médiane {float(np.median(r['height'])):+.2f} m, "
+              f"max {float(r['height'].max()):+.2f} m")
     elif args.command == "debug-creature":
         from evo import debug_creature
         if args.export:
