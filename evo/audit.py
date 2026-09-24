@@ -17,6 +17,7 @@ import numpy as np
 import config
 from evo import creature as cr
 from evo import physics
+from evo import skeleton as sk
 
 STAGES = ("gravite", "muscles", "hold", "liens_contacts", "hold2", "mouvement", "projection_sol")
 
@@ -68,20 +69,33 @@ def audited_substep(c, h, ledger):
 
     if config.ENERGY_MODE == "power":
         raise NotImplementedError("audit écrit pour ENERGY_MODE = 'torque'")
-    c.energy += float(np.sum(np.abs(c.activation))) * h
+    c.effort += float(np.sum(np.abs(c.activation))) * h
     if not c.fallen and np.any(w.pos[c.body_points, 1] <= config.GROUND_Y + config.FALL_CONTACT_EPS):
         c.fallen = True
         if config.FALL_DISABLES_HOLD:
             w.held[:] = False
     c.t += h
+    # Plausibilité : vitesses max (points du corps, torse) et erreur de longueur max.
+    speeds = np.hypot(w.vel[c.body_points, 0], w.vel[c.body_points, 1])
+    ledger["max_speed"] = max(ledger["max_speed"], float(speeds.max()))
+    torso = 0.5 * (w.vel[sk.NECK] + w.vel[sk.PELVIS])
+    ledger["max_torso_speed"] = max(ledger["max_torso_speed"], float(np.hypot(*torso)))
+    err = np.abs(w.link_lengths() - w.rest) / w.rest
+    tail = c.tail_links
+    ledger["max_length_error"] = max(ledger["max_length_error"], float(err[~tail].max()))
+    ledger["max_tail_error"] = max(ledger["max_tail_error"], float(err[tail].max()))
+    ledger["max_height"] = max(ledger["max_height"], c.height())
 
 
 def audit(genome, duration=10.0, start_height=None):
     """Rejoue `genome` et renvoie (créature, bilan d'énergie en J)."""
     h = config.DT / config.SUBSTEPS
     c = cr.Creature(genome, start_height=start_height)
+    c.tail_links = np.array([name == "tail" for name in c.skel.link_names])
     ledger = {k: 0.0 for name in STAGES for k in (name, name + "+")}
-    ledger.update({"total": 0.0, "schema_gravite": 0.0, "hors_muscles+": 0.0})
+    ledger.update({"total": 0.0, "schema_gravite": 0.0, "hors_muscles+": 0.0, "max_speed": 0.0,
+                   "max_torso_speed": 0.0, "max_length_error": 0.0, "max_tail_error": 0.0,
+                   "max_height": -np.inf})
     e_start = _ke(c.world) + _pe(c.world)
     for _ in range(int(round(duration / h))):
         audited_substep(c, h, ledger)

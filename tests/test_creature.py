@@ -169,7 +169,8 @@ def test_energy_is_time_integral_of_muscle_force():
     for _ in range(int(1.0 / H)):
         c.substep(H)
         expected += np.abs(c.activation).sum() * H
-    assert c.energy == pytest.approx(expected, rel=1e-12)
+    assert c.effort == pytest.approx(expected, rel=1e-12)
+    assert c.energy == config.ENERGY_SCALE * c.effort
 
 
 # Génome (§2.5) -----------------------------------------------------------------------

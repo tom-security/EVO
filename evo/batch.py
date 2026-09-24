@@ -370,6 +370,7 @@ def evaluate(genomes, duration=10.0, packed=None):
         float(config.KP), float(config.KD), float(cr.torque_unit()), float(config.TRUNK_X),
         float(config.TRUNK_WIDTH / 2), float(config.FALL_CONTACT_EPS), bool(config.FALL_DISABLES_HOLD),
         energy, fallen)
+    energy = config.ENERGY_SCALE * energy  # même opération que Creature.energy
     height = 0.5 * (pos[:, sk.NECK, 1] + pos[:, sk.PELVIS, 1]) - arrays["ref_y0"]
     muscle_mass = arrays["muscle_mass"]
     return {

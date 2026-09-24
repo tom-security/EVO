@@ -121,10 +121,38 @@ TARGET_RANGE_DEG = 90.0       # [CHOIX] §2.5 — angles cibles dans ±90° auto
 HOLD_PROBABILITY = 0.5        # [CHOIX] §2.5 — probabilité qu'une patte tienne dans une pose aléatoire
 # [CHOIX] §3.2 — énergie : "torque" = Σ|force musculaire|·dt, "power" = Σ|force·vitesse angulaire|·dt
 ENERGY_MODE = "torque"
+# [CHOIX] §3.2 — unité de l'énergie du HUD : énergie = ENERGY_SCALE × Σ|force musculaire|·dt.
+# Pur changement d'unité (aucun effet sur la dynamique). Calibré en phase 3b, étape 1.
+ENERGY_SCALE = 1.0
 
 # Fitness (§3.2) : score = hauteur finale − FITNESS_ENERGY·énergie − FITNESS_MUSCLE·masse musculaire
 FITNESS_ENERGY = 0.02         # [CHOIX] §3.2 — à calibrer en phase 3
 FITNESS_MUSCLE = 0.05         # [CHOIX] §3.2 — à calibrer en phase 3
+
+# ---------------------------------------------------------------------------
+# Évolution (§3)
+# ---------------------------------------------------------------------------
+POP_SIZE = 1000               # [VU] §3.1 — 1000 créatures
+SURVIVOR_FRACTION = 0.5       # [VU] §3.1 — les 500 meilleures survivent et ont 1 enfant chacune
+SIM_DURATION = 10.0           # [VU] §3.1 — secondes simulées par créature
+GENERATIONS = 200             # [VU] §3.4
+P_MUT = 0.1                   # [CHOIX] §3.3 — probabilité qu'un gène continu soit muté
+MUT_SIGMA_FRAC = 0.05         # [CHOIX] §3.3 — σ = 5 % de la plage d'init du gène
+P_BIG = 0.05                  # [CHOIX] §3.3 — probabilité qu'une mutation soit « grosse »
+BIG_FACTOR = 10.0             # [CHOIX] §3.3 — amplitude ×10 pour une grosse mutation
+P_FLIP = 0.03                 # [CHOIX] §3.3 — probabilité d'inverser un booléen « tenir »
+PERIOD_MUTATION = "linear"    # [CHOIX] §3.3 — "linear" (σ = 5 % de la plage) ou "log" (ratio multiplicatif)
+PERIOD_LOG_SIGMA = 0.1        # [CHOIX] — mode "log" : période × exp(N(0, σ)), σ ×BIG_FACTOR si grosse
+RUNS_DIR = "runs"             # [CHOIX] §8 — runs/<seed>/gen_XXXX.npz, stats.csv
+HIST_RANGE = (-10, 40)        # [VU] §7.2 — histogramme 1 m de −10 à 40 m
+
+# Audit du champion toutes les AUDIT_EVERY générations (evo/audit.py).
+AUDIT_EVERY = 25              # [CHOIX]
+AUDIT_MAX_CREATED = 1e-4      # [CHOIX] énergie créée hors muscles tolérée, en fraction de l'énergie de chute
+AUDIT_MAX_SPEED = 80.0        # [CHOIX] m/s — point du corps (bout d'un membre de 3 m qui tourne vite)
+AUDIT_MAX_TORSO_SPEED = 20.0  # [CHOIX] m/s — torse (chute libre de 9 m : 13 m/s)
+AUDIT_MAX_HEIGHT = 50.0       # [CHOIX] m — hauteur plausible en 10 s (champion de la vidéo : 36 m)
+AUDIT_MAX_TAIL_ERROR = 0.05   # [CHOIX] erreur de longueur de la queue tolérée (os du corps : < 1 %, §1.4)
 
 # ---------------------------------------------------------------------------
 # Vue debug de la créature (§7.6, images 15–17)

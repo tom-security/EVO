@@ -175,7 +175,7 @@ class Creature:
         self.ref_y0 = self.reference_point()[1]
         self.t = 0.0
         self.pose_index = -1
-        self.energy = 0.0
+        self.effort = 0.0  # Σ|force musculaire|·dt ; l'énergie du HUD vaut ENERGY_SCALE × effort
         self.fallen = False
         self.activation = np.zeros(len(JOINTS))  # force musculaire signée de chaque articulation
 
@@ -193,6 +193,11 @@ class Creature:
 
     def muscle_mass(self):
         return self.genome.muscle_mass()
+
+    @property
+    def energy(self):
+        """Énergie dépensée (§3.2), dans l'unité du HUD : ENERGY_SCALE × Σ|force musculaire|·dt."""
+        return config.ENERGY_SCALE * self.effort
 
     def score(self):
         return fitness(self.height(), self.energy, self.muscle_mass())
@@ -238,9 +243,9 @@ class Creature:
         rate = self.joint_phi_rate() if config.ENERGY_MODE == "power" else None
         physics.substep(self.world, h)
         if config.ENERGY_MODE == "power":
-            self.energy += float(np.sum(np.abs(self.activation * rate))) * h
+            self.effort += float(np.sum(np.abs(self.activation * rate))) * h
         else:
-            self.energy += float(np.sum(np.abs(self.activation))) * h
+            self.effort += float(np.sum(np.abs(self.activation))) * h
         if not self.fallen and np.any(self.world.pos[self.body_points, 1]
                                       <= config.GROUND_Y + config.FALL_CONTACT_EPS):
             self.fallen = True
