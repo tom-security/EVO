@@ -148,7 +148,7 @@ class Scene:
         if log:
             log(f"décor {'construit' if self.built else 'relu du cache'} ({self.cache_path})")
         if pygame.display.get_init() and pygame.display.get_surface() is not None:
-            self.layers = {n: (s.convert() if n == "ciel" else s.convert_alpha(), p, o)
+            self.layers = {n: (s.convert() if n == "ciel" else _rle(s.convert_alpha()), p, o)
                            for n, (s, p, o) in self.layers.items()}
 
     # --- rendu par frame ---------------------------------------------------
@@ -200,7 +200,8 @@ class Scene:
 
     # --- construction ------------------------------------------------------
     def _build(self):
-        builders = {"ciel": self._build_sky, "plan": self._build_plane}
+        builders = {"ciel": self._build_sky, "tres_lointain": self._build_far, "lointain": self._build_distant,
+                    "mi_proche": self._build_mid, "plan": self._build_plane, "premier_plan": self._build_front}
         order = BACK_LAYERS + FRONT_LAYERS
         for name in self.layer_names:
             # une graine par couche : ajouter ou retirer une couche ne change pas les autres
@@ -235,11 +236,73 @@ class Scene:
         """Plan de la créature (parallaxe 1) : branches, tronc, sol, rochers, touffes."""
         cv = _Canvas(self.framing, config.PARALLAX["plan"], self.max_shift, config.TRUNK_COLORS[4])
         top, bottom = cv.world_top() + 2.0, cv.world_bottom() - 2.0
+        for x, height, lean, span in config.PLANE_PALMS:
+            _palm(cv, rng, x, config.GROUND_Y - 0.5, height, lean, span, config.PALM_COLORS, detailed=True)
+        for x, height, width in config.PLANE_FERNS:
+            _fern(cv, rng, x, config.GROUND_Y - 0.3, height, width, config.FERN_COLORS)
         _branches(cv)
         _trunk(cv, rng, config.GROUND_Y - 0.6, top)
         _ground(cv, rng, bottom)
         _rocks(cv)
         _tufts(cv, rng)
+        return cv.finish(), cv.offset
+
+    def _build_far(self, rng):
+        """Couche 1 (très lointain) : brume, collines, arbres et palmiers en silhouettes pâles."""
+        cv = _Canvas(self.framing, config.PARALLAX["tres_lointain"], self.max_shift, config.FAR_COLORS[1])
+        x0, x1 = cv.world_x_range(6.0)
+        bottom = cv.world_bottom() - 2.0
+        haze, pale = config.FAR_COLORS
+        _hills(cv, rng, x0, x1, 7.5, 3.0, bottom, haze, n=7)
+        n_trees, n_palms = config.FAR_COUNTS
+        for x in rng.uniform(x0, x1, n_palms):
+            _palm(cv, rng, x, 7.0, rng.uniform(5.0, 7.5), rng.uniform(-12, 12), rng.uniform(4.0, 6.0), (haze,) * 4)
+        _hills(cv, rng, x0, x1, 4.5, 2.2, bottom, pale, n=6)
+        for x in rng.uniform(x0, x1, n_trees):
+            _tree_silhouette(cv, rng, x, bottom, rng.uniform(9.0, 14.0), rng.uniform(5.0, 8.0), pale)
+        for x in rng.uniform(x0, x1, n_palms):
+            _palm(cv, rng, x, 3.5, rng.uniform(5.5, 8.0), rng.uniform(-14, 14), rng.uniform(4.5, 6.5), (pale,) * 4)
+        return cv.finish(), cv.offset
+
+    def _build_distant(self, rng):
+        """Couche 2 (lointain) : relief, gros arbres à canopée arrondie avec lianes, palmiers ; kaki."""
+        cv = _Canvas(self.framing, config.PARALLAX["lointain"], self.max_shift, config.DISTANT_COLORS[0])
+        x0, x1 = cv.world_x_range(6.0)
+        bottom = cv.world_bottom() - 2.0
+        kaki, kaki2 = config.DISTANT_COLORS
+        n_trees, n_palms = config.DISTANT_COUNTS
+        for x in rng.uniform(x0, x1, n_palms):
+            _palm(cv, rng, x, 1.5, rng.uniform(6.5, 9.5), rng.uniform(-14, 14), rng.uniform(5.5, 7.5), (kaki2,) * 4)
+        for x, height, width in config.DISTANT_TREES:
+            _tree_silhouette(cv, rng, x, bottom, height, width, kaki)
+        for x in rng.uniform(x0, x1, n_trees):
+            _tree_silhouette(cv, rng, x, bottom, rng.uniform(10.0, 16.0), rng.uniform(6.0, 9.0), kaki)
+        _hills(cv, rng, x0, x1, 2.4, 2.4, bottom, kaki, n=6)
+        return cv.finish(), cv.offset
+
+    def _build_mid(self, rng):
+        """Couche 3 (mi-proche) : collines sombres, palmiers en deux tons, fougères, arbre latéral."""
+        cv = _Canvas(self.framing, config.PARALLAX["mi_proche"], self.max_shift, config.MID_HILL_COLOR)
+        x0, x1 = cv.world_x_range(6.0)
+        top, bottom = cv.world_top() + 2.0, cv.world_bottom() - 2.0
+        dark, lit, trunk = config.MID_PALM_COLORS
+        for x, height, lean in config.MID_PALMS:
+            _palm(cv, rng, x, 0.8, height, lean, 0.85 * height, (dark, lit, lit, trunk), detailed=True, coconut=False)
+        _hills(cv, rng, x0, x1, 1.6, 1.3, bottom, config.MID_HILL_COLOR, n=5)
+        for x, height in config.MID_FERNS:
+            _fern(cv, rng, x, 0.4, height, 1.4 * height, (config.MID_PALM_COLORS[0], config.MID_HILL_COLOR,
+                                                           config.MID_PALM_COLORS[1]))
+        _side_tree(cv, rng, bottom, top)
+        return cv.finish(), cv.offset
+
+    def _build_front(self, rng):
+        """Couche 6 (premier plan) : grandes canopées low-poly portées par les branches du tronc,
+        dessinées après le lézard (elles le masquent quand il passe dessous)."""
+        cv = _Canvas(self.framing, config.PARALLAX["premier_plan"], self.max_shift, config.CANOPY_COLORS[0])
+        base_y = config.GROUND_Y + config.START_HEIGHT
+        for (hud, side, dx, dy, post, th), (off, width, height) in zip(config.BRANCHES, config.FG_CANOPIES):
+            bottom = base_y + hud + dy + config.FG_CANOPY_LIFT
+            _canopy(cv, rng, config.TRUNK_X + side * off, bottom, width, height, config.CANOPY_COLORS, vines=True)
         return cv.finish(), cv.offset
 
     # --- cache -------------------------------------------------------------
@@ -272,11 +335,21 @@ class Scene:
             json.dump(meta, fh, indent=1)
 
 
+def _rle(surf):
+    """Encodage RLE de SDL : les pixels transparents sont sautés au blit (4 à 8 fois plus rapide
+    pour ces couches, qui sont transparentes à 50–90 % ; écart ≤ 2 niveaux sur les bords)."""
+    surf.set_alpha(255, pygame.RLEACCEL)
+    # l'encodage se fait au premier blit vers l'écran : on le déclenche dès le chargement (1 pixel)
+    pygame.display.get_surface().blit(surf, (0, 0), pygame.Rect(0, 0, 1, 1))
+    return surf
+
+
 # ---------------------------------------------------------------------------
 # Cache : clé = graine + paramètres du décor + code de ce fichier + cadrage
 # ---------------------------------------------------------------------------
 _DECOR_PREFIXES = ("SCENE_", "SKY_", "CLOUD", "TRUNK_", "BRANCH", "GRASS_", "DIRT_", "ROCK",
-                   "TUFT", "MARKER_", "DECOR_", "PARALLAX")
+                   "TUFT", "MARKER_", "DECOR_", "PARALLAX", "FAR_", "DISTANT_", "MID_", "SIDE_", "PALM_",
+                   "COCONUT_", "FERN_", "CANOPY_", "VINE_", "PLANE_", "FG_")
 _DECOR_KEYS = ("START_HEIGHT", "GROUND_Y", "FONT_SANS")
 
 
@@ -469,3 +542,190 @@ def _tufts(cv, rng):
             base = x + rng.uniform(-0.25, 0.25) * h
             w = 0.16 * h
             cv.poly([(base - w, g), (base + w, g), (x + dx, g + bh)], light if k % 2 else dark)
+
+
+# ---------------------------------------------------------------------------
+# Éléments des arrière-plans et du premier plan
+# ---------------------------------------------------------------------------
+def _hills(cv, rng, x0, x1, base, amp, bottom, color, n=6):
+    """Relief low-poly : ligne brisée de n sommets autour de y = base, remplie jusqu'en bas."""
+    xs = np.sort(np.concatenate([[x0 - 5, x1 + 5], rng.uniform(x0, x1, 2 * n)]))
+    ys = config.GROUND_Y + base + rng.uniform(-0.3, 1.0, len(xs)) * amp
+    ys[1::2] -= 0.6 * amp          # alternance sommet / creux
+    cv.poly([(x0 - 5, bottom)] + list(zip(xs, ys)) + [(x1 + 5, bottom)], color)
+
+
+def _blob(rng, cx, bottom, width, height, n=11, jitter=0.16):
+    """Contour low-poly d'une canopée : dessus bosselé, dessous presque plat (sens trigonométrique)."""
+    pts = []
+    for k in range(n):
+        a = math.pi * (k + rng.uniform(-0.3, 0.3)) / (n - 1)          # 0 → π : dessus, de droite à gauche
+        r = 1.0 + rng.uniform(-jitter, jitter)
+        pts.append((cx + 0.5 * width * r * math.cos(a), bottom + 0.35 * height + 0.65 * height * r * math.sin(a)))
+    for k in range(1, 4):                                              # dessous : quelques sommets bas
+        x = cx - 0.5 * width + width * k / 4 + rng.uniform(-0.08, 0.08) * width
+        pts.append((x, bottom + rng.uniform(0.0, 0.18) * height))
+    return pts
+
+
+def _canopy(cv, rng, cx, bottom, width, height, colors, vines=False):
+    """Canopée low-poly (§5.2) : base, facettes éclairées en haut à gauche, dessous sombre, lianes."""
+    base, lit, under, shade = colors
+    outline = _blob(rng, cx, bottom, width, height)
+    top = outline[:11]
+    low = sorted(outline[11:], key=lambda p: p[0])
+    lower = [top[-1]] + low + [top[0]]                 # bord inférieur, de gauche à droite
+    if vines:
+        for x in rng.uniform(cx - 0.42 * width, cx + 0.42 * width, int(width // 3)):
+            length = rng.uniform(1.5, 0.45 * height)
+            w = rng.uniform(0.18, 0.3)
+            cv.poly([(x - w, bottom + 1.0), (x + w, bottom + 1.0), (x + w, bottom - length), (x - w, bottom - length)],
+                    config.VINE_COLOR)
+    drop = 0.08 * height
+    cv.poly([(x, y - drop) for x, y in lower] + lower[::-1], shade)          # ombre sous la canopée
+    cv.poly(outline, base)
+    cv.poly(lower + [(x, y + 0.22 * height) for x, y in lower[::-1]], under)  # dessous
+    cv.poly(outline[3:11] + [(cx - 0.05 * width, bottom + 0.62 * height)], base)
+    # facettes éclairées : deux pans le long du bord supérieur gauche (lumière de la gauche)
+    for k0, k1, depth in ((6, 8, 0.22), (8, 10, 0.3)):
+        edge = top[k0:k1 + 1]
+        inward = [(cx + (x - cx) * (1 - depth), bottom + 0.45 * height + (y - bottom - 0.45 * height) * (1 - depth))
+                  for x, y in edge[::-1]]
+        cv.poly(edge + inward, lit)
+    # quelques triangles d'ombre au milieu
+    for _ in range(int(rng.integers(1, 3))):
+        x = cx + rng.uniform(-0.25, 0.3) * width
+        y = bottom + rng.uniform(0.4, 0.62) * height
+        sz = rng.uniform(0.05, 0.08) * width
+        cv.poly([(x, y), (x + sz, y + 0.35 * sz), (x + 0.6 * sz, y - 0.45 * sz)], under)
+
+
+def _tree_silhouette(cv, rng, x, bottom, height, width, color):
+    """Arbre en silhouette (une couleur) : tronc, branches en L, canopée en blobs, lianes."""
+    g = config.GROUND_Y
+    tw = rng.uniform(0.09, 0.14) * width
+    crown = g + height - 0.45 * width
+    cv.poly([(x - tw / 2, bottom), (x + tw / 2, bottom), (x + tw / 2, crown), (x - tw / 2, crown)], color)
+    for side in (-1, 1):
+        if rng.random() < 0.7:
+            y0 = g + rng.uniform(0.35, 0.6) * height
+            reach = rng.uniform(0.25, 0.45) * width
+            bw = 0.6 * tw
+            cv.poly([(x, y0), (x + side * reach, y0 + 0.4 * reach), (x + side * reach, y0 + 0.4 * reach + bw), (x, y0 + bw)], color)
+            cv.poly([(x + side * reach - side * bw, y0 + 0.4 * reach), (x + side * reach, y0 + 0.4 * reach),
+                     (x + side * reach, crown), (x + side * reach - side * bw, crown)], color)
+    for k in range(int(rng.integers(2, 4))):
+        bx = x + rng.uniform(-0.3, 0.3) * width
+        bw = width * rng.uniform(0.55, 0.85)
+        bb = crown + rng.uniform(-0.1, 0.25) * width
+        cv.poly(_blob(rng, bx, bb, bw, 0.55 * bw, n=9, jitter=0.2), color)
+        for vx in rng.uniform(bx - 0.35 * bw, bx + 0.35 * bw, int(rng.integers(1, 4))):
+            length = rng.uniform(0.1, 0.3) * height
+            cv.poly([(vx - 0.1, bb + 0.5), (vx + 0.1, bb + 0.5), (vx + 0.1, bb - length), (vx - 0.1, bb - length)], color)
+
+
+def _leaf(center, angle, length, width, droop, teeth=0):
+    """Feuille de palmier : nervure courbée vers le bas ; renvoie (moitié haute, moitié basse)."""
+    ts = np.linspace(0.0, 1.0, 9)
+    c, s = math.cos(angle), math.sin(angle)
+    mid = np.array([(center[0] + length * t * c, center[1] + length * t * s - droop * length * t * t) for t in ts])
+    tang = np.gradient(mid, axis=0)
+    nrm = np.array([(-ty, tx) for tx, ty in tang])
+    nrm /= np.maximum(np.hypot(nrm[:, 0], nrm[:, 1]), 1e-9)[:, None]
+    if nrm[4, 1] < 0:                  # « haut » de la feuille : normale vers le ciel
+        nrm = -nrm
+    w = width * np.sin(np.pi * np.clip(ts, 0, 1)) ** 0.8
+    upper = mid + nrm * w[:, None]
+    lower_w = w.copy()
+    if teeth:
+        lower_w[1:-1:2] *= 0.45        # dents de scie sur le bord inférieur
+    lower = mid - nrm * lower_w[:, None]
+    return [tuple(p) for p in np.vstack([upper, mid[::-1]])], [tuple(p) for p in np.vstack([mid, lower[::-1]])]
+
+
+def _palm(cv, rng, x, base_y, height, lean_deg, span, colors, detailed=False, coconut=True):
+    """Palmier : stipe incliné et courbé, couronne de feuilles (deux tons si `detailed`), noix."""
+    dark, lit, lit2, trunk = colors[:4]
+    lean = math.radians(lean_deg)
+    top = (x + height * math.sin(lean), config.GROUND_Y + base_y + height * math.cos(lean))
+    base = (x, config.GROUND_Y + base_y - 3.0)
+    ctrl = (0.5 * (base[0] + top[0]) - 0.12 * height * math.sin(lean), 0.5 * (base[1] + top[1]))
+    ts = np.linspace(0, 1, 10)
+    pts = [((1 - t) ** 2 * base[0] + 2 * (1 - t) * t * ctrl[0] + t * t * top[0],
+            (1 - t) ** 2 * base[1] + 2 * (1 - t) * t * ctrl[1] + t * t * top[1]) for t in ts]
+    w0, w1 = 0.065 * height, 0.045 * height
+    left, right = [], []
+    for k, (px, py) in enumerate(pts):
+        a = pts[min(k + 1, len(pts) - 1)]
+        b = pts[max(k - 1, 0)]
+        d = np.array([a[0] - b[0], a[1] - b[1]])
+        d /= max(np.hypot(*d), 1e-9)
+        w = w0 + (w1 - w0) * ts[k]
+        left.append((px - d[1] * w, py + d[0] * w))
+        right.append((px + d[1] * w, py - d[0] * w))
+    cv.poly(left + right[::-1], trunk)
+    leaf_len = 0.5 * span
+    angles = [-15, 18, 52, 128, 162, 195] + ([80] if rng.random() < 0.5 else [])
+    for ang in angles:
+        a = math.radians(ang + rng.uniform(-8, 8))
+        upper, lower = _leaf(top, a, leaf_len * rng.uniform(0.8, 1.05), 0.11 * leaf_len, rng.uniform(0.25, 0.45),
+                             teeth=detailed)
+        if detailed:
+            cv.poly(lower, dark)
+            cv.poly(upper, lit if math.cos(a) < 0.2 else lit2)   # lumière de la gauche : feuilles de gauche plus claires
+        else:
+            cv.poly(lower + upper, dark)
+    if coconut and detailed:
+        r = 0.055 * height
+        cx, cy = top
+        cv.poly([(cx - 1.6 * r, cy + 0.3 * r), (cx - 0.9 * r, cy + 1.0 * r), (cx + 0.9 * r, cy + 1.0 * r),
+                 (cx + 1.6 * r, cy + 0.3 * r), (cx, cy)], config.COCONUT_COLORS[0])
+        cv.poly([(cx - 1.6 * r, cy + 0.3 * r), (cx, cy), (cx + 1.6 * r, cy + 0.3 * r), (cx + 1.3 * r, cy - 0.7 * r),
+                 (cx + 0.2 * r, cy - 1.3 * r), (cx - 1.2 * r, cy - 0.8 * r)], config.COCONUT_COLORS[1])
+
+
+def _fern(cv, rng, x, base_y, height, width, colors):
+    """Fougère / agave : éventail de longues feuilles pointues, moitié gauche éclairée."""
+    dark, mid, lit = colors
+    g = config.GROUND_Y + base_y
+    n = int(rng.integers(7, 10))
+    angles = np.sort(rng.uniform(25, 155, n))
+    for ang in sorted(angles, key=lambda a: abs(a - 90)):          # feuilles couchées d'abord
+        a = math.radians(ang)
+        length = height * (0.55 + 0.45 * math.sin(a)) * rng.uniform(0.85, 1.1)
+        tip = (x + 0.5 * width * math.cos(a) * length / height, g + length * math.sin(a))
+        w = 0.07 * length + 0.2
+        nx, ny = -math.sin(a) * w, math.cos(a) * w
+        mid_pt = (x + 0.45 * (tip[0] - x), g + 0.45 * (tip[1] - g))
+        cv.poly([(x, g), (mid_pt[0] + nx, mid_pt[1] + ny), tip, mid_pt], lit if ang > 90 else mid)
+        cv.poly([(x, g), mid_pt, tip, (mid_pt[0] - nx, mid_pt[1] - ny)], dark)
+    b = 0.12 * width
+    cv.poly([(x - b, g - 0.2), (x + b, g - 0.2), (x + 0.5 * b, g + 0.5 * b), (x - 0.5 * b, g + 0.5 * b)], dark)
+
+
+def _side_tree(cv, rng, bottom, top):
+    """Arbre latéral (images 03 à 09, à gauche) : tronc brun en deux tons sur toute la hauteur,
+    branches en L et canopées low-poly avec lianes, espacées de SIDE_TREE[2] m."""
+    x, width, step = config.SIDE_TREE
+    lit, shade = config.SIDE_TREE_COLORS
+    y = config.GROUND_Y + 11.5
+    k = 0
+    while y < top:
+        side = 1 if k % 3 != 2 else -1
+        (w_lo, w_hi), (h_lo, h_hi) = config.SIDE_CANOPY_SIZE
+        cw = rng.uniform(w_lo, w_hi)
+        cx = x + side * (0.42 * cw + rng.uniform(0.0, 2.0))
+        bw = 0.7
+        # branche : horizontale depuis le tronc, puis montée jusqu'à la canopée
+        reach = cx - x - side * 0.25 * cw
+        cv.poly([(x, y - 2.8), (x + reach, y - 2.8 + 0.5 * abs(reach) * 0.3), (x + reach, y - 2.8 + 0.5 * abs(reach) * 0.3 + bw),
+                 (x, y - 2.8 + bw)], shade)
+        cv.poly([(x + reach - side * bw, y - 2.8), (x + reach, y - 2.8), (x + reach, y + 1.0), (x + reach - side * bw, y + 1.0)],
+                shade)
+        _canopy(cv, rng, cx, y, cw, rng.uniform(h_lo, h_hi), config.SIDE_CANOPY_COLORS + (config.SIDE_CANOPY_COLORS[2],),
+                vines=True)
+        y += step * rng.uniform(0.85, 1.15)
+        k += 1
+    half = width / 2
+    cv.poly([(x - half, bottom), (x, bottom), (x, top), (x - half, top)], lit)
+    cv.poly([(x, bottom), (x + half, bottom), (x + half, top), (x, top)], shade)

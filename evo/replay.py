@@ -221,7 +221,15 @@ def _caption(pygame, surface, lines, pos, font):
         y += img.get_height()
 
 
-def export(replay, out_dir, times=(0, 2, 4, 6, 8, 10), compare=("t8m02", "t13m55"), use_cache=True, log=print):
+COMPARISONS = {   # nom → (instant de la vidéo, description de notre image)
+    "t8m02": ((8, 2), "champion à t = 0, cadrage serré de l'image 01"),
+    "t10m20": ((10, 20), "génération 0, créature 1 (n°0) à t = 6.5 s"),
+    "t13m55": ((13, 55), "champion au passage de +10 m"),
+    "t14m35": ((14, 35), "champion à t = 6.4 s"),
+}
+
+
+def export(replay, out_dir, times=(0, 2, 4, 6, 8, 10), compare=tuple(COMPARISONS), use_cache=True, log=print):
     """PNG aux instants demandés, planche 3×2, comparaisons côte à côte, temps par frame."""
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     import pygame
@@ -238,6 +246,7 @@ def export(replay, out_dir, times=(0, 2, 4, 6, 8, 10), compare=("t8m02", "t13m55
     wanted = {replay.frame_at(t): t for t in times}
     above10 = np.nonzero(replay.height >= 10.0)[0]
     frame_10m = int(above10[0]) if len(above10) else None
+    frame_6s4 = replay.frame_at(6.4)
     shots, timings, paths, special = {}, [], [], {}
     for f in range(replay.n_frames):
         view.camera.update(replay.ref_y[f], snap=(f == 0))
@@ -248,7 +257,9 @@ def export(replay, out_dir, times=(0, 2, 4, 6, 8, 10), compare=("t8m02", "t13m55
             paths.append(path)
             shots[wanted[f]] = screen.copy()
         if f == frame_10m:
-            special["t13m55"] = (screen.copy(), f)
+            special["t13m55"] = (screen.copy(), f, replay)
+        if f == frame_6s4:
+            special["t14m35"] = (screen.copy(), f, replay)
     small = pygame.font.SysFont(config.FONT_SANS, 18)
 
     # planche 3 × 2
@@ -268,19 +279,27 @@ def export(replay, out_dir, times=(0, 2, 4, 6, 8, 10), compare=("t8m02", "t13m55
         zview = JungleView(replay, framing=zoom, use_cache=use_cache, log=log)
         zview.reset_camera()
         zview.draw(screen, 0)
-        special["t8m02"] = (screen.copy(), 0)
-    refs = {"t8m02": (8, 2), "t13m55": (13, 55)}
+        special["t8m02"] = (screen.copy(), 0, replay)
+    if "t10m20" in compare:   # « Génération 0, Créature 1 » : première créature de la génération 0
+        first = Replay(replay.run_dir, gen=0, index=0, log=log)
+        fview = JungleView(first, use_cache=use_cache)
+        target = first.frame_at(6.5)
+        for f in range(target + 1):
+            fview.camera.update(first.ref_y[f], snap=(f == 0))
+        fview.draw(screen, target)
+        special["t10m20"] = (screen.copy(), target, first)
     for name in compare:
         if name not in special:
             log(f"comparaison {name} : pas d'image (la créature n'atteint pas l'instant voulu)")
             continue
-        ours, f = special[name]
-        ref_path = reference_image(*refs[name])
+        ours, f, rep = special[name]
+        ref_path = reference_image(*COMPARISONS[name][0])
         board = pygame.Surface((2 * w, h))
         board.blit(pygame.transform.smoothscale(pygame.image.load(ref_path), (w, h)), (0, 0))
         board.blit(ours, (w, 0))
         _caption(pygame, board, [f"Référence : {os.path.basename(ref_path)}"], (8, h - 44), small)
-        _caption(pygame, board, [f"Nous : {replay.label()}, t = {replay.t[f]:.2f} s, h = {replay.height[f]:+.2f} m"
+        _caption(pygame, board, [f"Nous : {rep.label()}" + (f" (n°{rep.index})" if rep is not replay else "")
+                                 + f", t = {rep.t[f]:.2f} s, h = {rep.height[f]:+.2f} m"
                                  + (" (cadrage de l'image 01 : 28.4 px/m)" if name == "t8m02" else "")],
                  (w + 8, h - 44), small)
         path = os.path.join(out_dir, f"comparaison_{name}.png")

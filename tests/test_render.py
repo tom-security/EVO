@@ -72,6 +72,34 @@ def test_scene_covers_decor_and_frames_are_filled(tmp_cache):
     assert np.all(arr[:, h - 2, 0] > arr[:, h - 2, 1])
 
 
+def test_all_layers_are_built_and_front_canopy_hides_the_lizard(tmp_cache):
+    scene = sc.Scene()
+    assert set(scene.layers) == set(config.SCENE_LAYERS)
+    for name, (_, parallax, _) in scene.layers.items():
+        assert parallax == config.PARALLAX[name]
+    c = cr.Creature(cr.diagonal_gait_genome())
+    shape = rl.LizardShape(c.skel)
+    # sous la première canopée du premier plan (branche à +12 m HUD, côté droit)
+    hud, side, dx, dy, post, th = config.BRANCHES[0]
+    off, width, height = config.FG_CANOPIES[0]
+    y_mid = config.GROUND_Y + config.START_HEIGHT + hud + dy + config.FG_CANOPY_LIFT + 0.45 * height
+    pos = c.world.pos + (np.array([config.TRUNK_X + side * 0.2 * off, y_mid]) - c.reference_point())
+    cam = sc.Camera(scene.framing)
+    cam.update(y_mid, snap=True)
+    surf = pygame.Surface(config.WINDOW_SIZE)
+
+    def lizard_pixels(front):
+        scene.draw_back(surf, cam.shift)
+        shape.draw(surf, pos, cam.origin(), scene.framing.scale)
+        if front:
+            scene.draw_front(surf, cam.shift)
+        a = pygame.surfarray.array3d(surf)
+        return int((_near(a, config.LIZARD_LIGHT, 2) | _near(a, config.LIZARD_DARK, 2)).sum())
+
+    visible, hidden = lizard_pixels(False), lizard_pixels(True)
+    assert visible > 500 and hidden < 0.1 * visible
+
+
 def test_markers_appear_only_once_reached(tmp_cache):
     scene = sc.Scene()
     surf = pygame.Surface(config.WINDOW_SIZE)

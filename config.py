@@ -266,10 +266,15 @@ FONT_MONO = ["dejavusansmono", "liberationmono", "freemono"]
 SCENE_SCALE = 20.2
 SCENE_GROUND_PX = 548
 CAMERA_LERP = 0.12            # [CHOIX] §5.6 « lerp doux » : part de l'écart rattrapée par frame (0.08 : ≈ 14 px de retard à +10 m)
-# [CHOIX] §5.6 — parallaxe de chaque couche (0 = fixe à l'écran, 1 = plan de la créature)
-PARALLAX = {"ciel": 0.0, "tres_lointain": 0.1, "lointain": 0.25, "mi_proche": 0.5,
-            "plan": 1.0, "premier_plan": 1.2}
-SCENE_LAYERS = ("ciel", "plan")   # [CHOIX] couches construites (phase 4a-1 : ciel + plan)
+# Parallaxe de chaque couche (0 = fixe à l'écran, 1 = plan de la créature). §5.6 [CHOIX] : 0 / 0.1 /
+# 0.25 / 0.5 / 1.0 / 1.2. [DÉDUIT] par corrélation verticale entre les images 03→05, 03→06 et 09→08
+# (décalage de caméra lu sur le grand palmier et l'agave au sol, qui suivent le sol) : silhouettes
+# kaki 0.28, arbre latéral et palmiers mi-proches 0.56, canopées du premier plan et leurs branches
+# 1.0 (elles restent accrochées au tronc tout en passant devant le lézard). Très lointain : non
+# mesurable, valeur du §5.6.
+PARALLAX = {"ciel": 0.0, "tres_lointain": 0.1, "lointain": 0.28, "mi_proche": 0.56,
+            "plan": 1.0, "premier_plan": 1.0}
+SCENE_LAYERS = ("ciel", "tres_lointain", "lointain", "mi_proche", "plan", "premier_plan")   # [CHOIX]
 SCENE_SEED = 5                # [CHOIX] graine du décor procédural
 DECOR_TOP_HUD = 50.0          # [CHOIX] ≥ 45 m (§5.6) : haut du décor en hauteur HUD ; la caméra s'y arrête
 SCENE_SUPERSAMPLE = 2         # [CHOIX] décor dessiné ×2 puis réduit (anticrénelage sans jointures ; puissance de 2)
@@ -308,6 +313,36 @@ ROCK_COLORS = ("#C47C4C", "#9C5434", "#744424")  # [VU] facettes : claire (haut 
 ROCKS = ((-25.2, 2.2), (12.6, 2.0), (21.8, 0.8))   # [DÉDUIT] images 01 et 03 : (x m, largeur m ; 45 et 40 px)
 TUFT_COLORS = ("#748404", "#A4B41C", "#34442C")   # [VU] touffes d'herbe
 TUFTS = ((-2.9, 1.3), (5.9, 1.6), (-7.1, 0.9), (-12.4, 1.1), (19.2, 1.2), (27.5, 0.9))  # [DÉDUIT] image 03 : (x m, hauteur m)
+
+# Arrière-plans et premier plan (§5.2, §5.6). Positions en m depuis l'axe du tronc ; hauteurs en m
+# au-dessus du sol telles que vues au cadrage de départ (espace de la couche).
+FAR_COLORS = ("#B4C888", "#A4BC8C")       # [DÉDUIT] images 03/09 : brume la plus lointaine ; [VU] silhouettes pâles
+DISTANT_COLORS = ("#848C5C", "#7C8C5C")   # [VU] silhouettes kaki (mesuré #808C58)
+MID_HILL_COLOR = "#5C6C24"                # [VU] (mesuré #586C24, images 03 et 06) : collines mi-proches
+MID_PALM_COLORS = ("#3C4828", "#546428", "#6C5030")   # [DÉDUIT] image 03 : feuille sombre, éclairée, stipe (plus ternes qu'au sol)
+SIDE_TREE_COLORS = ("#705430", "#54482C")            # [DÉDUIT] image 03 : tronc de l'arbre latéral, face éclairée / ombre
+SIDE_CANOPY_COLORS = ("#808C24", "#98A030", "#5C6820")   # [DÉDUIT] image 03 : base, facette éclairée, dessous
+PALM_COLORS = ("#34442C", "#8C9C2C", "#647C24", "#803C24")   # [VU] feuilles sombre / éclairées ; [DÉDUIT] stipe #803C24 (§5.2 : #74442C)
+COCONUT_COLORS = ("#A87848", "#542C2C")    # [DÉDUIT] image 03 : noix éclairées / ombre (§5.2 : #9C5434 / #8C4C2C)
+FERN_COLORS = ("#38481C", "#546020", "#98A030")   # [DÉDUIT] image 03 : feuilles d'agave sombre, moyenne, éclairée
+CANOPY_COLORS = ("#A4B41C", "#C4D41C", "#6C7C14", "#4C5424")   # [VU] base, facettes éclairées, dessous, ombre
+VINE_COLOR = "#6C7C14"                     # [VU] lianes (rectangles fins)
+# [CHOIX] nombres d'éléments procéduraux : (arbres, palmiers) très lointains, (arbres, palmiers) lointains
+FAR_COUNTS = (9, 8)
+DISTANT_COUNTS = (5, 5)
+# [DÉDUIT] images 03, 05, 06, 09 : gros arbres kaki (x m, hauteur m, largeur de canopée m)
+DISTANT_TREES = ((-11.5, 17.5, 10.0), (26.0, 31.0, 16.0), (-25.0, 24.0, 11.0), (9.0, 13.0, 8.0))
+SIDE_TREE = (-28.6, 4.2, 9.0)             # [DÉDUIT] image 03 : arbre latéral (x m, largeur m, écart entre canopées m)
+SIDE_CANOPY_SIZE = ((11.0, 20.0), (4.0, 6.5))   # [DÉDUIT] images 03 et 09 : largeur, hauteur des canopées de l'arbre latéral (m)
+MID_PALMS = ((-13.0, 9.5, -6.0), (-7.8, 8.3, 9.0), (16.5, 8.6, 22.0), (-19.5, 7.0, -12.0))   # [DÉDUIT] image 03 : (x, hauteur, inclinaison °)
+MID_FERNS = ((9.5, 3.8), (15.2, 2.8), (28.0, 4.6), (-22.5, 3.2), (4.0, 2.4))    # [DÉDUIT] image 03 : (x, hauteur)
+PLANE_PALMS = ((24.6, 16.2, 3.0, 15.5),)  # [DÉDUIT] image 03 : grand palmier au sol (x, hauteur, inclinaison °, envergure m)
+PLANE_FERNS = ((-17.2, 7.6, 10.5), (-10.5, 3.2, 4.0))   # [DÉDUIT] image 03 : agaves au sol (x, hauteur, largeur)
+# [DÉDUIT] images 06, 08, 09 : canopée du premier plan portée par chaque branche de BRANCHES
+# (centre à cette distance de l'axe du tronc, du côté de la branche ; largeur ; hauteur, en m).
+# Image 09 : x 570–1110 px, soit de −3.5 à +23.5 m : elle couvre la moitié droite du tronc.
+FG_CANOPIES = ((10.0, 27.0, 12.0), (8.0, 22.0, 10.0), (10.0, 25.0, 11.0))
+FG_CANOPY_LIFT = 2.6                       # [DÉDUIT] image 09 : bas de la canopée 2.6 m au-dessus du pied du poteau
 
 # Repères de hauteur (§5.6) : ligne blanche fine sur la largeur du tronc, libellé à gauche.
 # [DÉDUIT] images 06, 08, 09 : un repère n'apparaît qu'une fois atteint par le lézard (jamais au-dessus de lui)
