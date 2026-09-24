@@ -265,7 +265,7 @@ FONT_MONO = ["dejavusansmono", "liberationmono", "freemono"]
 # jamais sous le cadrage de départ (image 04 : créature au sol, cadrage inchangé).
 SCENE_SCALE = 20.2
 SCENE_GROUND_PX = 548
-CAMERA_LERP = 0.08            # [CHOIX] §5.6 « lerp doux » : part de l'écart rattrapée par frame
+CAMERA_LERP = 0.12            # [CHOIX] §5.6 « lerp doux » : part de l'écart rattrapée par frame (0.08 : ≈ 14 px de retard à +10 m)
 # [CHOIX] §5.6 — parallaxe de chaque couche (0 = fixe à l'écran, 1 = plan de la créature)
 PARALLAX = {"ciel": 0.0, "tres_lointain": 0.1, "lointain": 0.25, "mi_proche": 0.5,
             "plan": 1.0, "premier_plan": 1.2}
@@ -310,6 +310,7 @@ TUFT_COLORS = ("#748404", "#A4B41C", "#34442C")   # [VU] touffes d'herbe
 TUFTS = ((-2.9, 1.3), (5.9, 1.6), (-7.1, 0.9), (-12.4, 1.1), (19.2, 1.2), (27.5, 0.9))  # [DÉDUIT] image 03 : (x m, hauteur m)
 
 # Repères de hauteur (§5.6) : ligne blanche fine sur la largeur du tronc, libellé à gauche.
+# [DÉDUIT] images 06, 08, 09 : un repère n'apparaît qu'une fois atteint par le lézard (jamais au-dessus de lui)
 MARKER_STEP = 10.0            # [VU] §5.6 — en hauteur HUD (depuis le départ) [DÉDUIT] image 03 sans ligne à 10 m du sol
 MARKER_COLOR = "#FCFCFC"      # [VU]
 MARKER_FONT_PX = 46           # [DÉDUIT] image 06 : chiffres de 34 px de haut
@@ -329,13 +330,18 @@ LIZARD_FINGER = "#D4FC7C"     # [VU] rayons des doigts
 LIZARD_PAD = "#5C9C3C"        # [VU ≈] disques au bout des doigts
 LIZARD_EYE_COLOR = "#040404"  # [VU]
 LIZARD_SUPERSAMPLE = 2        # [CHOIX] lézard dessiné ×2 puis réduit (puissance de 2 : smoothscale exact ; ×3 perd 2 niveaux de couleur et d'alpha)
-LIZARD_LIMB_WIDTH = 0.11      # [DÉDUIT] image 01 : humérus / fémur ≈ 1/3 de la largeur des hanches (× colonne de référence)
+LIZARD_LIMB_WIDTH = 0.154     # [DÉDUIT] image 01 : humérus / fémur ≈ 1/3 de la largeur des hanches (0.11), ×1.4 pour l'allure compacte de la vidéo (× colonne de référence)
 LIZARD_DISTAL_RATIO = 0.7     # [VU] §5.4 — avant-bras et tibia ≈ 70 % de l'humérus et du fémur
 # [DÉDUIT] image 02 : demi-largeur du torse aux épaules (× clavicule), aux hanches (× bassin) et à la
 # taille (× la plus grande des deux) ; torse ovoïde lissé entre ces largeurs, le long de la colonne
-LIZARD_TORSO = (0.9, 1.0, 0.82)
+LIZARD_TORSO = (1.26, 1.4, 0.82)    # ×1.4 aux épaules et aux hanches (4a-1 : 0.9, 1.0) : lézard compact
 LIZARD_TAIL_BASE = 0.5        # [DÉDUIT] image 01 : demi-largeur de la queue au bassin (× demi-largeur des hanches)
 LIZARD_TAIL_TAPER = 1.15      # [CHOIX] exposant de l'effilage de la queue (1 = linéaire)
+# [CHOIX] dessin seulement : la queue est prolongée au-delà du dernier point jusqu'à TAIL_VISUAL_FACTOR ×
+# la colonne (images 01 et 06 : queue ≈ 1.9 × le torse ; queue physique : TAIL_LENGTH_FACTOR = 1.2), avec
+# une courbure amortie (×TAIL_VISUAL_DAMPING par segment) et sans passer sous le sol.
+TAIL_VISUAL_FACTOR = 1.9
+TAIL_VISUAL_DAMPING = 0.6
 LIZARD_HEAD = (0.85, 1.55)    # [DÉDUIT] image 02 : demi-largeur (× celle des épaules), longueur / largeur
 # [DÉDUIT] image 02 : œil = ellipse noire centrée à 55 % de la tête depuis le cou, demi-axes 0.11 × longueur
 # de tête (le long) et 0.14 × demi-largeur de tête (en travers), centre à 0.97 × la demi-largeur locale (il dépasse)

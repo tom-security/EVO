@@ -107,6 +107,7 @@ class JungleView:
         self.framing = self.scene.framing
         self.camera = scene.Camera(self.framing)
         self.lizard = render_lizard.LizardShape(replay.skel)
+        self.reached = np.maximum.accumulate(replay.height)   # hauteur HUD maximale atteinte à chaque frame
 
     def reset_camera(self):
         self.camera.update(self.replay.ref_y[0], snap=True)
@@ -114,6 +115,7 @@ class JungleView:
     def draw(self, surface, frame, timings=None):
         t0 = time.perf_counter()
         self.scene.draw_back(surface, self.camera.shift)
+        self.scene.draw_markers(surface, self.camera.shift, self.reached[frame])
         t1 = time.perf_counter()
         self.lizard.draw(surface, self.replay.pos[frame], self.camera.origin(), self.framing.scale)
         t2 = time.perf_counter()

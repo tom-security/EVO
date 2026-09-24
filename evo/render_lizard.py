@@ -74,6 +74,8 @@ class LizardShape:
         self.pad_radius = 0.5 * pad * self.w_distal
         self.palm_radius = 0.5 * palm * self.w_distal
         self.n_points = len(skel.pos)
+        tail_len = sum(length for name, length in zip(skel.link_names, skel.rest) if name == "tail")
+        self.tail_extra = max(0.0, config.TAIL_VISUAL_FACTOR * self.spine - tail_len)   # prolongement dessiné (m)
         self.margin = max(self.w_hip, self.w_sh, self.finger_len + self.pad_radius, self.head_len) + self.w_limb
 
     # ------------------------------------------------------------------
@@ -89,8 +91,9 @@ class LizardShape:
         light, dark = config.LIZARD_LIGHT, config.LIZARD_DARK
         out = []
 
-        # 1. queue : ligne médiane lissée, effilée jusqu'à une pointe fine
-        chain = _catmull_rom(np.vstack([pelvis, P[sk.TAIL_START:]]), samples=4)
+        # 1. queue : ligne médiane lissée, prolongée au-delà du dernier point (dessin seulement),
+        #    effilée jusqu'à une pointe fine
+        chain = _catmull_rom(self._visual_tail(np.vstack([pelvis, P[sk.TAIL_START:]])), samples=4)
         seg = np.diff(chain, axis=0)
         seg_len = np.hypot(seg[:, 0], seg[:, 1])
         u = np.concatenate([[0.0], np.cumsum(seg_len)]) / max(seg_len.sum(), 1e-9)
@@ -100,6 +103,8 @@ class LizardShape:
         width = self.w_tail * np.clip(1 - u, 0.0, 1.0) ** config.LIZARD_TAIL_TAPER + 0.02
         edge_l = chain + normals * width[:, None]
         edge_r = chain - normals * width[:, None]
+        for edge in (edge_l, edge_r, chain):   # la queue dessinée ne passe pas sous le sol
+            np.maximum(edge[:, 1], config.GROUND_Y, out=edge[:, 1])
         out.append((light, np.vstack([edge_l, chain[::-1]])))
         out.append((dark, np.vstack([edge_r, chain[::-1]])))
 
@@ -154,6 +159,31 @@ class LizardShape:
                             for a in ang])
             out.append((config.LIZARD_EYE_COLOR, ell))
         return out
+
+    def _visual_tail(self, tail):
+        """Prolonge la chaîne de la queue de `tail_extra` m : même longueur de segment, courbure
+        moyenne des derniers segments amortie de TAIL_VISUAL_DAMPING à chaque segment, jamais sous le sol."""
+        if self.tail_extra <= 0 or len(tail) < 3:
+            return tail
+        seg = np.diff(tail, axis=0)
+        ang = np.arctan2(seg[:, 1], seg[:, 0])
+        turns = (np.diff(ang) + np.pi) % (2 * np.pi) - np.pi
+        turn = float(np.mean(turns[-3:])) if len(turns) else 0.0
+        step = float(np.hypot(*seg[-1])) or 1e-3
+        heading = float(ang[-1])
+        total = float(np.hypot(seg[:, 0], seg[:, 1]).sum()) + self.tail_extra
+        pts, left, p = [], self.tail_extra, tail[-1].copy()
+        while left > 1e-6:
+            turn *= config.TAIL_VISUAL_DAMPING
+            heading += turn
+            d = min(step, left)
+            p = p + d * np.array([math.cos(heading), math.sin(heading)])
+            left -= d
+            # la queue dessinée ne traverse pas le sol (bord compris) : elle s'y couche
+            floor = config.GROUND_Y + self.w_tail * (left / total) ** config.LIZARD_TAIL_TAPER + 0.02
+            p[1] = max(p[1], floor)
+            pts.append(p.copy())
+        return np.vstack([tail, pts])
 
     @staticmethod
     def _capsule(a, b, width, color):

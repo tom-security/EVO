@@ -72,6 +72,30 @@ def test_scene_covers_decor_and_frames_are_filled(tmp_cache):
     assert np.all(arr[:, h - 2, 0] > arr[:, h - 2, 1])
 
 
+def test_markers_appear_only_once_reached(tmp_cache):
+    scene = sc.Scene()
+    surf = pygame.Surface(config.WINDOW_SIZE)
+    row = int(round(scene.framing.y_px(config.GROUND_Y + config.START_HEIGHT + 10.0)))
+    x = scene.framing.size[0] // 2
+    for reached, visible in ((9.9, False), (10.0, True), (15.0, True)):
+        scene.draw_back(surf, 0.0)
+        scene.draw_markers(surf, 0.0, reached)
+        assert (tuple(surf.get_at((x, row)))[:3] == tuple(pygame.Color(config.MARKER_COLOR))[:3]) == visible
+
+
+def test_visual_tail_is_longer_than_physics_and_stays_above_ground():
+    c = cr.Creature(cr.diagonal_gait_genome())
+    shape = rl.LizardShape(c.skel)
+    pos = c.world.pos.copy()
+    tail = np.vstack([pos[sk.PELVIS], pos[sk.TAIL_START:]])
+    visual = shape._visual_tail(tail)
+    length = np.hypot(*np.diff(visual, axis=0).T).sum()
+    assert length == pytest.approx(config.TAIL_VISUAL_FACTOR * shape.spine, rel=1e-6)
+    pos[:, 1] -= pos[:, 1].min() - config.GROUND_Y      # bout de la queue physique posé sur le sol
+    polys = shape.polygons(pos)
+    assert min(p[:, 1].min() for _, p in polys[:2]) >= config.GROUND_Y - 1e-9
+
+
 def test_camera_is_fixed_at_start_then_follows_with_lerp():
     cam = sc.Camera(sc.Framing())
     start = config.GROUND_Y + config.START_HEIGHT

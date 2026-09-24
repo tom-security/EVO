@@ -135,6 +135,7 @@ class Scene:
         self.layer_names = tuple(config.SCENE_LAYERS if layers is None else layers)
         self.max_shift = config.DECOR_TOP_HUD * self.framing.scale
         self.markers = [k * config.MARKER_STEP for k in range(1, int(config.DECOR_TOP_HUD // config.MARKER_STEP) + 1)]
+        self._prepare_markers()
         self.key = cache_key(self.framing, self.layer_names)
         self.layers = {}   # nom → (surface, parallaxe, décalage)
         self.built = False
@@ -157,10 +158,39 @@ class Scene:
         surface.blit(surf, (0, 0), pygame.Rect(0, top, self.framing.size[0], self.framing.size[1]))
 
     def draw_back(self, surface, shift):
-        """Ciel, arrière-plans et plan de la créature (tronc, sol, repères)."""
+        """Ciel, arrière-plans et plan de la créature (tronc, sol)."""
         for name in BACK_LAYERS:
             if name in self.layers:
                 self._blit(surface, name, shift)
+
+    def draw_markers(self, surface, shift, reached_hud):
+        """Repères de hauteur (§5.6) atteints par le lézard : ligne blanche sur le tronc, libellé à gauche.
+
+        [DÉDUIT] images 06, 08 et 09 : la vidéo ne montre jamais un repère au-dessus du lézard ; on ne
+        dessine donc un repère qu'une fois que la hauteur HUD du lézard l'a atteint.
+        """
+        f = self.framing
+        h = f.size[1]
+        base = config.GROUND_Y + config.START_HEIGHT
+        for hud in self.markers:
+            if hud > reached_hud:
+                break
+            y = int(round(f.y_px(base + hud, shift)))
+            label = self._marker_labels[hud]
+            if -label.get_height() < y < h + label.get_height():
+                surface.fill(self._marker_color, (self._marker_left, y - config.MARKER_LINE_PX // 2,
+                                                  self._marker_right - self._marker_left, config.MARKER_LINE_PX))
+                surface.blit(label, label.get_rect(midright=(self._marker_label_x, y)))
+
+    def _prepare_markers(self):
+        f = self.framing
+        pygame.font.init()
+        font = pygame.font.SysFont(config.FONT_SANS, int(round(config.MARKER_FONT_PX * f.scale / config.SCENE_SCALE)))
+        self._marker_color = _rgb(config.MARKER_COLOR)
+        self._marker_labels = {hud: font.render(f"{hud:g} m", True, self._marker_color) for hud in self.markers}
+        self._marker_left = int(round(f.x_px(config.TRUNK_X - config.TRUNK_WIDTH / 2)))
+        self._marker_right = int(round(f.x_px(config.TRUNK_X + config.TRUNK_WIDTH / 2)))
+        self._marker_label_x = int(round(self._marker_left - config.MARKER_LABEL_GAP_PX * f.scale / config.SCENE_SCALE))
 
     def draw_front(self, surface, shift):
         """Premier plan, qui passe devant le lézard."""
@@ -202,7 +232,7 @@ class Scene:
         return surf, 0.0
 
     def _build_plane(self, rng):
-        """Plan de la créature (parallaxe 1) : branches, tronc, sol, rochers, touffes, repères."""
+        """Plan de la créature (parallaxe 1) : branches, tronc, sol, rochers, touffes."""
         cv = _Canvas(self.framing, config.PARALLAX["plan"], self.max_shift, config.TRUNK_COLORS[4])
         top, bottom = cv.world_top() + 2.0, cv.world_bottom() - 2.0
         _branches(cv)
@@ -210,9 +240,7 @@ class Scene:
         _ground(cv, rng, bottom)
         _rocks(cv)
         _tufts(cv, rng)
-        surf = cv.finish()
-        _markers(surf, cv)
-        return surf, cv.offset
+        return cv.finish(), cv.offset
 
     # --- cache -------------------------------------------------------------
     def _load(self):
@@ -441,23 +469,3 @@ def _tufts(cv, rng):
             base = x + rng.uniform(-0.25, 0.25) * h
             w = 0.16 * h
             cv.poly([(base - w, g), (base + w, g), (x + dx, g + bh)], light if k % 2 else dark)
-
-
-def _markers(surf, cv):
-    """Repères de hauteur (hauteur HUD) : ligne blanche sur le tronc et libellé « 10 m » à gauche."""
-    f = cv.f
-    pygame.font.init()
-    font = pygame.font.SysFont(config.FONT_SANS, int(round(config.MARKER_FONT_PX * f.scale / config.SCENE_SCALE)))
-    color = _rgb(config.MARKER_COLOR)
-    left = int(round(f.x_px(config.TRUNK_X - config.TRUNK_WIDTH / 2)))
-    right = int(round(f.x_px(config.TRUNK_X + config.TRUNK_WIDTH / 2)))
-    gap = config.MARKER_LABEL_GAP_PX * f.scale / config.SCENE_SCALE
-    base = config.GROUND_Y + config.START_HEIGHT
-    for hud in range(int(config.MARKER_STEP), int(config.DECOR_TOP_HUD) + 1, int(config.MARKER_STEP)):
-        row = f.y_px(base + hud) + cv.offset
-        if not 0 <= row < surf.get_height():
-            continue
-        y = int(round(row))
-        pygame.draw.rect(surf, color, (left, y - config.MARKER_LINE_PX // 2, right - left, config.MARKER_LINE_PX))
-        label = font.render(f"{hud} m", True, color)
-        surf.blit(label, label.get_rect(midright=(int(round(left - gap)), y)))
