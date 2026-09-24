@@ -93,8 +93,11 @@ REST_POSE_DEG = {
 # qui est impossible avec des pattes de 0.4 m. On garde les proportions du §2.5 et on met
 # tout le corps à l'échelle ×BODY_SCALE. BODY_SCALE = 1 redonne exactement les longueurs du §2.5.
 BODY_SCALE = 7.0          # [DÉDUIT] images 03–05 : lézard ≈ 7.7 m de la tête au bout de la queue
-START_HEIGHT = 9.0        # [DÉDUIT] §1.7 — hauteur du point de référence au-dessus du sol à t = 0 ;
-                          # à 9 m, une créature couchée affiche ≈ −8.2 m (vidéo : −7.8 à −9 m)
+# [DÉDUIT] §1.7 — hauteur du point de référence (centre du torse) au-dessus du sol à t = 0.
+# Mesuré sur les images 03/05 : 0 m du HUD à 208 px au-dessus du haut de l'herbe, à 20.2 px/m.
+# Créature inerte : départ 9 m → −7.42 m à 10 s (assise sur le bassin), départ 10.3 m → −8.71 m
+# (vidéo : −7.8 à −9 m pour une créature au sol).
+START_HEIGHT = 10.3
 TRUNK_X = 0.0             # [CHOIX] axe du tronc
 TRUNK_WIDTH = 12.3        # [DÉDUIT] image 05 : 248 px à 20.2 px/m
 FALL_CONTACT_EPS = 1e-3   # [CHOIX] m — un point du corps (hors queue) à moins de ça du sol le touche
@@ -107,10 +110,30 @@ SYMMETRIC_MORPHOLOGY = True   # [DÉDUIT] §2.3 — mêmes longueurs et forces �
 S_MAX = 1.6                   # [CHOIX] §2.3 — force max autorisée d'un muscle (unités internes)
 # [CHOIX] §2.3 — couple produit par une force musculaire de 1, en « poids × colonne » de la
 # créature de référence (masse totale × G × longueur de colonne, à BODY_SCALE) : le calibrage
-# ne dépend donc pas de BODY_SCALE. Réglé en phase 2 sur l'allure diagonale écrite à la main
-# (forces 1.0, période 2 s) : 0.35 → +3.4 m en 10 s, 0.5 → +3.75 m, 0.75 → +3.7 m ; sous
-# ~0.2 elle ne décolle pas. À recalibrer en phase 3 (§3.2).
-TORQUE_SCALE = 0.5
+# ne dépend donc pas de BODY_SCALE.
+# Phase 2 (allure diagonale écrite à la main, forces 1.0, période 2 s, départ 8 m) : 0.35 → +3.4 m
+# en 10 s, 0.5 → +3.75 m. Phase 3b, étape 1 (génération 0, 1000 créatures, graines 0/1/2, départ 9 m,
+# prise 0.5) — grille 1 :
+#   TORQUE_SCALE   au sol           meilleure (score)      énergie brute méd / max
+#   0.10           767/787/741      −0.0 / +2.0 / +0.1     38 / 74–80
+#   0.25           724/737/700      +4.2 / +4.9 / +2.7     31 / 68–72
+#   0.50           651/686/652      +6.5 / +10.1 / +5.9    31 / 73–84
+#   1.50           593/635/590      +14.5 / +9.8 / +9.8    42 / 87–99
+#   → TORQUE_SCALE seul ne donne pas ≈ 45 % au sol : 51 des 70 créatures au sol d'un échantillon
+#     tenaient encore le mur quand un pied a touché le sol (descente « en rappel »). La part au sol
+#     dépend surtout de HOLD_PROBABILITY (grille 2, ci-dessous).
+# Grille 3 (départ 10.3 m, ENERGY_SCALE = 14.5 / médiane brute de la gén. 0, 30 générations, graines 0/1) :
+#   couple (TS ; prise)   E_SCALE  au sol g0  pic ~0 g0  champion g30     S_MAX top10% / champion
+#   0.10 ; 0.65           0.345    430 / 439  273 / 292  +7.3 / +7.0 m    4.9 / 1.2 %   0 / 0 %
+#   0.25 ; 0.62 (retenu)  0.413    428 / 439  228 / 212  +14.1 / +10.9 m  4.0 / 15.6 %  12.5 / 0 %
+#   0.25 ; 0.65           0.404    376 / 377  254 / 255  +11.2 / +13.2 m  7.0 / 12.8 %  0 / 0 %
+#   Aucun couple ne sature (≤ 16 % des forces à ≥ 0.99·S_MAX), mais à 0.10 la grimpe plafonne
+#   deux fois plus bas ; 0.25/0.62 donne ≈ 44 % au sol et le plus petit pic autour de 0 (§9 :
+#   « un petit groupe »). Dans tous les runs, la meilleure de la génération 0 grimpe déjà (+1.6 à
+#   +5 m), alors que le §9 dit qu'elle ne grimpe pas : à traiter avec la fitness (étape 2).
+#   Refaire : python main.py train --generations 30 --seed 0 --run-dir runs/calib/ts0.25_p0.62_s0 \
+#             --set TORQUE_SCALE=0.25 --set HOLD_PROBABILITY=0.62 --set ENERGY_SCALE=0.413
+TORQUE_SCALE = 0.25
 KP = 6.0                      # [CHOIX] §2.4 — gain PD, en force musculaire par radian d'écart
 KD = 1.5                      # [CHOIX] §2.4 — amortissement PD, en force musculaire par rad/s
 N_POSES = 4                   # [CHOIX] §2.4 — K poses par cycle d'horloge (3 à 8)
@@ -118,12 +141,17 @@ PERIOD_INIT = (0.5, 5.0)      # [DÉDUIT] §2.4 — période d'horloge tirée un
 PERIOD_BOUNDS = (0.3, 8.0)    # [CHOIX] §2.4 — bornes de la période (mutation, phase 3)
 LENGTH_FACTOR_RANGE = (0.6, 1.4)  # [CHOIX] §2.5 — longueurs d'os = référence × BODY_SCALE × U(0.6, 1.4)
 TARGET_RANGE_DEG = 90.0       # [CHOIX] §2.5 — angles cibles dans ±90° autour de la posture de repos
-HOLD_PROBABILITY = 0.5        # [CHOIX] §2.5 — probabilité qu'une patte tienne dans une pose aléatoire
+# [CHOIX] §2.5 — probabilité qu'une patte tienne dans une pose aléatoire. Grille 2 (génération 0,
+# graines 0/1/2, au sol sur 1000) : TS 0.25 → prise 0.5 : 700–737, 0.6 : 530–542, 0.7 : 315–361 ;
+# départ 10.3 m : −5 % seulement. Retenu 0.62 (voir TORQUE_SCALE, grille 3).
+HOLD_PROBABILITY = 0.62
 # [CHOIX] §3.2 — énergie : "torque" = Σ|force musculaire|·dt, "power" = Σ|force·vitesse angulaire|·dt
 ENERGY_MODE = "torque"
 # [CHOIX] §3.2 — unité de l'énergie du HUD : énergie = ENERGY_SCALE × Σ|force musculaire|·dt.
-# Pur changement d'unité (aucun effet sur la dynamique). Calibré en phase 3b, étape 1.
-ENERGY_SCALE = 1.0
+# Pur changement d'unité (aucun effet sur la dynamique), réglé après TORQUE_SCALE et HOLD_PROBABILITY :
+# 14.5 / médiane brute de la génération 0 (35.1 ; graines 0/1/2 : 35.1 / 34.6 / 35.8) = 0.413.
+# Génération 0 mise à l'échelle : médiane 14.5, max 29.5 / 30.4 / 29.6 (cible : médiane 13–16, max 30–38).
+ENERGY_SCALE = 0.413
 
 # Fitness (§3.2) : score = hauteur finale − FITNESS_ENERGY·énergie − FITNESS_MUSCLE·masse musculaire
 FITNESS_ENERGY = 0.02         # [CHOIX] §3.2 — à calibrer en phase 3

@@ -111,7 +111,11 @@ class _Panel:
         if pts:
             x, y = pts[-1]
             pygame.draw.circle(self.s, _c(PANEL), (int(x), int(y)), 6)
-            _text(self.s, self.f["small"], text, (min(x + 8, self.plot.right - 4), y), TEXT, "midleft")
+            width = self.f["small"].size(text)[0]
+            if x + 8 + width <= self.r.right - 4:
+                _text(self.s, self.f["small"], text, (x + 8, y), TEXT, "midleft")
+            else:  # pas la place à droite : au-dessus du dernier point, aligné à droite
+                _text(self.s, self.f["small"], text, (x - 4, y - 8), TEXT, "bottomright")
 
     def references(self, refs):
         for g, v, label in refs:
