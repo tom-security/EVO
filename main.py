@@ -91,7 +91,7 @@ def main(argv=None):
         from evo import charts, evolution
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
         gens = [args.gen] if args.command == "histogram" else None
-        for path in charts.export_run(run_dir, args.out, gens=gens if args.command == "histogram" else None):
+        for path in charts.export_run(run_dir, args.out, gens=gens, curves=args.command == "graphs"):
             print(path)
     elif args.command == "debug-creature":
         from evo import debug_creature

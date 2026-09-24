@@ -216,20 +216,21 @@ def histogram_chart(row, title, size=(1280, 720), stats_lines=(), reference=None
     return surface
 
 
-def export_run(run_dir, out_dir=None, gens=None):
+def export_run(run_dir, out_dir=None, gens=None, curves=True):
     """Courbes + histogrammes (gén. 0, 1, dernière) d'un run, en PNG. Renvoie les chemins."""
     from evo import evolution as ev
 
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")  # rendu sans écran
     pygame.display.init()
     out_dir = out_dir or os.path.join(run_dir, "graphes")
     os.makedirs(out_dir, exist_ok=True)
     rows = ev.read_stats(run_dir)
     seed = os.path.basename(os.path.normpath(run_dir))
     paths = []
-    title = f"Run {seed} : {int(rows[-1]['gen'])} générations"
-    path = os.path.join(out_dir, "courbes.png")
-    pygame.image.save(evolution_chart(rows, title), path)
-    paths.append(path)
+    if curves:
+        path = os.path.join(out_dir, "courbes.png")
+        pygame.image.save(evolution_chart(rows, f"Run {seed} : {int(rows[-1]['gen'])} générations"), path)
+        paths.append(path)
     last = int(rows[-1]["gen"])
     for g in gens if gens is not None else sorted({0, min(1, last), last}):
         row = rows[g]
