@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import config
-from evo import physics
+from evo import calibration, physics
 from evo import skeleton as sk
 from evo.benches import (H, ContractBench, GravityBench, HoldBench, IterationBench,
                          LinkBench, MassBench, MovementBench, PendulumBench)
@@ -86,6 +86,27 @@ def test_link_conserves_momentum():
     for _ in range(60):
         physics.step(world)
     np.testing.assert_allclose(world.momentum(), p0, atol=1e-12)
+
+
+def test_simple_pendulum_small_oscillation_period():
+    """Pendule à 2 points : un point fixé, un point lié par un os, lâché à 5°.
+
+    Hypothèse : la masse de l'os est répartie sur ses deux extrémités (§1.6) et celle du
+    point fixé ne compte pas (masse infinie) ; c'est donc un pendule simple idéal (masse
+    ponctuelle, tige sans masse), de période T = 2π√(L/g) indépendante de la masse.
+    Ce n'est PAS une tige pesante (qui donnerait 2π√(2L/3g)).
+    """
+    for length in (0.5, 1.0, 2.0):
+        measured = calibration.measure_period(calibration.simple_pendulum(length, 5.0))
+        bare = calibration.pendulum_period_theory(length, 5.0, amplitude_correction=False)
+        corrected = calibration.pendulum_period_theory(length, 5.0)
+        # À 5°, l'amplitude finie allonge la période de θ0²/16 ≈ 4.8e-4 : tolérance 1e-3 sur 2π√(L/g).
+        assert measured == pytest.approx(bare, rel=1e-3)
+        # Avec la correction d'amplitude, il reste l'erreur du schéma : Euler semi-implicite
+        # ~(ωh)²/24 ≈ 2e-6 pour h = DT/SUBSTEPS = 1/480 s, plus la légère décroissance
+        # d'amplitude due à la dissipation. Mesuré : ≤ 4e-6 (SUBSTEPS 8), ≤ 1.5e-5 (SUBSTEPS 4).
+        # Tolérance 1e-4 : valable pour SUBSTEPS ≥ 4.
+        assert measured == pytest.approx(corrected, rel=1e-4)
 
 
 # 5. Itérations -----------------------------------------------------------------
@@ -182,6 +203,52 @@ def test_skeleton_topology_and_symmetry():
         np.testing.assert_allclose(skel.pos[left] * (-1, 1), skel.pos[right], atol=1e-12)
     assert skel.pos[sk.L_HAND, 1] > skel.pos[sk.NECK, 1]   # bras levés
     assert skel.pos[sk.L_FOOT, 1] < skel.pos[sk.PELVIS, 1]  # jambes vers le bas
+
+
+# Solveur numba vs référence Python ----------------------------------------------
+needs_numba = pytest.mark.skipif(not physics.HAVE_NUMBA, reason="numba non installé")
+
+
+@needs_numba
+def test_numba_kernels_match_python_reference_single_call():
+    rng = np.random.default_rng(1)
+    skel = sk.build_skeleton()
+    for _ in range(20):
+        pos = skel.pos + rng.normal(scale=0.02, size=skel.pos.shape)  # liens un peu faussés
+        vel = rng.normal(size=skel.pos.shape)
+        worlds = []
+        for backend in ("numba", "python"):
+            world = physics.World(pos, skel.links, skel.rest, skel.is_bone, vel=vel)
+            world.held[sk.R_FOOT] = True
+            world.backend = backend
+            physics.link(world, H)
+            physics.project_links(world)
+            worlds.append(world)
+        np.testing.assert_allclose(worlds[0].vel, worlds[1].vel, rtol=0, atol=1e-12)
+        np.testing.assert_allclose(worlds[0].pos, worlds[1].pos, rtol=0, atol=1e-12)
+
+
+@needs_numba
+def test_numba_matches_python_reference_on_human_pendulum():
+    """Même trajectoire à 1e-9 près sur les 10 s du banc 8 (en pratique identique au bit près)."""
+    benches = []
+    for backend in ("numba", "python"):
+        bench = PendulumBench()
+        bench.world.backend = backend
+        benches.append(run(bench, PendulumBench.DURATION))
+    a, b = (bench.world for bench in benches)
+    np.testing.assert_allclose(a.pos, b.pos, rtol=0, atol=1e-9)
+    np.testing.assert_allclose(a.vel, b.vel, rtol=0, atol=1e-9)
+
+
+# Stabilisation -------------------------------------------------------------------
+def test_chosen_stabilisation_injects_no_energy():
+    chosen = calibration.run_human_pendulum(config.BETA, config.N_POS_ITER)
+    assert chosen["injected"] < 1e-6
+    assert chosen["body"] < 0.01 and chosen["tail"] < 0.01
+    # Contre-exemple documenté dans config.py : Baumgarte seul injecte de l'énergie.
+    beta_only = calibration.run_human_pendulum(config.BETA, 0)
+    assert beta_only["injected"] > 0.1
 
 
 # 8. Pendule humain -------------------------------------------------------------

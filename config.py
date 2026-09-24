@@ -15,12 +15,26 @@ DT = 1.0 / 60.0     # [CHOIX] §1.4 — pas d'une frame
 SUBSTEPS = 8        # [CHOIX] §1.4 — sous-pas par frame (dt_physique = 1/480 s)
 N_ITER = 30         # [CHOIX] §1.4 — passes de Gauss-Seidel sur les vitesses des liens
 BETA = 0.2          # [CHOIX] §1.4 — stabilisation de Baumgarte (biais = BETA·C/h), haut de la plage 0.1–0.2
-N_POS_ITER = 8      # [CHOIX] §1.4 — passes de projection de position après intégration
-# Calibrage phase 1 (banc 8, pendu par une main 10 s, erreur max os du corps / queue) :
-#   BETA 0.1, N_POS_ITER 2 -> 0.31 % / 0.99 %   (limite sur la queue : segments courts et légers)
-#   BETA 0.2, N_POS_ITER 8 -> 0.12 % / 0.50 %   (retenu ; la spec suggérait 1–3 passes, 8 coûte ~+25 %)
-#   SUBSTEPS 16 (BETA 0.1, N_POS_ITER 2) -> 0.11 % / 0.34 %   (2× plus cher)
+N_POS_ITER = 8      # [CHOIX] §1.4 — passes de projection de position après intégration (la spec suggérait 1–3)
+# Choix de la stabilisation (`python main.py debug-physics --calibrate`) :
+#   banc 8 = pendu par une main 10 s ; pendule simple = 2 points, 30°, 20 s.
+#   « injecté » = somme des hausses d'énergie d'un sous-pas au suivant (la gravité est conservative).
+#
+#   config             BETA proj  corps %  queue %  E-E0 J  injecté J  dissipé J  pendule simple ΔE/E
+#   BETA seul           0.2    0    0.685    9.760  -1.992     0.5320     -2.524        +0.16 %
+#   projection seule    0.0    8    0.183    0.804  -2.820     0.0000     -2.820        -3.74 %
+#   les deux (retenu)   0.2    8    0.135    0.502  -2.490     0.0000     -2.490        -3.74 %
+#
+#   BETA seul injecte de l'énergie (le biais ajoute une vitesse artificielle pour rattraper l'écart) et laisse
+#   la queue s'étirer de ~10 %. Les deux ensemble ne corrigent pas deux fois la même erreur :
+#   la projection a lieu en fin de sous-pas, donc au sous-pas suivant C ≈ 0 et Baumgarte ne
+#   traite que ce que les 8 passes n'ont pas résorbé. Aucune énergie injectée, erreur la plus
+#   faible, et moins de dissipation que la projection seule.
+#   Reste une dissipation d'ordre h, propre à la correction des vitesses (la vitesse
+#   tangente d'un sous-pas a une composante radiale au suivant, que Link() retire) :
+#   ~3.7 % de l'énergie d'oscillation en 20 s à 30° (1.9 % avec SUBSTEPS 16, 0.96 % avec 32).
 DAMPING = 0.0       # [CHOIX] — amortissement global des vitesses (1/s), 0 = aucun
+USE_NUMBA = True    # [CHOIX] §4 — solveur de liens compilé ; False = référence Python pure
 
 # Méthode naïve « ressort » (vidéo aquatique), uniquement pour la comparaison du banc 4.
 SPRING_K = 100.0    # [CHOIX] raideur (N/m) : assez souple pour montrer l'élasticité

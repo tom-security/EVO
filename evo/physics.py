@@ -3,15 +3,25 @@
 Les fonctions portent les noms de la slide « Moteur physique » (image 19) :
 Movement(), Gravity(), Hold(), Link(), Contract().
 
-Phase 1 : un `World` = un seul système, en numpy. Le solveur de liens est une boucle
-Python car Gauss-Seidel est séquentiel par nature ; il passera en numba batché
-(B, P, 2) en phase 3 sans changer ces noms ni la séparation topologie / longueurs.
+Un `World` = un seul système. Tout est en numpy, sauf le solveur de liens
+(Gauss-Seidel sur les vitesses + projection de position), séquentiel par nature :
+il est compilé avec numba. La même boucle en Python pur est gardée comme référence
+(`backend="python"`), et les tests vérifient que les deux donnent le même résultat.
 """
 import math
 
 import numpy as np
 
 import config
+
+try:
+    from numba import njit
+    HAVE_NUMBA = True
+except ImportError:  # repli : la référence Python pure
+    HAVE_NUMBA = False
+
+    def njit(*args, **kwargs):
+        return lambda f: f
 
 
 def compute_masses(n_points, links, rest, is_bone):
@@ -64,6 +74,7 @@ class World:
         self.n_pos_iter = config.N_POS_ITER
         self.damping = config.DAMPING
         self.link_mode = "rigid"  # "rigid" (méthode de la vidéo) ou "spring" (méthode naïve, banc 4)
+        self.backend = "numba" if (config.USE_NUMBA and HAVE_NUMBA) else "python"
 
     @property
     def inv_mass(self):
@@ -178,57 +189,121 @@ def link(world, h):
     """
     if len(world.links) == 0 or world.n_iter <= 0:
         return
-    w = world.inv_mass.tolist()
-    px, py = world.pos[:, 0].tolist(), world.pos[:, 1].tolist()
-    vx, vy = world.vel[:, 0].tolist(), world.vel[:, 1].tolist()
-
-    # Les positions ne bougent pas pendant les passes : axes et biais calculés une fois.
-    constraints = []
-    for (i, j), rest in zip(world.links.tolist(), world.rest.tolist()):
-        wi, wj = w[i], w[j]
-        wsum = wi + wj
-        dx, dy = px[j] - px[i], py[j] - py[i]
-        dist = math.hypot(dx, dy)
-        if wsum == 0.0 or dist < 1e-12:
-            continue
-        bias = world.beta * (dist - rest) / h
-        constraints.append((i, j, dx / dist, dy / dist, wi, wj, wsum, bias))
-
-    for _ in range(world.n_iter):
-        for i, j, nx, ny, wi, wj, wsum, bias in constraints:
-            vrel = (vx[j] - vx[i]) * nx + (vy[j] - vy[i]) * ny
-            lam = -(vrel + bias) / wsum
-            vx[i] -= lam * wi * nx
-            vy[i] -= lam * wi * ny
-            vx[j] += lam * wj * nx
-            vy[j] += lam * wj * ny
-
-    world.vel[:, 0] = vx
-    world.vel[:, 1] = vy
+    kernel = _link_velocities_numba if world.backend == "numba" else _link_velocities_python
+    kernel(world.pos, world.vel, world.inv_mass, world.links, world.rest,
+           float(h), int(world.n_iter), float(world.beta))
 
 
 def project_links(world):
     """Projection de position (§1.4, étape 4) : ramène chaque lien à sa longueur, pondéré par 1/m."""
     if len(world.links) == 0 or world.n_pos_iter <= 0:
         return
-    w = world.inv_mass.tolist()
-    px, py = world.pos[:, 0].tolist(), world.pos[:, 1].tolist()
-    links = [(i, j, rest, w[i], w[j], w[i] + w[j])
-             for (i, j), rest in zip(world.links.tolist(), world.rest.tolist())
-             if w[i] + w[j] > 0.0]
-    for _ in range(world.n_pos_iter):
-        for i, j, rest, wi, wj, wsum in links:
-            dx, dy = px[j] - px[i], py[j] - py[i]
-            dist = math.hypot(dx, dy)
+    kernel = _project_links_numba if world.backend == "numba" else _project_links_python
+    kernel(world.pos, world.inv_mass, world.links, world.rest, int(world.n_pos_iter))
+
+
+# Noyaux du solveur. Les versions numba et Python font exactement les mêmes
+# opérations dans le même ordre ; elles modifient `vel` / `pos` sur place.
+
+@njit(cache=True)
+def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta):
+    n_links = links.shape[0]
+    nx = np.zeros(n_links)
+    ny = np.zeros(n_links)
+    bias = np.zeros(n_links)
+    active = np.zeros(n_links, dtype=np.bool_)
+    # Les positions ne bougent pas pendant les passes : axes et biais calculés une fois.
+    for k in range(n_links):
+        i, j = links[k, 0], links[k, 1]
+        dx = pos[j, 0] - pos[i, 0]
+        dy = pos[j, 1] - pos[i, 1]
+        dist = math.sqrt(dx * dx + dy * dy)
+        if inv_mass[i] + inv_mass[j] == 0.0 or dist < 1e-12:
+            continue
+        active[k] = True
+        nx[k] = dx / dist
+        ny[k] = dy / dist
+        bias[k] = beta * (dist - rest[k]) / h
+    for _ in range(n_iter):
+        for k in range(n_links):
+            if not active[k]:
+                continue
+            i, j = links[k, 0], links[k, 1]
+            wi, wj = inv_mass[i], inv_mass[j]
+            vrel = (vel[j, 0] - vel[i, 0]) * nx[k] + (vel[j, 1] - vel[i, 1]) * ny[k]
+            lam = -(vrel + bias[k]) / (wi + wj)
+            vel[i, 0] -= lam * wi * nx[k]
+            vel[i, 1] -= lam * wi * ny[k]
+            vel[j, 0] += lam * wj * nx[k]
+            vel[j, 1] += lam * wj * ny[k]
+
+
+@njit(cache=True)
+def _project_links_numba(pos, inv_mass, links, rest, n_pos_iter):
+    for _ in range(n_pos_iter):
+        for k in range(links.shape[0]):
+            i, j = links[k, 0], links[k, 1]
+            wi, wj = inv_mass[i], inv_mass[j]
+            if wi + wj == 0.0:
+                continue
+            dx = pos[j, 0] - pos[i, 0]
+            dy = pos[j, 1] - pos[i, 1]
+            dist = math.sqrt(dx * dx + dy * dy)
             if dist < 1e-12:
                 continue
-            k = (dist - rest) / (wsum * dist)
-            px[i] += wi * k * dx
-            py[i] += wi * k * dy
-            px[j] -= wj * k * dx
-            py[j] -= wj * k * dy
-    world.pos[:, 0] = px
-    world.pos[:, 1] = py
+            c = (dist - rest[k]) / ((wi + wj) * dist)
+            pos[i, 0] += wi * c * dx
+            pos[i, 1] += wi * c * dy
+            pos[j, 0] -= wj * c * dx
+            pos[j, 1] -= wj * c * dy
+
+
+def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta):
+    """Référence Python pure de `_link_velocities_numba` (listes Python pour la vitesse)."""
+    w = inv_mass.tolist()
+    px, py = pos[:, 0].tolist(), pos[:, 1].tolist()
+    vx, vy = vel[:, 0].tolist(), vel[:, 1].tolist()
+    constraints = []
+    for (i, j), r in zip(links.tolist(), rest.tolist()):
+        dx, dy = px[j] - px[i], py[j] - py[i]
+        dist = math.sqrt(dx * dx + dy * dy)
+        if w[i] + w[j] == 0.0 or dist < 1e-12:
+            continue
+        constraints.append((i, j, dx / dist, dy / dist, beta * (dist - r) / h))
+    for _ in range(n_iter):
+        for i, j, nx, ny, bias in constraints:
+            wi, wj = w[i], w[j]
+            vrel = (vx[j] - vx[i]) * nx + (vy[j] - vy[i]) * ny
+            lam = -(vrel + bias) / (wi + wj)
+            vx[i] -= lam * wi * nx
+            vy[i] -= lam * wi * ny
+            vx[j] += lam * wj * nx
+            vy[j] += lam * wj * ny
+    vel[:, 0] = vx
+    vel[:, 1] = vy
+
+
+def _project_links_python(pos, inv_mass, links, rest, n_pos_iter):
+    """Référence Python pure de `_project_links_numba`."""
+    w = inv_mass.tolist()
+    px, py = pos[:, 0].tolist(), pos[:, 1].tolist()
+    pairs = list(zip(links.tolist(), rest.tolist()))
+    for _ in range(n_pos_iter):
+        for (i, j), r in pairs:
+            wi, wj = w[i], w[j]
+            if wi + wj == 0.0:
+                continue
+            dx, dy = px[j] - px[i], py[j] - py[i]
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist < 1e-12:
+                continue
+            c = (dist - r) / ((wi + wj) * dist)
+            px[i] += wi * c * dx
+            py[i] += wi * c * dy
+            px[j] -= wj * c * dx
+            py[j] -= wj * c * dy
+    pos[:, 0] = px
+    pos[:, 1] = py
 
 
 def spring_link(world, h, k=None, c=None):
