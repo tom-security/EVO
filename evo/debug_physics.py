@@ -7,7 +7,7 @@ import config
 from evo.benches import BENCHES, H
 
 SPEEDS = (1.0, 0.25, 0.1)
-CONTROLS = "1–8 / ←→ banc · Espace pause · R recommencer · S ralenti · V vitesses"
+CONTROLS = "1–9 / ←→ banc · Espace pause · R recommencer · S ralenti · V vitesses"
 
 
 def draw_frame(painter, bench, index, speed=1.0, paused=False):
@@ -52,7 +52,7 @@ def run_interactive(start=1):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif pygame.K_1 <= event.key <= pygame.K_8:
+                elif pygame.K_1 <= event.key <= pygame.K_9:
                     index = event.key - pygame.K_1
                 elif event.key == pygame.K_RIGHT:
                     index = (index + 1) % len(benches)
@@ -96,7 +96,7 @@ def export(out_dir):
     width, height = config.WINDOW_SIZE
     surface = pygame.Surface(config.WINDOW_SIZE)
     painter = Painter(surface, load_fonts())
-    overview = pygame.Surface((width, height * len(BENCHES) // 4))
+    overview = pygame.Surface((width, (len(BENCHES) + 1) // 2 * height // 2))
     overview.fill(pygame.Color(config.SCHEMA_BG))
 
     for index, cls in enumerate(BENCHES):

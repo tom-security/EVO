@@ -75,6 +75,9 @@ class World:
         self.damping = config.DAMPING
         self.link_mode = "rigid"  # "rigid" (méthode de la vidéo) ou "spring" (méthode naïve, banc 4)
         self.backend = "numba" if (config.USE_NUMBA and HAVE_NUMBA) else "python"
+        self.ground_y = None  # hauteur du sol (None = pas de sol) ; les bancs de la phase 1 n'en ont pas
+        self.ground_friction = config.GROUND_FRICTION
+        self.contact_margin = config.CONTACT_MARGIN
 
     @property
     def inv_mass(self):
@@ -180,34 +183,45 @@ def contract(world, h):
 
 
 def link(world, h):
-    """Link() : liens rigides par correction des vitesses (§1.4).
+    """Link() : liens rigides par correction des vitesses (§1.4), et contacts avec le sol.
 
     Pour chaque lien, on annule la vitesse relative le long de l'axe par deux
     impulsions opposées. On répète la passe sur tous les liens `n_iter` fois
     (Gauss-Seidel) : chaque passe réduit l'erreur. Le biais de Baumgarte
     (beta·C/h) ramène doucement les longueurs qui ont dérivé.
+    Le sol (§1.7) est résolu dans les mêmes passes : impulsion normale ≥ 0 qui
+    empêche de le traverser, frottement de Coulomb borné par μ × l'impulsion normale.
     """
-    if len(world.links) == 0 or world.n_iter <= 0:
+    ground = world.ground_y is not None
+    if (len(world.links) == 0 and not ground) or world.n_iter <= 0:
         return
     kernel = _link_velocities_numba if world.backend == "numba" else _link_velocities_python
     kernel(world.pos, world.vel, world.inv_mass, world.links, world.rest,
-           float(h), int(world.n_iter), float(world.beta))
+           float(h), int(world.n_iter), float(world.beta),
+           ground, float(world.ground_y or 0.0), float(world.ground_friction), float(world.contact_margin))
 
 
 def project_links(world):
-    """Projection de position (§1.4, étape 4) : ramène chaque lien à sa longueur, pondéré par 1/m."""
-    if len(world.links) == 0 or world.n_pos_iter <= 0:
+    """Projection de position (§1.4, étape 4) : ramène chaque lien à sa longueur, pondéré par 1/m.
+
+    Avec un sol, chaque passe remonte aussi au niveau du sol les points passés dessous.
+    """
+    ground = world.ground_y is not None
+    if (len(world.links) == 0 and not ground) or world.n_pos_iter <= 0:
         return
     kernel = _project_links_numba if world.backend == "numba" else _project_links_python
-    kernel(world.pos, world.inv_mass, world.links, world.rest, int(world.n_pos_iter))
+    kernel(world.pos, world.inv_mass, world.links, world.rest, int(world.n_pos_iter),
+           ground, float(world.ground_y or 0.0))
 
 
 # Noyaux du solveur. Les versions numba et Python font exactement les mêmes
 # opérations dans le même ordre ; elles modifient `vel` / `pos` sur place.
 
 @njit(cache=True)
-def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta):
+def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta,
+                           ground, ground_y, friction, margin):
     n_links = links.shape[0]
+    n_points = pos.shape[0]
     nx = np.zeros(n_links)
     ny = np.zeros(n_links)
     bias = np.zeros(n_links)
@@ -224,6 +238,18 @@ def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta):
         nx[k] = dx / dist
         ny[k] = dy / dist
         bias[k] = beta * (dist - rest[k]) / h
+    # Contacts avec le sol : points libres proches du sol ou qui vont le traverser.
+    # vn_min = vitesse verticale minimale : s'approcher jusqu'au sol, ou en ressortir.
+    contact = np.zeros(n_points, dtype=np.bool_)
+    vn_min = np.zeros(n_points)
+    lam_n = np.zeros(n_points)
+    lam_t = np.zeros(n_points)
+    if ground:
+        for p in range(n_points):
+            gap = pos[p, 1] - ground_y
+            if inv_mass[p] > 0.0 and (gap < margin or gap + vel[p, 1] * h < 0.0):
+                contact[p] = True
+                vn_min[p] = -gap / h if gap > 0.0 else -beta * gap / h
     for _ in range(n_iter):
         for k in range(n_links):
             if not active[k]:
@@ -236,10 +262,22 @@ def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta):
             vel[i, 1] -= lam * wi * ny[k]
             vel[j, 0] += lam * wj * nx[k]
             vel[j, 1] += lam * wj * ny[k]
+        if ground:
+            for p in range(n_points):
+                if not contact[p]:
+                    continue
+                # impulses cumulées (par unité de masse) : normale ≥ 0, |tangente| ≤ μ·normale
+                new_n = max(lam_n[p] + vn_min[p] - vel[p, 1], 0.0)
+                vel[p, 1] += new_n - lam_n[p]
+                lam_n[p] = new_n
+                bound = friction * new_n
+                new_t = min(max(lam_t[p] - vel[p, 0], -bound), bound)
+                vel[p, 0] += new_t - lam_t[p]
+                lam_t[p] = new_t
 
 
 @njit(cache=True)
-def _project_links_numba(pos, inv_mass, links, rest, n_pos_iter):
+def _project_links_numba(pos, inv_mass, links, rest, n_pos_iter, ground, ground_y):
     for _ in range(n_pos_iter):
         for k in range(links.shape[0]):
             i, j = links[k, 0], links[k, 1]
@@ -256,9 +294,14 @@ def _project_links_numba(pos, inv_mass, links, rest, n_pos_iter):
             pos[i, 1] += wi * c * dy
             pos[j, 0] -= wj * c * dx
             pos[j, 1] -= wj * c * dy
+        if ground:
+            for p in range(pos.shape[0]):
+                if inv_mass[p] > 0.0 and pos[p, 1] < ground_y:
+                    pos[p, 1] = ground_y
 
 
-def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta):
+def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta,
+                            ground, ground_y, friction, margin):
     """Référence Python pure de `_link_velocities_numba` (listes Python pour la vitesse)."""
     w = inv_mass.tolist()
     px, py = pos[:, 0].tolist(), pos[:, 1].tolist()
@@ -270,6 +313,12 @@ def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta):
         if w[i] + w[j] == 0.0 or dist < 1e-12:
             continue
         constraints.append((i, j, dx / dist, dy / dist, beta * (dist - r) / h))
+    contacts = []  # [point, vn_min, impulsion normale cumulée, impulsion tangente cumulée]
+    if ground:
+        for p in range(len(px)):
+            gap = py[p] - ground_y
+            if w[p] > 0.0 and (gap < margin or gap + vy[p] * h < 0.0):
+                contacts.append([p, -gap / h if gap > 0.0 else -beta * gap / h, 0.0, 0.0])
     for _ in range(n_iter):
         for i, j, nx, ny, bias in constraints:
             wi, wj = w[i], w[j]
@@ -279,11 +328,19 @@ def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta):
             vy[i] -= lam * wi * ny
             vx[j] += lam * wj * nx
             vy[j] += lam * wj * ny
+        for c in contacts:
+            p, vmin, lam_n, lam_t = c
+            new_n = max(lam_n + vmin - vy[p], 0.0)
+            vy[p] += new_n - lam_n
+            bound = friction * new_n
+            new_t = min(max(lam_t - vx[p], -bound), bound)
+            vx[p] += new_t - lam_t
+            c[2], c[3] = new_n, new_t
     vel[:, 0] = vx
     vel[:, 1] = vy
 
 
-def _project_links_python(pos, inv_mass, links, rest, n_pos_iter):
+def _project_links_python(pos, inv_mass, links, rest, n_pos_iter, ground, ground_y):
     """Référence Python pure de `_project_links_numba`."""
     w = inv_mass.tolist()
     px, py = pos[:, 0].tolist(), pos[:, 1].tolist()
@@ -302,6 +359,10 @@ def _project_links_python(pos, inv_mass, links, rest, n_pos_iter):
             py[i] += wi * c * dy
             px[j] -= wj * c * dx
             py[j] -= wj * c * dy
+        if ground:
+            for p in range(len(py)):
+                if w[p] > 0.0 and py[p] < ground_y:
+                    py[p] = ground_y
     pos[:, 0] = px
     pos[:, 1] = py
 

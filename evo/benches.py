@@ -9,6 +9,7 @@ import math
 import numpy as np
 
 import config
+from evo import creature as cr
 from evo import physics
 from evo import skeleton as sk
 
@@ -578,5 +579,83 @@ class PendulumBench(Bench):
                 painter.arrow(p, v, 15, width=4)
 
 
+# ---------------------------------------------------------------------------
+# 9. Sol
+# ---------------------------------------------------------------------------
+class GroundBench(Bench):
+    number = 9
+    title = "Sol"
+    subtitle = "Collision sans rebond + frottement de Coulomb ; créature inerte lâchée à 8 m."
+    snapshot_times = (0.0, 1.3, 3.0, 6.0)
+    V0 = 5.0                 # m/s, vitesse de glissement initiale
+    FRICTIONS = (0.5, 1.0, 2.0)
+
+    def reset(self):
+        self.creature = cr.Creature(cr.limp_genome())
+        self.sliders = []
+        for mu in self.FRICTIONS:
+            world = physics.World([(0.0, config.GROUND_Y)], mass=[1.0], vel=[(self.V0, 0.0)])
+            world.ground_y = config.GROUND_Y
+            world.ground_friction = mu
+            self.sliders.append(world)
+        names = self.creature.skel.link_names
+        self.tail_mask = np.array([n == "tail" for n in names])
+        self.min_y = float(self.creature.world.pos[:, 1].min())
+        self.max_body = self.max_tail = 0.0
+        self.clock = 0.0
+
+    def stop_distance(self, mu):
+        return self.V0 ** 2 / (2 * mu * config.G)
+
+    def substep(self, h):
+        self.creature.substep(h)
+        for world in self.sliders:
+            physics.substep(world, h)
+        w = self.creature.world
+        self.min_y = min(self.min_y, float(w.pos[:, 1].min()))
+        err = np.abs(w.link_lengths() - w.rest) / w.rest
+        self.max_body = max(self.max_body, float(err[~self.tail_mask].max()))
+        self.max_tail = max(self.max_tail, float(err[self.tail_mask].max()))
+        self.clock += h
+
+    def metrics(self):
+        c = self.creature
+        slides = "  ".join(f"μ={w.ground_friction:g} : {w.pos[0, 0]:.3f} m (théorie {self.stop_distance(w.ground_friction):.3f})"
+                           for w in self.sliders)
+        return [f"créature : hauteur {c.height():+.2f} m   au sol : {'oui' if c.fallen else 'non'}"
+                f"   point le plus bas {self.min_y:+.1e} m   énergie cinétique {c.world.kinetic_energy():.2f} J",
+                f"erreur de longueur max : os du corps {self.max_body * 100:.2f} %   queue {self.max_tail * 100:.2f} % (pic à l'impact)",
+                f"glissade à {self.V0:g} m/s, arrêt à : {slides}"]
+
+    def draw(self, painter):
+        width, height = config.WINDOW_SIZE
+        ground_px = 560
+        # Gauche : la créature (échelle de la créature).
+        painter.set_camera((330, ground_px), 30)
+        painter.line_px((20, ground_px), (640, ground_px), config.SCHEMA_BONE, 3)
+        w = self.creature.world
+        start_y = painter.to_px((0, config.START_HEIGHT))[1]
+        painter.dashed_px((40, start_y), (620, start_y), config.SCHEMA_TEXT_DIM, 1)
+        painter.text(f"départ : {config.START_HEIGHT:g} m", (44, start_y - 22), "small", config.SCHEMA_TEXT_DIM)
+        for (a, b), name in zip(w.links, self.creature.skel.link_names):
+            if name != "brace":
+                painter.bone(w.pos[a], w.pos[b], 3 if name == "tail" else 5)
+        for k, p in enumerate(w.pos):
+            painter.point(p, radius=2 if k >= sk.TAIL_START else 4)
+        # Droite : points qui glissent, avec la distance d'arrêt théorique v0²/(2μg).
+        painter.set_camera((720, ground_px), 190)
+        painter.line_px((660, ground_px), (1260, ground_px), config.SCHEMA_BONE, 3)
+        for k, world in enumerate(self.sliders):
+            y = ground_px - 60 - 110 * k
+            painter.set_camera((720, y), 190)
+            painter.line_px((700, y), (1250, y), config.SCHEMA_BRACE, 2)
+            stop = painter.to_px((self.stop_distance(world.ground_friction), 0))
+            painter.line_px((stop[0], y - 22), (stop[0], y + 8), config.SCHEMA_GRAVITY, 3)
+            painter.point(world.pos[0], radius=12)
+            if self.show_velocity:
+                painter.arrow(world.pos[0], world.vel[0], 18, width=6)
+            painter.text(f"μ = {world.ground_friction:g}", (700, y - 44), "small", config.SCHEMA_TEXT_DIM)
+
+
 BENCHES = [MovementBench, GravityBench, HoldBench, LinkBench,
-           IterationBench, ContractBench, MassBench, PendulumBench]
+           IterationBench, ContractBench, MassBench, PendulumBench, GroundBench]

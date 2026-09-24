@@ -68,15 +68,16 @@ def _mirror(deg):
     return 180.0 - deg
 
 
-def build_skeleton(lengths=None, tail_segments=None, tail_length_factor=None):
+def build_skeleton(lengths=None, tail_segments=None, tail_length_factor=None, head_length=None):
     """Construit le squelette dans la posture de gecko du repos.
 
-    `lengths` : dict des 7 longueurs d'os (défaut : config.BONE_REF_LENGTHS).
+    `lengths` : dict des 7 longueurs d'os (défaut : config.BONE_REF_LENGTHS, sans BODY_SCALE).
     Les longueurs des liens de rigidité sont celles de la posture de repos.
     """
     L = dict(config.BONE_REF_LENGTHS)
     if lengths:
         L.update(lengths)
+    head_length = config.HEAD_LENGTH if head_length is None else head_length
     n_tail = config.TAIL_SEGMENTS if tail_segments is None else tail_segments
     tail_factor = config.TAIL_LENGTH_FACTOR if tail_length_factor is None else tail_length_factor
     pose = config.REST_POSE_DEG
@@ -84,7 +85,7 @@ def build_skeleton(lengths=None, tail_segments=None, tail_length_factor=None):
     pos = np.zeros((TAIL_START + n_tail, 2))
     pos[PELVIS] = (0.0, 0.0)
     pos[NECK] = (0.0, L["spine"])
-    pos[HEAD] = pos[NECK] + (0.0, config.HEAD_LENGTH)
+    pos[HEAD] = pos[NECK] + (0.0, head_length)
     for side, shoulder, elbow, hand, hip, knee, foot in (
             (+1, L_SHOULDER, L_ELBOW, L_HAND, L_HIP, L_KNEE, L_FOOT),
             (-1, R_SHOULDER, R_ELBOW, R_HAND, R_HIP, R_KNEE, R_FOOT)):
