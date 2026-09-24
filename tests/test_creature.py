@@ -217,7 +217,9 @@ def test_fitness_satisfies_calibration_constraints():
     fallen = cr.fitness(-8.0, 25.0, 13.0)
     champion = cr.fitness(36.0, 32.5, 13.5)
     assert immobile > fallen
-    assert champion > 30.0
+    assert champion > 15.0  # « très positif » : +21.7 avec les coefficients calibrés
+    # §9, gén. 23 : la grimpeuse (2.3 m, E 4.9, M 8.0) bat l'immobile (−0.1 m, E 0.5, M 3.3)
+    assert cr.fitness(2.3, 4.9, 8.0) > cr.fitness(-0.1, 0.5, 3.3)
     # à hauteur égale, moins d'énergie et moins de muscles gagnent
     assert cr.fitness(2.0, 5.0, 8.0) > cr.fitness(2.0, 10.0, 8.0) > cr.fitness(2.0, 10.0, 12.0)
 

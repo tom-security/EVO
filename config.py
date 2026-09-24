@@ -154,8 +154,32 @@ ENERGY_MODE = "torque"
 ENERGY_SCALE = 0.413
 
 # Fitness (§3.2) : score = hauteur finale − FITNESS_ENERGY·énergie − FITNESS_MUSCLE·masse musculaire
-FITNESS_ENERGY = 0.02         # [CHOIX] §3.2 — à calibrer en phase 3
-FITNESS_MUSCLE = 0.05         # [CHOIX] §3.2 — à calibrer en phase 3
+# [CHOIX] §3.2 — calibré en phase 3b, étape 2 (runs de 40 générations, 1000 créatures, runs/fit/) :
+#   (c_E ; c_M ; graine)  meilleure g0 h   muscle moy. g1/10/20/40   période moy. g1/10/20/40   champion g40
+#   grille 1 : 0.1 ; 0.1 ; 0     +3.1 m    12.8 / 13.6 / 13.0 / 16.5  2.6 / 1.8 / 1.2 / 1.3       +13.1 m
+#              0.2 ; 0.2 ; 0     +1.7 m    12.6 /  9.6 /  9.4 / 11.1  2.6 / 1.9 / 1.0 / 0.9       +13.2 m
+#              0.4 ; 0.4 ; 0     −0.5 m    11.9 /  7.1 /  5.5 /  7.5  2.7 / 2.4 / 2.9 / 0.8        +5.9 m
+#   grille 2 : 0.5 ; 0.4 ; 0     −0.4 m    11.6 /  7.6 /  6.1 /  7.7  2.7 / 3.5 / 1.8 / 0.8        +8.0 m
+#              0.6 ; 0.4 ; 0     −0.4 m    11.5 /  7.5 /  5.1 /  1.3  2.7 / 3.6 / 2.6 / 4.0        −0.4 m
+#              (et 0.8/0.4, 0.5/0.3, 0.6/0.3 : même tendance)
+#   grille 3 : 0.5 ; 0.4 ; 1 / 2  la paresse gagne : muscle 1.5 / 0.6 à g40, champion −0.5 / −0.4 m
+#   → avec c_M ≥ 0.3, une créature presque sans muscles (M ≈ 0.5, E ≈ 0.2) reste accrochée pour
+#     rien et finit par battre les grimpeuses.
+#   Re-score des populations sauvegardées + contrainte du §9 (gén. 23 : la grimpeuse h 2.3, E 4.9,
+#   M 8.0 doit battre l'immobile h −0.1, E 0.5) : avec nos immobiles (M 0.5 à 3.3), la zone
+#   compatible avec la phase flemmarde (c_E ≥ 0.4) se réduit à c_E 0.40–0.45 et c_M ≤ 0.10.
+#   grille 4 (3 graines chacun) :
+#              0.40 ; 0.05     +1.7/+4.9/+5.1  muscle min g5–15 9.2–9.4, période max 2.7–3.0 : pas de flemme
+#              0.40 ; 0.10     +1.7/+4.9/+5.1  muscle min 7.6–8.9, période max 3.0–3.4 ; champion g40
+#                   (retenu)                   +7.3 / +16.7 / +13.0 m (période 1.8–2.1 s), muscle 10–14
+#              0.45 ; 0.05     −0.1/+4.9/+5.1  flemme sur 2 graines sur 3
+#   Écarts restants au §9 : la meilleure de la génération 0 grimpe déjà sur 2 graines sur 3
+#   (§9 : première grimpe vers la gén. 12), et la période ne monte qu'à 3–3.4 s (§9 : 4.5 s).
+#   Contraintes du §3.2 : immobile > tombée ; champion gén. 200 (36 m, E 32.5, M 13.5) = +21.7.
+#   Refaire : python main.py train --generations 40 --seed 0 --run-dir runs/fit/g4_cE0.4_cM0.1_s0 \
+#             --set FITNESS_ENERGY=0.4 --set FITNESS_MUSCLE=0.1
+FITNESS_ENERGY = 0.4
+FITNESS_MUSCLE = 0.1
 
 # ---------------------------------------------------------------------------
 # Évolution (§3)
