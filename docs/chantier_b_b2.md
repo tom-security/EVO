@@ -129,28 +129,34 @@ génération auditée (`joints --energy`) :
 - Sur 10 s, la projection seule remonte plus d'énergie potentielle avec butées que sans (génome aléatoire de
   graine 3 : +139 J contre +5 J), mais moins que ce que la passe de vitesse dissipe dans les mêmes sous-pas.
 
-## 5. Alerte : erreur de longueur des os dans une posture coincée
+## 5. Limite connue : longueur des os dans une posture coincée (ordre de projection conservé)
 
-Un audit sur 51 a signalé une erreur de longueur des os de 1,97 % (critère du §1.4 : < 1 %) : champion de la
-génération 20 de la graine 2, à t = 4,4 s, main gauche et deux pieds tenus, hanches et coude droit en butée. Tout
-le torse est déformé (tête +1,97 %, demi-bassins −1,9 et −1,2 %, colonne −1,1 %), au-dessus de 1 % pendant
-0,9 s. Le système est sur-contraint (trois prises + trois butées) : à chaque passe de projection, les butées
-passent après les liens et l'erreur reste sur les os. Aucune énergie n'est créée. C'est rare : sur les 10
-meilleures des générations 0, 20, 50, 100 et 200 de la graine 2, seule cette créature dépasse 1 % (les autres :
-0,44 % au plus) ; audits des champions des graines 0 et 1 : 0,46 % au plus ; sans butées : 0,27 % au plus.
+**Le cas.** Un audit de champion sur 51 a signalé une erreur de longueur des os de 1,97 % (critère du §1.4 :
+< 1 %) : champion de la génération 20 de la graine 2, à t = 4,4 s, main gauche et deux pieds tenus, les deux
+hanches et le coude droit en butée. Tout le torse est déformé (tête +1,97 %, demi-bassins −1,9 et −1,2 %, colonne
+−1,1 %), au-dessus de 1 % pendant 0,9 s (443 sous-pas), puis l'erreur retombe. Le système est sur-contraint (trois
+prises + trois butées) : dans chaque passe de projection, les butées passent après les liens et l'erreur qui ne
+peut pas être résorbée reste sur les os. **Aucune énergie n'est créée** (0 J hors muscles sur la grimpe).
 
-Deux variantes testées sans réentraîner, sur 12 créatures (celle-ci, les 3 suivantes de sa génération, et les
+**Sa fréquence.** Sur les 10 meilleures des générations 0, 20, 50, 100 et 200 de la graine 2, seule cette créature
+dépasse 1 % (les autres : 0,44 % au plus) ; audits des champions des graines 0 et 1 : 0,46 % au plus ; sans
+butées : 0,27 % au plus.
+
+**Variantes testées** sans réentraîner, sur 12 créatures (celle-ci, les 3 suivantes de sa génération, et les
 4 meilleures des générations 80 de la graine 1 et 200 de la graine 2) :
 
 | projection | erreur des os max | pénétration max | énergie créée |
 |---|---|---|---|
-| actuelle (liens, butées, sol) | 1,97 % | 0,002° | 0 J |
+| **actuelle, conservée** (liens, butées, sol) | 1,97 % | 0,002° | 0 J |
 | butées d'abord (butées, liens, sol) | 0,93 % | 1,0° | 0 J |
 | actuelle, 24 passes au lieu de 12 | 1,27 % | 0,000° | 0 J |
 
-Aucune ne tient les deux critères dans ce cas coincé. À trancher : garder l'ordre actuel (butées exactes,
-dépassement rare et bref des os), passer aux butées d'abord (os < 1 %, butées à 1° près), ou plus de passes (coût).
-Les deux dernières demandent un nouveau réentraînement.
+**Décision (validée).** L'ordre actuel est conservé, sans réentraînement : passer aux butées d'abord multiplierait
+la pénétration par 500 (0,002° → 1,0°, au-delà du critère de 0,5°) pour corriger un défaut rare, bref et sans
+conséquence énergétique ; 24 passes ne suffisent pas non plus (1,27 %) et coûtent du temps de calcul.
+
+**Surveillance.** L'audit de chaque champion (`audit.csv`, toutes les AUDIT_EVERY générations) garde son alerte
+« erreur de longueur des os » au-delà de 1 % : si ce cas devenait fréquent dans un futur run, il s'y verrait.
 
 ## 6. Autres constats
 
@@ -160,8 +166,49 @@ Les deux dernières demandent un nouveau réentraînement.
 - `joints` compte « au-delà » à plus de 1e-6° : sans cette tolérance, une cible posée sur la butée par une mutation
   (−60,000000000000014°) comptait comme hors bornes.
 
-## 7. Pour la suite
+## 7. Écrans refaits sur runs/butees/2
 
-Écrans à refaire sur les nouveaux runs, après ta validation : replay, vue population, histogramme, analyse,
-comparaison de générations (référence : graine 2, `runs/butees/2`). Points à discuter : la variante de projection
-du §5, les pieds qui croisent l'axe (§3), et l'excès de créatures au sol et de muscle des graines 0 et 1.
+Mêmes commandes et mêmes jeux d'images que les phases 4 à 6 et le chantier A, avec `--run-dir runs/butees/2`
+(sorties dans `out/chantierB/ecrans/`, hors git) : `replay --gen 200 --export`, `population --gen 200 --export`,
+`population --gen 0 --cycle --export`, `histogram --gen 0 / 1 / 200 --style video`, `analyze --gen 200 --export`,
+`compare --export`, et les 6 vidéos (replay, créature 1 de la génération 0 ×4 avec carton, analyse au ralenti,
+comparaison, population, cycle). Aucune alerte : toutes les hauteurs rejouées ou réévaluées sont celles du run.
+Aucun réglage d'écran n'a été modifié.
+
+| Écran | Ce qu'on voit | Référence |
+|---|---|---|
+| Replay | champion +35,3 m ; HUD période 0,6 s, muscle 10,2, énergie 8,8 ; 21,8 m à t = 6,4 s | image 09 : 0,6 s, 13,5, 32,5 ; 23,1 m |
+| Replay, génération 0 | créature 1 : −6,1 m à t = 6,5 s, sur le tronc | image 03 : −4,9 m |
+| Vue population | génération 200 triée ; 51 au sol, 62 % entre 30 et 35 m | §9 : ≈ 30 au sol, majorité entre 30 et 35 m |
+| Histogramme | génération 200 : pic à 34–35 m, la barre de 34 m (537) dépasse la graduation maximale de 500 et est dessinée tronquée ; générations 0 et 1 : un groupe au sol, puis un pic autour de 0 qui grossit | images 26 à 28 |
+| Cycle de la population | génération 0 → 1, comparable au chantier A (mêmes longueurs d'os tirées, poses un peu différentes) | image 25 |
+| Analyse | forces : deltoïde 0 %, grand dorsal 40 %, biceps 24 %, fléchisseurs de hanche 0 %, fessiers 42 %, quadriceps 100 % | §9 : 22 %, 76 %, 57 %, 31 % |
+| Comparaison de générations | 4 champions (générations 0, 23, 100, 200 : +3,0 à +35,3 m à 10 s), tous à l'écran de 0,5 à 10 s, 15,3 px/m | image 37 |
+
+- **Temps de rendu** : plus élevés que lors des phases 5 et 6, mais c'est la machine : rechronométré dans les mêmes
+  conditions, l'ancien champion prend 14,7 ms par image en analyse (10,5 ms en phase 5c) et le nouveau 12,9 ms. Le
+  replay reste à 6,3 ms (0 % au-delà de 16,7 ms).
+- **Nouveau constat : une morphologie trapue.** Toute la population de la graine 2 avec butées a une colonne à
+  0,62 fois la référence (borne basse 0,6), un fémur à 0,60 (borne basse) et un demi-bassin à 1,36 (borne haute
+  1,4) ; l'ancien champion avait une colonne à 0,89. Le lézard est plus court et plus large, sa queue (1,2 × la
+  colonne) aussi, et il replie ses pattes contre le corps : les miniatures de la vue population sont compactes, et
+  en analyse la queue disparaît derrière les pieds, qui se croisent sous le bassin (le point ouvert du §3). La
+  vidéo montre un lézard allongé.
+
+**Écarts connus révisés** (champion de la graine 2, génération 200) :
+- période finale trop longue : **résolu** (0,58 s ; vidéo : 0,6 s) ;
+- forces au plafond : **plus au plafond**, mais réparties autrement que dans la vidéo (deltoïde et fléchisseurs de
+  hanche à 0 %, quadriceps à 100 %) ;
+- pas de marche diagonale : **partielle** (une pose sur quatre en diagonale, main G + pied D) ;
+- génération 0 trop bonne : inchangé (meilleure +3,0 m ; vidéo : la meilleure ne grimpe pas) ;
+- créatures au sol à la génération 200 : 51 (vidéo ≈ 30 ; avant B2 : 88) ;
+- énergie du champion : 8,8 (vidéo 32,5), inchangé ;
+- **nouveau** : morphologie trapue, pieds croisés sous le bassin.
+
+## 8. Pour la suite
+
+- Ramener le chantier B sur `claude/modest-ritchie-mkwjnd`, et choisir alors le run de référence par défaut : les
+  commandes lisent `runs/<graine>`, c'est-à-dire les anciens runs sans butées ; les nouveaux sont dans
+  `runs/butees/<graine>` (hors git, dans ce conteneur).
+- Points à discuter : la morphologie trapue (longueurs collées aux bornes de `LENGTH_FACTOR_RANGE`), les pieds qui
+  croisent l'axe (§3), l'excès de créatures au sol, la masse musculaire des graines 0 et 1.
