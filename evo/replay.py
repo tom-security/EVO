@@ -33,9 +33,7 @@ class Replay:
     def __init__(self, run_dir, gen=None, rank=1, index=None, log=print):
         self.run_dir = run_dir
         self.by_index = index is not None   # rejoué par indice : le HUD affiche « Créature: i »
-        with open(os.path.join(run_dir, "config.json")) as fh:
-            ev.apply_config(json.load(fh), strict=False)
-        cr._torque_unit.cache_clear()
+        ev.use_run_config(run_dir)
         gens = ev.saved_generations(run_dir)
         if not gens:
             raise FileNotFoundError(f"aucune génération sauvegardée dans {run_dir}")

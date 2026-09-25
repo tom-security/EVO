@@ -137,6 +137,8 @@ def main(argv=None):
     joints.add_argument("--top", type=int, default=1, help="meilleures créatures rejouées (défaut : 1, le champion)")
     joints.add_argument("--sample", type=int, default=0, help="en plus, N créatures tirées au hasard dans la génération")
     joints.add_argument("--export", metavar="DIR", help="écrit les mesures en JSON dans DIR")
+    joints.add_argument("--energy", action="store_true",
+                        help="audit d'énergie de chaque créature en plus : sauts au moment où une butée s'engage")
 
     args = parser.parse_args(argv)
     if args.command == "debug-physics":
@@ -266,7 +268,7 @@ def main(argv=None):
         import sys
         from evo import evolution, joint_audit
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
-        result = joint_audit.audit(run_dir, gen=args.gen, top=args.top, sample=args.sample)
+        result = joint_audit.audit(run_dir, gen=args.gen, top=args.top, sample=args.sample, energy=args.energy)
         if args.export:
             print(joint_audit.export(result, args.export))
         if not result["identique"]:

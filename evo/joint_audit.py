@@ -1,9 +1,10 @@
-"""Commande `joints` (chantier B, phase B1) : angles articulaires réels des créatures entraînées.
+"""Commande `joints` (chantier B) : angles articulaires réels des créatures entraînées.
 
-Le moteur n'a aucune butée d'angle entre deux os : seules les cibles du génome sont bornées (§2.5). Cet audit
-rejoue des créatures d'un run (moteur scalaire, config du run, hauteur vérifiée au bit près), relève à chaque
-sous-pas l'angle anatomique des 8 articulations musclées et le compare aux butées config.JOINT_LIMITS_DEG.
-Il ne touche pas au moteur : il sert au diagnostic (docs/chantier_b_diagnostic.md) et à l'avant/après de B2.
+Avant B2, le moteur n'avait aucune butée d'angle entre deux os ; depuis, il applique config.JOINT_LIMITS_DEG
+aux runs entraînés avec JOINT_LIMITS (les runs plus anciens se rejouent sans). Cet audit rejoue des créatures
+d'un run (moteur scalaire, config du run, hauteur vérifiée au bit près), relève à chaque sous-pas l'angle
+anatomique des 8 articulations musclées et le compare aux butées : diagnostic de B1
+(docs/chantier_b_diagnostic.md), avant/après de B2 ; --energy ajoute les sauts d'énergie aux butées.
 
 Conventions (vue de dessus sur le mur, gauche et droite en miroir, ordre des articulations de creature.JOINTS) :
 - épaule, hanche : α = angle de l'humérus (du fémur) depuis l'axe latéral du corps, prolongement de la
@@ -48,9 +49,7 @@ def _series(pos):
 
 def rest_angles():
     """Angle anatomique (°) de chaque type d'articulation dans la posture de repos (config.REST_POSE_DEG)."""
-    p = config.REST_POSE_DEG
-    return {"épaule": 180.0 - p["humerus"], "coude": p["humerus"] - p["forearm"],
-            "hanche": 180.0 - p["femur"], "genou": p["tibia"] - p["femur"]}
+    return cr.anatomical_rest_deg()
 
 
 def rest_offsets():
@@ -155,6 +154,7 @@ def joint_stats(angles):
             "hors_butees": float(beyond.mean()), "sous_min": float((x < lo).mean()),
             "au_dessus_max": float((x > hi).mean()),
             "exces_median": float(np.median(excess[beyond])) if beyond.any() else 0.0,
+            "exces_max": float(excess.max()),
             "plus_de_10": float((excess > 10.0).mean()),
             "tour_complet": float(np.mean([np.any(np.ptp(a, axis=0) > 360.0) for a in per])),
         }
@@ -174,9 +174,7 @@ def targets_out_of_bounds(pop):
 
 def use_run_config(run_dir):
     """Config du run (comme Replay) : mêmes constantes qu'à l'entraînement."""
-    with open(os.path.join(run_dir, "config.json")) as fh:
-        ev.apply_config(json.load(fh), strict=False)
-    cr._torque_unit.cache_clear()
+    ev.use_run_config(run_dir)
 
 
 def record(genome):
@@ -190,6 +188,21 @@ def record(genome):
         c.substep(h)
         P[k] = c.world.pos
     return P, c
+
+
+def energy_at_limits(genome):
+    """Audit d'énergie (evo/audit.py) de la grimpe : énergie créée hors muscles par sous-pas, selon que des
+    butées s'y engagent, restent actives ou non (max et somme, J), et son équivalent hauteur (m)."""
+    from evo import audit  # import tardif : rejeu étape par étape, plus lent
+
+    c, ledger = audit.audit(genome, duration=config.SIM_DURATION)
+    weight = float(c.world.mass.sum() * config.G)
+    out = {k: float(ledger[k]) for k in audit.LIMIT_KEYS}
+    out.update(cree_hors_muscles=float(ledger["hors_muscles+"]), poids=weight,
+               saut_engagement_max_m=float(ledger["saut_engagement_max"]) / weight,
+               liens_contacts_hausses=float(ledger["liens_contacts+"]),
+               projection=float(ledger["projection_sol"]), projection_hausses=float(ledger["projection_sol+"]))
+    return out
 
 
 def audit_creature(genome, stored_height=None):
@@ -209,8 +222,9 @@ def audit_creature(genome, stored_height=None):
     return row, A
 
 
-def audit(run_dir, gen=None, top=1, sample=0, log=print):
-    """Rejoue les `top` meilleures créatures d'une génération (et `sample` tirées au hasard) et mesure leurs angles."""
+def audit(run_dir, gen=None, top=1, sample=0, energy=False, log=print):
+    """Rejoue les `top` meilleures créatures d'une génération (et `sample` tirées au hasard) et mesure leurs angles ;
+    energy : audit d'énergie de chacune en plus (sauts au moment où une butée s'engage)."""
     use_run_config(run_dir)
     gens = ev.saved_generations(run_dir)
     if not gens:
@@ -231,6 +245,8 @@ def audit(run_dir, gen=None, top=1, sample=0, log=print):
         for i in indices:
             row, A = audit_creature(pop.genome(i), float(res["height"][i]))
             row.update(groupe=group, indice=i, rang=int(rank_of[i]))
+            if energy:
+                row["energie"] = energy_at_limits(pop.genome(i))
             rows.append(row)
             angles.append(A)
         groups[group] = {"n": len(indices), "articulations": joint_stats(angles),
@@ -238,6 +254,7 @@ def audit(run_dir, gen=None, top=1, sample=0, log=print):
     result = {
         "run": run_dir, "graine": os.path.basename(os.path.normpath(run_dir)), "gen": gen,
         "butees_deg": {k: list(v) for k, v in config.JOINT_LIMITS_DEG.items()},
+        "butees_moteur": bool(config.JOINT_LIMITS),
         "repos_deg": rest_angles(), "plage_cibles_deg": target_range(),
         "creatures": rows, "groupes": groups, "cibles_hors_butees": targets_out_of_bounds(pop),
         "identique": all(r["identique"] for r in rows), "secondes": time.perf_counter() - t0,
@@ -251,7 +268,8 @@ def audit(run_dir, gen=None, top=1, sample=0, log=print):
 def report_lines(result):
     """Tableau lisible : une ligne par créature, puis les groupes et les cibles du génome."""
     lims = ", ".join(f"{k} [{lo:+.0f}, {hi:+.0f}]" for k, (lo, hi) in result["butees_deg"].items())
-    lines = [f"angles articulaires — graine {result['graine']}, gén. {result['gen']} ; butées (°) : {lims}",
+    engine = "appliquées par le moteur" if result["butees_moteur"] else "non appliquées par le moteur (run d'avant B2)"
+    lines = [f"angles articulaires — graine {result['graine']}, gén. {result['gen']} ; butées (°) : {lims}, {engine}",
              "  min..max (°), part du temps hors butées ; côtés gauche et droit réunis"]
     for r in result["creatures"]:
         cells = " | ".join(f"{k} {d['min']:+5.0f}..{d['max']:+5.0f} {d['hors_butees']:4.0%}"
@@ -259,11 +277,16 @@ def report_lines(result):
                            for k, d in r["articulations"].items())
         axis = " ".join(f"{p} {v:.0%}" for p, v in r["axe_traverse"].items())
         status = "" if r["identique"] else " ÉCART DE HAUTEUR"
+        if "energie" in r:
+            e = r["energie"]
+            status += (f" | énergie : {int(e['butees_engagements'])} engagements, saut max {e['saut_engagement_max']:.2e} J"
+                       f" ({e['saut_engagement_max_m'] * 1000:.2f} mm), sans butée {e['saut_libre_max']:.2e} J,"
+                       f" créé hors muscles {e['cree_hors_muscles']:.2e} J")
         lines.append(f"  {r['groupe']:10s} rang {r['rang']:4d} (n°{r['indice']}) h {r['hauteur']:+6.1f} m | {cells} | "
                      f"axe traversé : {axis} | croisements G/D {r['croisements']['gauche_droite']:.0%}{status}")
     for name, g in result["groupes"].items():
         cells = " | ".join(f"{k} {d['hors_butees']:4.0%} (sous {d['sous_min']:.0%}, au-dessus {d['au_dessus_max']:.0%}, "
-                           f"excès médian {d['exces_median']:.0f}°, tours {d['tour_complet']:.0%})"
+                           f"excès médian {d['exces_median']:.0f}°, max {d['exces_max']:.2f}°, tours {d['tour_complet']:.0%})"
                            for k, d in g["articulations"].items())
         lines.append(f"  groupe {name} ({g['n']} créatures, au sol {g['au_sol']:.0%}) : {cells}")
     lines.append("  cibles du génome hors butées (toute la population) : "

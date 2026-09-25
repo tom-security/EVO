@@ -7,6 +7,10 @@ Un `World` = un seul système. Tout est en numpy, sauf le solveur de liens
 (Gauss-Seidel sur les vitesses + projection de position), séquentiel par nature :
 il est compilé avec numba. La même boucle en Python pur est gardée comme référence
 (`backend="python"`), et les tests vérifient que les deux donnent le même résultat.
+
+Butées articulaires (chantier B2) : contraintes à sens unique sur l'angle des articulations,
+résolues dans les mêmes passes que les liens, avec le schéma du contact au sol (terme spéculatif,
+biais BETA, projection de position) ; l'impulsion a la forme de Contract().
 """
 import math
 
@@ -64,6 +68,13 @@ class World:
         self.held = np.zeros(n, dtype=bool) if held is None else np.array(held, dtype=bool)
         self.joints = np.array(joints, dtype=np.int64).reshape(-1, 3)
         self.torque = np.zeros(len(self.joints))
+        # Butées (B2) : u = limit_sign[q]·θ_q doit rester dans [limit_lo[q], limit_hi[q]] (rad), θ_q étant l'angle
+        # signé de l'articulation q (joint_angles). Tableaux vides : aucune butée (set_joint_limits les pose).
+        self.limit_sign = np.zeros(0)
+        self.limit_lo = np.zeros(0)
+        self.limit_hi = np.zeros(0)
+        self.limit_margin = math.radians(config.JOINT_LIMIT_MARGIN_DEG)
+        self.limit_active = np.zeros(0, dtype=bool)  # butées entrées dans le solveur au dernier sous-pas
         self.contract_forces = np.zeros((n, 2))  # dernières forces de Contract(), pour affichage/vérif
         self.t = 0.0
 
@@ -78,6 +89,25 @@ class World:
         self.ground_y = None  # hauteur du sol (None = pas de sol) ; les bancs de la phase 1 n'en ont pas
         self.ground_friction = config.GROUND_FRICTION
         self.contact_margin = config.CONTACT_MARGIN
+
+    def set_joint_limits(self, sign, lo, hi):
+        """Une butée par articulation de `joints` : limit_sign·θ reste dans [lo, hi] (rad, hi − lo < 2π)."""
+        sign, lo, hi = (np.array(x, dtype=np.float64).reshape(-1) for x in (sign, lo, hi))
+        if not len(sign) == len(lo) == len(hi) == len(self.joints):
+            raise ValueError("une butée par articulation")
+        if np.any(hi <= lo) or np.any(hi - lo >= 2 * math.pi):
+            raise ValueError("butées : il faut lo < hi et hi − lo < 2π")
+        self.limit_sign, self.limit_lo, self.limit_hi = sign, lo, hi
+        self.limit_active = np.zeros(len(lo), dtype=bool)
+
+    def limit_violation(self):
+        """(J,) distance (rad) de chaque articulation à sa butée la plus proche : > 0 dans la plage, < 0 au-delà."""
+        a, p, b = self.joints.T if len(self.limit_lo) else (np.zeros(0, int),) * 3
+        out = np.empty(len(self.limit_lo))
+        for q in range(len(out)):
+            out[q] = _limit_geometry_py(*self.pos[a[q]], *self.pos[p[q]], *self.pos[b[q]],
+                                        self.limit_sign[q], self.limit_lo[q], self.limit_hi[q])[0]
+        return out
 
     @property
     def inv_mass(self):
@@ -198,12 +228,14 @@ def link(world, h):
     empêche de le traverser, frottement de Coulomb borné par μ × l'impulsion normale.
     """
     ground = world.ground_y is not None
-    if (len(world.links) == 0 and not ground) or world.n_iter <= 0:
+    if (len(world.links) == 0 and not ground and len(world.limit_lo) == 0) or world.n_iter <= 0:
         return
     kernel = _link_velocities_numba if world.backend == "numba" else _link_velocities_python
     kernel(world.pos, world.vel, world.inv_mass, world.links, world.rest,
            float(h), int(world.n_iter), float(world.beta),
-           ground, float(world.ground_y or 0.0), float(world.ground_friction), float(world.contact_margin))
+           ground, float(world.ground_y or 0.0), float(world.ground_friction), float(world.contact_margin),
+           world.joints, world.limit_sign, world.limit_lo, world.limit_hi, float(world.limit_margin),
+           world.limit_active)
 
 
 def project_links(world):
@@ -212,19 +244,65 @@ def project_links(world):
     Avec un sol, chaque passe remonte aussi au niveau du sol les points passés dessous.
     """
     ground = world.ground_y is not None
-    if (len(world.links) == 0 and not ground) or world.n_pos_iter <= 0:
+    if (len(world.links) == 0 and not ground and len(world.limit_lo) == 0) or world.n_pos_iter <= 0:
         return
     kernel = _project_links_numba if world.backend == "numba" else _project_links_python
     kernel(world.pos, world.inv_mass, world.links, world.rest, int(world.n_pos_iter),
-           ground, float(world.ground_y or 0.0))
+           ground, float(world.ground_y or 0.0), world.joints, world.limit_sign, world.limit_lo, world.limit_hi,
+           float(world.limit_margin))
 
 
 # Noyaux du solveur. Les versions numba et Python font exactement les mêmes
 # opérations dans le même ordre ; elles modifient `vel` / `pos` sur place.
 
+# Butées : trois petites fonctions partagées par les noyaux scalaires, leur référence Python et
+# l'évaluateur batché (evo/batch.py), pour que tous fassent les mêmes opérations dans le même ordre.
+@njit(cache=True)
+def _limit_geometry(ax, ay, px, py, bx, by, sign, lo, hi):
+    """Butée de l'articulation (A, pivot P, B) : (C, s, J_A, J_B).
+
+    u = sign·θ doit rester dans [lo, hi]. C = distance (rad) à la borne la plus proche sur le cercle
+    (> 0 dans la plage, < 0 au-delà : un angle très hors bornes repart par le côté le plus court) ;
+    Ċ = s·θ̇. J_A, J_B : gradient de θ par rapport à A et B (celui de P vaut −(J_A + J_B)), soit la
+    forme des forces de Contract().
+    """
+    rax = ax - px
+    ray = ay - py
+    rbx = bx - px
+    rby = by - py
+    da = rax * rax + ray * ray
+    db = rbx * rbx + rby * rby
+    theta = math.atan2(rax * rby - ray * rbx, rax * rbx + ray * rby)
+    delta = (sign * theta - 0.5 * (lo + hi) + math.pi) % (2.0 * math.pi) - math.pi
+    half = 0.5 * (hi - lo)
+    if delta >= 0.0:  # borne haute : C = demi-largeur − δ, Ċ = −sign·θ̇
+        return half - delta, -sign, ray / da, -rax / da, -rby / db, rbx / db
+    return half + delta, sign, ray / da, -rax / da, -rby / db, rbx / db
+
+
+@njit(cache=True)
+def _limit_mass(wa, wb, wp, jax, jay, jbx, jby):
+    """(K, J_P) : masse effective inverse de la butée (w = 1/m, 0 si tenu) et gradient pour le pivot."""
+    jpx = -(jax + jbx)
+    jpy = -(jay + jby)
+    return wa * (jax * jax + jay * jay) + wb * (jbx * jbx + jby * jby) + wp * (jpx * jpx + jpy * jpy), jpx, jpy
+
+
+@njit(cache=True)
+def _limit_rate(jax, jay, jbx, jby, jpx, jpy, vax, vay, vbx, vby, vpx, vpy):
+    """θ̇ = J·v de l'articulation."""
+    return jax * vax + jay * vay + jbx * vbx + jby * vby + jpx * vpx + jpy * vpy
+
+
+# versions Python pures (référence) : mêmes opérations
+_limit_geometry_py = getattr(_limit_geometry, "py_func", _limit_geometry)
+_limit_mass_py = getattr(_limit_mass, "py_func", _limit_mass)
+_limit_rate_py = getattr(_limit_rate, "py_func", _limit_rate)
+
 @njit(cache=True)
 def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta,
-                           ground, ground_y, friction, margin):
+                           ground, ground_y, friction, margin,
+                           joints, lim_sign, lim_lo, lim_hi, lim_margin, lim_active):
     n_links = links.shape[0]
     n_points = pos.shape[0]
     nx = np.zeros(n_links)
@@ -255,6 +333,30 @@ def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta,
             if inv_mass[p] > 0.0 and (gap < margin or gap + vel[p, 1] * h < 0.0):
                 contact[p] = True
                 vn_min[p] = -gap / h if gap > 0.0 else -beta * gap / h
+    # Butées : comme le contact au sol. Entrent dans le solveur à moins de lim_margin, ou si le sous-pas les
+    # franchirait ; Ċ ≥ −C/h avant la butée (y arriver, pas au-delà), Ċ ≥ −beta·C/h au-delà ; impulsion cumulée ≥ 0.
+    n_lim = lim_lo.shape[0]
+    l_on = np.zeros(n_lim, dtype=np.bool_)
+    l_s = np.zeros(n_lim)
+    l_j = np.zeros((n_lim, 6))
+    l_k = np.zeros(n_lim)
+    l_min = np.zeros(n_lim)
+    l_lam = np.zeros(n_lim)
+    for q in range(n_lim):
+        a, p, b = joints[q, 0], joints[q, 1], joints[q, 2]
+        c, s, jax, jay, jbx, jby = _limit_geometry(pos[a, 0], pos[a, 1], pos[p, 0], pos[p, 1],
+                                                   pos[b, 0], pos[b, 1], lim_sign[q], lim_lo[q], lim_hi[q])
+        kk, jpx, jpy = _limit_mass(inv_mass[a], inv_mass[b], inv_mass[p], jax, jay, jbx, jby)
+        rate = s * _limit_rate(jax, jay, jbx, jby, jpx, jpy, vel[a, 0], vel[a, 1], vel[b, 0], vel[b, 1],
+                               vel[p, 0], vel[p, 1])
+        on = kk > 0.0 and (c < lim_margin or c + rate * h < 0.0)
+        lim_active[q] = on
+        if on:
+            l_on[q] = True
+            l_s[q] = s
+            l_j[q, 0], l_j[q, 1], l_j[q, 2], l_j[q, 3], l_j[q, 4], l_j[q, 5] = jax, jay, jbx, jby, jpx, jpy
+            l_k[q] = kk
+            l_min[q] = -c / h if c > 0.0 else -beta * c / h
     for _ in range(n_iter):
         for k in range(n_links):
             if not active[k]:
@@ -267,6 +369,22 @@ def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta,
             vel[i, 1] -= lam * wi * ny[k]
             vel[j, 0] += lam * wj * nx[k]
             vel[j, 1] += lam * wj * ny[k]
+        for q in range(n_lim):
+            if not l_on[q]:
+                continue
+            a, p, b = joints[q, 0], joints[q, 1], joints[q, 2]
+            rate = l_s[q] * _limit_rate(l_j[q, 0], l_j[q, 1], l_j[q, 2], l_j[q, 3], l_j[q, 4], l_j[q, 5],
+                                        vel[a, 0], vel[a, 1], vel[b, 0], vel[b, 1], vel[p, 0], vel[p, 1])
+            new = max(l_lam[q] + (l_min[q] - rate) / l_k[q], 0.0)
+            d = (new - l_lam[q]) * l_s[q]
+            l_lam[q] = new
+            wa, wb, wp = inv_mass[a], inv_mass[b], inv_mass[p]
+            vel[a, 0] += wa * l_j[q, 0] * d
+            vel[a, 1] += wa * l_j[q, 1] * d
+            vel[b, 0] += wb * l_j[q, 2] * d
+            vel[b, 1] += wb * l_j[q, 3] * d
+            vel[p, 0] += wp * l_j[q, 4] * d
+            vel[p, 1] += wp * l_j[q, 5] * d
         if ground:
             for p in range(n_points):
                 if not contact[p]:
@@ -282,7 +400,16 @@ def _link_velocities_numba(pos, vel, inv_mass, links, rest, h, n_iter, beta,
 
 
 @njit(cache=True)
-def _project_links_numba(pos, inv_mass, links, rest, n_pos_iter, ground, ground_y):
+def _project_links_numba(pos, inv_mass, links, rest, n_pos_iter, ground, ground_y,
+                         joints, lim_sign, lim_lo, lim_hi, lim_margin):
+    # butées candidates : à moins de lim_margin de la borne au début de la projection (les passes ne déplacent
+    # les points que de corrections de longueur, bien plus petites) ; les autres ne sont pas recalculées
+    n_lim = lim_lo.shape[0]
+    near = np.zeros(n_lim, dtype=np.bool_)
+    for q in range(n_lim):
+        a, p, b = joints[q, 0], joints[q, 1], joints[q, 2]
+        near[q] = _limit_geometry(pos[a, 0], pos[a, 1], pos[p, 0], pos[p, 1], pos[b, 0], pos[b, 1],
+                                  lim_sign[q], lim_lo[q], lim_hi[q])[0] < lim_margin
     for _ in range(n_pos_iter):
         for k in range(links.shape[0]):
             i, j = links[k, 0], links[k, 1]
@@ -299,6 +426,25 @@ def _project_links_numba(pos, inv_mass, links, rest, n_pos_iter, ground, ground_
             pos[i, 1] += wi * c * dy
             pos[j, 0] -= wj * c * dx
             pos[j, 1] -= wj * c * dy
+        for q in range(n_lim):  # butées franchies : ramenées sur la borne (linéarisé, affiné à chaque passe)
+            if not near[q]:
+                continue
+            a, p, b = joints[q, 0], joints[q, 1], joints[q, 2]
+            cq, s, jax, jay, jbx, jby = _limit_geometry(pos[a, 0], pos[a, 1], pos[p, 0], pos[p, 1],
+                                                        pos[b, 0], pos[b, 1], lim_sign[q], lim_lo[q], lim_hi[q])
+            if cq >= 0.0:
+                continue
+            wa, wb, wp = inv_mass[a], inv_mass[b], inv_mass[p]
+            kk, jpx, jpy = _limit_mass(wa, wb, wp, jax, jay, jbx, jby)
+            if kk == 0.0:
+                continue
+            mu = -cq / kk * s
+            pos[a, 0] += wa * jax * mu
+            pos[a, 1] += wa * jay * mu
+            pos[b, 0] += wb * jbx * mu
+            pos[b, 1] += wb * jby * mu
+            pos[p, 0] += wp * jpx * mu
+            pos[p, 1] += wp * jpy * mu
         if ground:
             for p in range(pos.shape[0]):
                 if inv_mass[p] > 0.0 and pos[p, 1] < ground_y:
@@ -306,7 +452,8 @@ def _project_links_numba(pos, inv_mass, links, rest, n_pos_iter, ground, ground_
 
 
 def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta,
-                            ground, ground_y, friction, margin):
+                            ground, ground_y, friction, margin,
+                            joints, lim_sign, lim_lo, lim_hi, lim_margin, lim_active):
     """Référence Python pure de `_link_velocities_numba` (listes Python pour la vitesse)."""
     w = inv_mass.tolist()
     px, py = pos[:, 0].tolist(), pos[:, 1].tolist()
@@ -324,6 +471,16 @@ def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta,
             gap = py[p] - ground_y
             if w[p] > 0.0 and (gap < margin or gap + vy[p] * h < 0.0):
                 contacts.append([p, -gap / h if gap > 0.0 else -beta * gap / h, 0.0, 0.0])
+    stops = []  # [a, p, b, s, J (6), K, Ċ minimal, impulsion cumulée]
+    for q, ((a, p, b), sign, lo, hi) in enumerate(zip(joints.tolist()[:len(lim_lo)], lim_sign.tolist(),
+                                                       lim_lo.tolist(), lim_hi.tolist())):
+        c, s, jax, jay, jbx, jby = _limit_geometry_py(px[a], py[a], px[p], py[p], px[b], py[b], sign, lo, hi)
+        kk, jpx, jpy = _limit_mass_py(w[a], w[b], w[p], jax, jay, jbx, jby)
+        rate = s * _limit_rate_py(jax, jay, jbx, jby, jpx, jpy, vx[a], vy[a], vx[b], vy[b], vx[p], vy[p])
+        on = kk > 0.0 and (c < lim_margin or c + rate * h < 0.0)
+        lim_active[q] = on
+        if on:
+            stops.append([a, p, b, s, (jax, jay, jbx, jby, jpx, jpy), kk, -c / h if c > 0.0 else -beta * c / h, 0.0])
     for _ in range(n_iter):
         for i, j, nx, ny, bias in constraints:
             wi, wj = w[i], w[j]
@@ -333,6 +490,19 @@ def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta,
             vy[i] -= lam * wi * ny
             vx[j] += lam * wj * nx
             vy[j] += lam * wj * ny
+        for st in stops:
+            a, p, b, s, J, kk, cmin, lam = st
+            rate = s * _limit_rate_py(*J, vx[a], vy[a], vx[b], vy[b], vx[p], vy[p])
+            new = max(lam + (cmin - rate) / kk, 0.0)
+            d = (new - lam) * s
+            st[7] = new
+            wa, wb, wp = w[a], w[b], w[p]
+            vx[a] += wa * J[0] * d
+            vy[a] += wa * J[1] * d
+            vx[b] += wb * J[2] * d
+            vy[b] += wb * J[3] * d
+            vx[p] += wp * J[4] * d
+            vy[p] += wp * J[5] * d
         for c in contacts:
             p, vmin, lam_n, lam_t = c
             new_n = max(lam_n + vmin - vy[p], 0.0)
@@ -345,11 +515,15 @@ def _link_velocities_python(pos, vel, inv_mass, links, rest, h, n_iter, beta,
     vel[:, 1] = vy
 
 
-def _project_links_python(pos, inv_mass, links, rest, n_pos_iter, ground, ground_y):
+def _project_links_python(pos, inv_mass, links, rest, n_pos_iter, ground, ground_y,
+                          joints, lim_sign, lim_lo, lim_hi, lim_margin):
     """Référence Python pure de `_project_links_numba`."""
     w = inv_mass.tolist()
     px, py = pos[:, 0].tolist(), pos[:, 1].tolist()
     pairs = list(zip(links.tolist(), rest.tolist()))
+    stops = [((a, p, b), sign, lo, hi) for (a, p, b), sign, lo, hi
+             in zip(joints.tolist()[:len(lim_lo)], lim_sign.tolist(), lim_lo.tolist(), lim_hi.tolist())
+             if _limit_geometry_py(px[a], py[a], px[p], py[p], px[b], py[b], sign, lo, hi)[0] < lim_margin]
     for _ in range(n_pos_iter):
         for (i, j), r in pairs:
             wi, wj = w[i], w[j]
@@ -364,6 +538,21 @@ def _project_links_python(pos, inv_mass, links, rest, n_pos_iter, ground, ground
             py[i] += wi * c * dy
             px[j] -= wj * c * dx
             py[j] -= wj * c * dy
+        for (a, p, b), sign, lo, hi in stops:
+            cq, s, jax, jay, jbx, jby = _limit_geometry_py(px[a], py[a], px[p], py[p], px[b], py[b], sign, lo, hi)
+            if cq >= 0.0:
+                continue
+            wa, wb, wp = w[a], w[b], w[p]
+            kk, jpx, jpy = _limit_mass_py(wa, wb, wp, jax, jay, jbx, jby)
+            if kk == 0.0:
+                continue
+            mu = -cq / kk * s
+            px[a] += wa * jax * mu
+            py[a] += wa * jay * mu
+            px[b] += wb * jbx * mu
+            py[b] += wb * jby * mu
+            px[p] += wp * jpx * mu
+            py[p] += wp * jpy * mu
         if ground:
             for p in range(len(py)):
                 if w[p] > 0.0 and py[p] < ground_y:

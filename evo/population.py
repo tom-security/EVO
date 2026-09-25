@@ -70,9 +70,7 @@ def sort_end():
 # ---------------------------------------------------------------------------
 def load_run_config(run_dir):
     """Config du run (comme pour un replay), pour réévaluer à l'identique."""
-    with open(os.path.join(run_dir, "config.json")) as fh:
-        ev.apply_config(json.load(fh), strict=False)
-    cr._torque_unit.cache_clear()
+    ev.use_run_config(run_dir)
 
 
 class Generation:

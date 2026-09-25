@@ -9,6 +9,8 @@ Conventions
   la jambe vers la tête), ischios (flexion du genou).
 - Les forces musculaires sont en unités internes (0 à S_MAX) ; le couple physique vaut
   force × torque_unit() (voir config.TORQUE_SCALE).
+- Butées (chantier B2, config.JOINT_LIMITS) : φ reste dans joint_limits_phi(), la traduction de
+  config.JOINT_LIMITS_DEG ; les cibles du génome restent dans la même plage (target_bounds()).
 """
 import math
 from dataclasses import dataclass, replace
@@ -51,6 +53,31 @@ LIMB_NAMES = ("main G", "main D", "pied G", "pied D")
 
 def wrap_angle(a):
     return (np.asarray(a) + np.pi) % (2 * np.pi) - np.pi
+
+
+def anatomical_rest_deg():
+    """Angle anatomique (°) de chaque type d'articulation au repos (config.REST_POSE_DEG) : épaule et hanche,
+    angle de l'os depuis l'axe latéral (+ vers la tête) ; coude et genou, flexion (+ = pli naturel). L'angle
+    anatomique vaut φ + cette valeur (evo/joint_audit.py)."""
+    p = config.REST_POSE_DEG
+    return {"épaule": 180.0 - p["humerus"], "coude": p["humerus"] - p["forearm"],
+            "hanche": 180.0 - p["femur"], "genou": p["tibia"] - p["femur"]}
+
+
+def joint_limits_phi():
+    """(8, 2) butées [min, max] de φ (rad), dans l'ordre de JOINTS : config.JOINT_LIMITS_DEG − angle de repos."""
+    rest = anatomical_rest_deg()
+    return np.radians([[config.JOINT_LIMITS_DEG[k][0] - rest[k], config.JOINT_LIMITS_DEG[k][1] - rest[k]]
+                       for _ in SIDES for k in JOINT_TYPES])
+
+
+def target_bounds():
+    """(bas, haut) des cibles φ du génome : la plage articulaire (8,) si JOINT_LIMITS, sinon ±TARGET_RANGE_DEG."""
+    if config.JOINT_LIMITS:
+        lim = joint_limits_phi()
+        return lim[:, 0], lim[:, 1]
+    span = math.radians(config.TARGET_RANGE_DEG)
+    return -span, span
 
 
 def reference_lengths():
@@ -110,8 +137,8 @@ def random_genome(rng, n_poses=None):
     else:
         strengths = rng.uniform(0.0, config.S_MAX, size=(2, 4, 2))
     period = rng.uniform(*config.PERIOD_INIT)
-    span = math.radians(config.TARGET_RANGE_DEG)
-    targets = rng.uniform(-span, span, size=(k, 8))
+    low, high = target_bounds()
+    targets = rng.uniform(low, high, size=(k, 8))
     holds = rng.random(size=(k, 4)) < config.HOLD_PROBABILITY
     return Genome(lengths, strengths, float(period), targets, holds)
 
@@ -171,6 +198,9 @@ class Creature:
         self.world.joints = np.array(JOINTS, dtype=np.int64)
         self.world.torque = np.zeros(len(JOINTS))
         self.phi_rest = JOINT_SIGNS * self.world.joint_angles()
+        if config.JOINT_LIMITS:  # butées en u = signe·θ, l'angle du moteur orienté comme φ : φ = u − φ_repos
+            lim = joint_limits_phi()
+            self.world.set_joint_limits(JOINT_SIGNS, lim[:, 0] + self.phi_rest, lim[:, 1] + self.phi_rest)
         self.body_points = np.arange(sk.TAIL_START)  # tout sauf la queue
         self.ref_y0 = self.reference_point()[1]
         self.t = 0.0

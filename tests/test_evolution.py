@@ -29,8 +29,8 @@ def test_mutations_respect_bounds_symmetry_and_rates():
     assert np.all((children.strengths >= 0) & (children.strengths <= config.S_MAX))
     np.testing.assert_array_equal(children.strengths[:, 0], children.strengths[:, 1])  # symétrie
     assert np.all((children.period >= config.PERIOD_BOUNDS[0]) & (children.period <= config.PERIOD_BOUNDS[1]))
-    span = math.radians(config.TARGET_RANGE_DEG)
-    assert np.all(np.abs(children.targets) <= span + 1e-12)
+    low, high = cr.target_bounds()   # plage articulaire (JOINT_LIMITS), sinon ±TARGET_RANGE_DEG
+    assert np.all((children.targets >= low - 1e-12) & (children.targets <= high + 1e-12))
     # fréquence des mutations : P_MUT par gène continu (±4 écarts-types), P_FLIP par booléen
     changed = np.mean(children.targets != parents.targets)
     n = parents.targets.size
@@ -44,9 +44,10 @@ def test_big_mutations_make_a_long_tail():
     parents = _pop(2000)
     parents.targets[:] = 0.0
     children = ev.mutate(parents, np.random.default_rng(2))
-    delta = children.targets[children.targets != 0.0]
-    sigma = config.MUT_SIGMA_FRAC * 2 * math.radians(config.TARGET_RANGE_DEG)
-    beyond = np.mean(np.abs(delta) > 4 * sigma)  # quasi impossible pour une gaussienne seule
+    low, high = cr.target_bounds()
+    sigma = np.broadcast_to(config.MUT_SIGMA_FRAC * (high - low), children.targets.shape)  # 5 % de la plage
+    changed = children.targets != 0.0
+    beyond = np.mean(np.abs(children.targets[changed]) > 4 * sigma[changed])  # quasi impossible pour une gaussienne seule
     assert config.P_BIG * 0.4 < beyond < config.P_BIG * 1.2
 
 

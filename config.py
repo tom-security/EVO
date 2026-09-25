@@ -147,7 +147,7 @@ TARGET_RANGE_DEG = 90.0       # [CHOIX] §2.5 — angles cibles dans ±90° auto
 #   du demi-bassin) ; + = protraction (vers la tête), − = rétraction ; ±90° = os parallèle à la colonne.
 # - coude, genou : β = flexion (0 = tendu) ; + = pli naturel, celui du repos (avant-bras tourné vers la
 #   tête, tibia tourné vers la queue) ; − = pli à l'envers.
-# En B1, seul l'audit `joints` les lit : le moteur n'a encore aucune butée (phase B2).
+# Le moteur les applique si JOINT_LIMITS (phase B2), et les cibles du génome restent alors dans ces plages.
 # - épaule −60 [CHOIX] fin de poussée (vidéo : −49°) ; +90 [CHOIX] humérus parallèle à la colonne, au-delà
 #   le bras passe devant la tête.
 # - coude, genou 0 [DÉDUIT] images 11, 12 et 16 : les 12 membres lus plient tous du côté du repos ;
@@ -159,6 +159,12 @@ JOINT_LIMITS_DEG = {
     "hanche": (-80.0, 75.0),
     "genou": (0.0, 140.0),
 }
+# [CHOIX] chantier B2 — butées articulaires dans le moteur, et cibles du génome dans la plage articulaire (§2.5
+# « dans la plage articulaire »). Absent de la config d'un run (runs d'avant B2) : False, ils se rejouent tels quels.
+JOINT_LIMITS = True
+# [CHOIX] B2 — une butée entre dans le solveur à moins de ça (comme CONTACT_MARGIN pour le sol), ou si elle serait
+# franchie dans le sous-pas. Même schéma que le contact au sol : terme spéculatif, biais BETA (0), projection seule.
+JOINT_LIMIT_MARGIN_DEG = 2.0
 # [CHOIX] §2.5 — probabilité qu'une patte tienne dans une pose aléatoire. Grille 2 (génération 0,
 # graines 0/1/2, au sol sur 1000) : TS 0.25 → prise 0.5 : 700–737, 0.6 : 530–542, 0.7 : 315–361 ;
 # départ 10.3 m : −5 % seulement. Retenu 0.62 (voir TORQUE_SCALE, grille 3).
@@ -225,6 +231,9 @@ AUDIT_MAX_SPEED = 80.0        # [CHOIX] m/s — point du corps (bout d'un membre
 AUDIT_MAX_TORSO_SPEED = 20.0  # [CHOIX] m/s — torse (chute libre de 9 m : 13 m/s)
 AUDIT_MAX_HEIGHT = 50.0       # [CHOIX] m — hauteur plausible en 10 s (champion de la vidéo : 36 m)
 AUDIT_MAX_TAIL_ERROR = 0.05   # [CHOIX] erreur de longueur de la queue tolérée (os du corps : < 1 %, §1.4)
+# [CHOIX] B2 — énergie créée hors muscles tolérée dans un seul sous-pas où une butée s'engage, en équivalent
+# hauteur (5 mm, soit ≈ 1/10 du seuil sur 10 s) : un saut au contact d'une butée est signalé même si le score est bon.
+AUDIT_MAX_LIMIT_JUMP = 0.005
 
 # ---------------------------------------------------------------------------
 # Vue debug de la créature (§7.6, images 15–17)

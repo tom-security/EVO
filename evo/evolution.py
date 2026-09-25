@@ -109,8 +109,12 @@ def mutate(parents, rng):
         i_lo, i_hi = config.PERIOD_INIT
         period = _mutate_values(parents.period, frac * (i_hi - i_lo), p_lo, p_hi, rng)
 
-    span = math.radians(config.TARGET_RANGE_DEG)
-    targets = _mutate_values(parents.targets, frac * 2 * span, -span, span, rng)
+    if config.JOINT_LIMITS:  # σ = 5 % de la plage articulaire de chaque articulation, cibles dans la plage
+        low, high = cr.target_bounds()
+        targets = _mutate_values(parents.targets, frac * (high - low), low, high, rng)
+    else:
+        span = math.radians(config.TARGET_RANGE_DEG)
+        targets = _mutate_values(parents.targets, frac * 2 * span, -span, span, rng)
 
     flips = rng.random(parents.holds.shape) < config.P_FLIP
     holds = parents.holds ^ flips
@@ -225,6 +229,25 @@ def saved_generations(run_dir):
     return sorted(int(f[4:8]) for f in os.listdir(run_dir) if f.startswith("gen_") and f.endswith(".npz"))
 
 
+# Valeur d'une clé absente de la config d'un run : celle d'avant son introduction (les runs d'avant les butées
+# articulaires se rejouent sans elles).
+LEGACY_DEFAULTS = {"JOINT_LIMITS": False}
+
+
+def run_config(run_dir):
+    """Config enregistrée d'un run, complétée par LEGACY_DEFAULTS pour les clés qu'il n'a pas."""
+    with open(os.path.join(run_dir, "config.json")) as fh:
+        saved = json.load(fh)
+    return {**LEGACY_DEFAULTS, **saved}
+
+
+def use_run_config(run_dir):
+    """Applique la config d'un run (replay, réévaluation, audit) : mêmes constantes qu'à l'entraînement."""
+    changed = apply_config(run_config(run_dir), strict=False)
+    cr._torque_unit.cache_clear()
+    return changed
+
+
 def config_snapshot():
     snap = {}
     for key in dir(config):
@@ -272,7 +295,8 @@ def _write_stats(run_dir, rows):
 # Audit du champion
 # ---------------------------------------------------------------------------
 AUDIT_COLUMNS = ["gen", "index", "height", "height_replay", "created_J", "created_height_m", "max_speed",
-                 "max_torso_speed", "max_length_error", "max_tail_error", "max_height", "alerts"]
+                 "max_torso_speed", "max_length_error", "max_tail_error", "max_height",
+                 "limit_engagements", "limit_jump_max_J", "limit_jump_sum_J", "free_jump_max_J", "alerts"]
 
 
 def audit_champion(run_dir, gen, pop, results, log=print):
@@ -297,24 +321,34 @@ def audit_champion(run_dir, gen, pop, results, log=print):
         alerts.append(f"erreur de longueur des os {ledger['max_length_error'] * 100:.2f} %")
     if ledger["max_tail_error"] > config.AUDIT_MAX_TAIL_ERROR:
         alerts.append(f"erreur de longueur de la queue {ledger['max_tail_error'] * 100:.2f} %")
+    jump = ledger["saut_engagement_max"]  # énergie créée hors muscles dans un sous-pas où une butée s'engage
+    if jump / weight > config.AUDIT_MAX_LIMIT_JUMP:
+        alerts.append(f"saut de {jump:.3f} J à l'engagement d'une butée (≈ {jump / weight * 1000:.1f} mm)")
     row = {"gen": gen, "index": best, "height": f"{results['height'][best]:.6f}",
            "height_replay": f"{c.height():.6f}", "created_J": f"{ledger['hors_muscles+']:.6f}",
            "created_height_m": f"{created_height:.5f}", "max_speed": f"{ledger['max_speed']:.2f}",
            "max_torso_speed": f"{ledger['max_torso_speed']:.2f}",
            "max_length_error": f"{ledger['max_length_error']:.5f}",
            "max_tail_error": f"{ledger['max_tail_error']:.5f}", "max_height": f"{ledger['max_height']:.3f}",
-           "alerts": " ; ".join(alerts)}
+           "limit_engagements": int(ledger["butees_engagements"]), "limit_jump_max_J": f"{jump:.6g}",
+           "limit_jump_sum_J": f"{ledger['saut_engagement_somme']:.6g}",
+           "free_jump_max_J": f"{ledger['saut_libre_max']:.6g}", "alerts": " ; ".join(alerts)}
     path = os.path.join(run_dir, "audit.csv")
     new = not os.path.exists(path)
+    columns = AUDIT_COLUMNS
+    if not new:  # fichier d'un run plus ancien : on garde ses colonnes
+        with open(path, newline="") as f:
+            columns = next(csv.reader(f), AUDIT_COLUMNS)
     with open(path, "a", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=AUDIT_COLUMNS)
+        writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
         if new:
             writer.writeheader()
         writer.writerow(row)
     status = "ALERTE : " + " ; ".join(alerts) if alerts else "ok"
     log(f"    audit gén. {gen} (champion n°{best}) : créé hors muscles {ledger['hors_muscles+']:.4f} J "
         f"(≈ {created_height * 1000:.1f} mm), "
-        f"vitesse max {ledger['max_speed']:.1f} m/s, torse {ledger['max_torso_speed']:.1f} m/s → {status}")
+        f"vitesse max {ledger['max_speed']:.1f} m/s, torse {ledger['max_torso_speed']:.1f} m/s, "
+        f"butées {int(ledger['butees_engagements'])} engagements, saut max {jump:.2e} J → {status}")
     return row
 
 
@@ -330,8 +364,7 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
     snapshot_path = os.path.join(run_dir, "config.json")
 
     if done:  # reprise : on réapplique la config du run
-        with open(snapshot_path) as f:
-            saved = json.load(f)
+        saved = run_config(run_dir)
         if overrides:
             clash = {k: v for k, v in overrides.items() if saved.get(k) != (list(v) if isinstance(v, tuple) else v)}
             if clash:

@@ -197,7 +197,8 @@ def test_random_genome_respects_init_ranges():
             np.testing.assert_array_equal(g.strengths[0], g.strengths[1])
         assert config.PERIOD_INIT[0] <= g.period <= config.PERIOD_INIT[1]
         assert g.targets.shape == (config.N_POSES, 8) and g.holds.shape == (config.N_POSES, 4)
-        assert np.all(np.abs(g.targets) <= math.radians(config.TARGET_RANGE_DEG))
+        low, high = cr.target_bounds()   # plage articulaire (JOINT_LIMITS), sinon ±TARGET_RANGE_DEG
+        assert np.all((g.targets >= low - 1e-12) & (g.targets <= high + 1e-12))
 
 
 def test_muscle_mass_is_sum_of_16_strengths_without_tail():

@@ -18,10 +18,13 @@ def _test_genomes():
                      cr.diagonal_gait_genome(period=1.3, strength=0.7, swing_deg=55.0), cr.limp_genome()]
 
 
-@pytest.fixture(scope="module")
-def reference():
-    genomes = _test_genomes()
-    return genomes, [cr.Creature(g).simulate(10.0) for g in genomes]
+@pytest.fixture(scope="module", params=[True, False], ids=["butées", "sans butées"])
+def reference(request):
+    """Moteur scalaire avec et sans butées articulaires (JOINT_LIMITS, chantier B2)."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(config, "JOINT_LIMITS", request.param)
+        genomes = _test_genomes()
+        yield genomes, [cr.Creature(g).simulate(10.0) for g in genomes]
 
 
 @pytest.mark.parametrize("block", [8, 64])  # blocs pleins + bloc incomplet ; un seul bloc incomplet
