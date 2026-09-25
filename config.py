@@ -544,3 +544,11 @@ COMPARE_FRONT_LAYER = False   # [CHOIX] sans premier plan : ses canopées cacher
 COMPARE_LABEL = {"font": ("questrial", 22), "offset": (87, -49), "underline": (2, 3, 8, 7), "line": 2, "spacing": 8}
 COMPARE_LABEL_SHADOW = ("#000000", 0.35)   # [CHOIX] ombre de 1 px sous le texte et le souligné (lisibles sur un nuage blanc)
 COMPARE_EXPORT_TIMES = (0.5, 2.0, 4.0, 6.4, 8.0, 10.0)   # [CHOIX] instants exportés (planche de 3 × 2, t = 0.5 s : image 37)
+
+# ---------------------------------------------------------------------------
+# Export vidéo MP4 (§10, phase 6) : images pygame → ffmpeg (libx264, yuv420p), cadence FPS
+# ---------------------------------------------------------------------------
+VIDEO_CRF = 18                # [CHOIX] qualité x264 (18 : pertes à peine visibles)
+VIDEO_PRESET = "medium"       # [CHOIX] compromis vitesse d'encodage / taille
+VIDEO_HOLD_S = 1.0            # [CHOIX] dernière image tenue en fin de vidéo
+VIDEO_HIST_S = 2.0            # [CHOIX] vidéo de la vue population : histogramme après le tri
