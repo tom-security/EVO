@@ -525,14 +525,22 @@ ANALYSIS_LABEL_TIMES = (1.0, 1.1, 0.3)
 SLOW_SPEED = 0.25             # [VU] §7.4 — ralenti ×0.25 (touche S du replay et du mode analyse, ou --slow)
 
 COMPARE_GENS = (0, 23, 100, 200)   # [CHOIX] générations repères du §9
-COMPARE_GHOST_ALPHA = 0.55         # [CHOIX] fantômes semi-transparents (image 37 : le tronc se voit à travers les doigts)
+# [CHOIX] fantômes semi-transparents (image 37 : le tronc se voit à travers les doigts), de plus en plus opaques
+# avec la génération : la plus ancienne à 0.45, la plus récente à 0.9, les autres réparties entre les deux
+COMPARE_GHOST_ALPHA = (0.45, 0.9)
 # [CHOIX] §7.5 (détail non montré) : tous les champions partent ensemble et sont montrés au même instant t,
-# chacun à sa propre hauteur. La caméra (lerp du replay) suit le plus haut en gardant les autres à l'écran tant
-# que l'écart le permet : centre visé entre le plus haut et le plus bas, sans laisser le plus haut à moins de
-# 7 m du haut de l'écran (tête et libellé).
-COMPARE_TOP_MARGIN = 7.0
+# chacun à sa propre hauteur. Cadrage fixe (COMPARE_FIT) : l'échelle est calculée une fois pour que le plus grand
+# écart entre les torses sur les 10 s tienne dans l'écran avec des marges (m) en haut (tête et libellé) et en bas
+# (queue) ; jamais plus grande que SCENE_SCALE, arrondie à 0.1 px/m (décor mis en cache). La caméra (lerp du
+# replay) vise le milieu entre le plus haut et le plus bas, bornée par ces marges ; si l'écart ne tient pas
+# (COMPARE_FIT = False), le plus haut reste prioritaire.
+COMPARE_FIT = True
+COMPARE_MARGINS = (7.0, 7.5)
 COMPARE_FRONT_LAYER = False   # [CHOIX] sans premier plan : ses canopées cacheraient les fantômes (image 37 : aucune)
 # [DÉDUIT] image 37 : « Génération 200 » en Questrial 22 (146 px d'encre ; Questrial 22 : 149), souligné de 2 px
 # 3 px sous l'encre, de 8 px avant à 7 px après le texte ; trait de rappel de 2 px du NECK au début du souligné,
-# décalé de (87, −49) px. Sur la génération la plus récente (la plus avancée dans l'évolution).
-COMPARE_LABEL = {"font": ("questrial", 22), "offset": (87, -49), "underline": (2, 3, 8, 7), "line": 2}
+# décalé de (87, −49) px. Un libellé par fantôme (image 37 : plusieurs libellés et traits superposés) ;
+# [CHOIX] écart vertical minimal entre deux libellés : hauteur d'encre + spacing px (les plus bas descendent).
+COMPARE_LABEL = {"font": ("questrial", 22), "offset": (87, -49), "underline": (2, 3, 8, 7), "line": 2, "spacing": 8}
+COMPARE_LABEL_SHADOW = ("#000000", 0.35)   # [CHOIX] ombre de 1 px sous le texte et le souligné (lisibles sur un nuage blanc)
+COMPARE_EXPORT_TIMES = (0.5, 2.0, 4.0, 6.4, 8.0, 10.0)   # [CHOIX] instants exportés (planche de 3 × 2, t = 0.5 s : image 37)

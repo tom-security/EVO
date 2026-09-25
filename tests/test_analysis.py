@@ -117,32 +117,75 @@ def test_analysis_view_draws_overlay_and_labels(small_run, tmp_cache):
     assert set(keys) == {"epaule", "hanche", "genou"} and all(0 <= f < r.n_frames for f, _ in keys.values())
 
 
+class _Fake:
+    def __init__(self, ys, gen=0):
+        self.ref_y = np.asarray(ys, float)
+        self.gen = gen
+
+
 def test_compare_ghosts_same_time_and_camera(small_run, tmp_cache):
     pygame.display.init()
     screen = pygame.display.set_mode(config.WINDOW_SIZE)
     replays = cp.load_champions(small_run, [1, 0], log=None)
     view = cp.CompareView(replays)
-    assert [r.gen for r in view.replays] == [0, 1] and view.replay.gen == 1      # libellé : la plus récente
+    assert [r.gen for r in view.replays] == [0, 1] and view.replay.gen == 1
     assert "premier_plan" not in view.scene.layers
-    track = view.track
-    ys = np.stack([r.ref_y for r in view.replays])
-    above = view.framing.y_px(config.GROUND_Y + config.START_HEIGHT) / view.framing.scale
-    assert np.all(track >= 0.5 * (ys.max(0) + ys.min(0)) - 1e-12)
-    assert np.all(track >= ys.max(0) - (above - config.COMPARE_TOP_MARGIN) - 1e-12)
+    assert view.framing.scale == cp.fitted_scale(view.replays) <= config.SCENE_SCALE
+    assert view.alphas[0] < view.alphas[1]                           # la plus récente est la plus opaque
     view.reset_camera()
     view.draw(screen, 0)
     a = pygame.surfarray.array3d(screen).transpose(1, 0, 2).astype(int)
-    assert (a.min(axis=2) > 245).sum() > 100                         # libellé blanc « Génération 1 » souligné
+    white_rows = [y for y in range(a.shape[0]) if (a[y].min(axis=1) > 245).sum() > 60]   # soulignés
+    runs = [y for k, y in enumerate(white_rows) if k == 0 or y - white_rows[k - 1] > 1]
+    assert len(runs) == 2                                            # un libellé par fantôme
+    rects = [r for _, _, r in view.label_rects(0)]
+    assert not rects[0].colliderect(rects[1])                        # fantômes superposés au départ : libellés séparés
+    # chaque fantôme est dessiné : les pixels changent dans sa zone quand on l'ajoute
+    for k in range(2):
+        solo = cp.CompareView(replays)
+        solo.replays, solo.lizards, solo.alphas = [solo.replays[k]], [solo.lizards[k]], [solo.alphas[k]]
+        solo.labels, solo.shadows, solo.label_inks = [], [], []
+        solo.reset_camera()
+        solo.draw(screen, 0)
+        with_ghost = pygame.surfarray.array3d(screen).astype(int)
+        solo.scene.draw_back(screen, solo.camera.shift)
+        assert (np.abs(with_ghost - pygame.surfarray.array3d(screen).astype(int)).max(axis=2) > 20).sum() > 500
 
 
-def test_ghost_track_follows_the_highest(small_run):
-    class Fake:
-        def __init__(self, ys):
-            self.ref_y = np.asarray(ys, float)
+def test_fitted_scale_and_track_keep_everyone_on_screen():
     from evo.scene import Framing
-    f = Framing()
-    above = f.y_px(config.GROUND_Y + config.START_HEIGHT) / f.scale
-    low, high = Fake([10.3, 10.3]), Fake([10.3, 10.3 + 40.0])
-    track = cp.camera_track([low, high], f)
-    assert track[0] == pytest.approx(10.3)                           # ensemble : centre
-    assert track[1] == pytest.approx(10.3 + 40.0 - (above - config.COMPARE_TOP_MARGIN))   # écart trop grand : le plus haut
+    top, bottom = config.COMPARE_MARGINS
+    near = [_Fake([10.3, 12.0]), _Fake([10.3, 11.0])]
+    assert cp.fitted_scale(near) == config.SCENE_SCALE              # petit écart : cadrage normal
+    far = [_Fake(10.3 + np.linspace(0, s, 50)) for s in (5.0, 10.0, 22.0, 34.0)]
+    s = cp.fitted_scale(far)
+    assert s < config.SCENE_SCALE and 720 / s >= 34.0 - 5.0 + top + bottom
+    f = Framing(scale=s)
+    track = cp.camera_track(far, f)
+    y_ref = f.y_px(config.GROUND_Y + config.START_HEIGHT)
+    ys = np.stack([r.ref_y for r in far])
+    top_px = y_ref - (ys.max(0) - track) * s                         # torse le plus haut à l'écran
+    bottom_px = y_ref + (track - ys.min(0)) * s
+    assert np.all(top_px >= top * s - 1e-6) and np.all(bottom_px <= 720 - bottom * s + 1e-6)
+    # cadrage normal forcé et écart trop grand : le plus haut reste prioritaire
+    f0 = Framing()
+    above = f0.y_px(config.GROUND_Y + config.START_HEIGHT) / f0.scale
+    t0 = cp.camera_track([_Fake([10.3, 10.3]), _Fake([10.3, 50.3])], f0)
+    assert t0[0] == pytest.approx(10.3) and t0[1] == pytest.approx(50.3 - (above - top))
+
+
+def test_labels_alphas_and_sheet_layout():
+    a = cp.ghost_alphas(4)
+    assert a[0] == pytest.approx(config.COMPARE_GHOST_ALPHA[0]) and a[-1] == pytest.approx(config.COMPARE_GHOST_ALPHA[1])
+    assert all(x < y for x, y in zip(a, a[1:]))
+    ys = cp.label_layout([300.0, 300.0, 301.0, 299.0], 16, 720, gens=[0, 23, 100, 200])
+    order = list(np.argsort(ys))
+    assert order == [3, 2, 1, 0]                                     # superposés : la plus récente en haut
+    thick, gap, _, _ = config.COMPARE_LABEL["underline"]
+    assert np.all(np.diff(np.sort(ys)) >= 16 + gap + thick + config.COMPARE_LABEL["spacing"] - 1e-9)
+    ys = cp.label_layout([100.0, 400.0], 16, 720, gens=[0, 200])      # éloignés : chacun près de son fantôme
+    assert ys[0] < ys[1]
+    ys = cp.label_layout([715.0, 716.0, 717.0], 16, 720)            # en bas de l'écran : la pile remonte
+    assert ys.max() <= 720 - thick - 2 + 1e-9
+    cells, (cols, rows) = cp.sheet_cells(len(config.COMPARE_EXPORT_TIMES))
+    assert (cols, rows) == (3, 2) and len(set(cells)) == cols * rows   # aucune case vide
