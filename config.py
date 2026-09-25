@@ -306,7 +306,10 @@ BRANCH_COLOR = "#74442C"      # [VU] §5.2
 BRANCH_FACET = "#844C2C"      # [VU] §5.2
 # [DÉDUIT] images 03, 06, 09 et 40 : branches en L du tronc, qui porteront les canopées du premier
 # plan (phase 4a-2) : (départ en hauteur HUD m, côté ±1, avancée m, montée m, poteau m, épaisseur m)
-BRANCHES = ((12.0, 1, 4.9, 5.4, 6.0, 1.7), (31.0, -1, 4.6, 5.0, 6.0, 1.6), (43.0, 1, 4.9, 5.4, 6.0, 1.7))
+# [DÉDUIT] image 08 (chantier A) : au repère de 30 m, aucune autre branche ni canopée sur le tronc ou à ses
+# côtés jusqu'au haut de l'écran (45.4 m) ; les deux branches suivantes (31 et 43 m jusque-là) partent donc
+# au-dessus, à 46 et 58 m [CHOIX au-delà de 45 m, sans référence : côtés alternés, 12 m d'écart].
+BRANCHES = ((12.0, 1, 4.9, 5.4, 6.0, 1.7), (46.0, -1, 4.6, 5.0, 6.0, 1.6), (58.0, 1, 4.9, 5.4, 6.0, 1.7))
 
 # Sol (§5.2) : herbe dentelée, terre low-poly, rochers, touffes.
 GRASS_COLORS = ("#8C9C04", "#748404")   # [VU] bande claire du haut, bande sombre du dessous
@@ -349,7 +352,10 @@ PLANE_FERNS = ((-17.2, 8.6, 11.5), (-10.5, 3.8, 4.8), (28.8, 6.2, 7.2))   # [DÉ
 # (centre à cette distance de l'axe du tronc, du côté de la branche ; largeur ; hauteur, en m).
 # Image 09 : x 570–1110 px, soit de −3.5 à +23.5 m : elle couvre la moitié droite du tronc.
 FG_CANOPIES = ((10.0, 27.0, 12.0), (8.0, 22.0, 10.0), (10.0, 25.0, 11.0))
-FG_CANOPY_LIFT = 2.6                       # [DÉDUIT] image 09 : bas de la canopée 2.6 m au-dessus du pied du poteau
+# [DÉDUIT] images 06, 08 et 09 (chantier A) : la canopée de la branche de 12 m va de 23.1–23.3 m à 32.3–32.6 m
+# de hauteur HUD, au-dessus d'un poteau visible sur ≈ 5 m (image 06 : de 17.8 à 22.6 m) ; la phase 4 la posait
+# 2.6 m au-dessus du pied du poteau, soit 2.7 m trop bas (lecture de l'image 09 corrigée).
+FG_CANOPY_LIFT = 5.3
 
 # Repères de hauteur (§5.6) : ligne blanche fine sur la largeur du tronc, libellé à gauche.
 MARKER_STEP = 10.0            # [VU] §5.6 — en hauteur HUD (depuis le départ) [DÉDUIT] image 03 sans ligne à 10 m du sol
