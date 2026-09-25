@@ -35,6 +35,9 @@ LIMB_POINTS = ("coude", "main", "genou", "pied")
 _GIRDLES = ((sk.L_SHOULDER, sk.NECK, sk.PELVIS), (sk.R_SHOULDER, sk.NECK, sk.PELVIS),
             (sk.L_HIP, sk.PELVIS, sk.NECK), (sk.R_HIP, sk.PELVIS, sk.NECK))
 HEIGHT_TOLERANCE = 1e-9      # hauteur rejouée contre hauteur stockée (m), comme Replay
+# Au-delà d'une butée = de plus de 1e-6° : en dessous, c'est l'arrondi flottant d'un angle posé sur la borne (une
+# cible de génome ramenée sur la butée par une mutation, une articulation au contact).
+ANGLE_TOLERANCE_DEG = 1e-6
 
 
 def _signed(u, v):
@@ -140,14 +143,16 @@ def tail_swing(pos):
 def joint_stats(angles):
     """Par type d'articulation, sur une ou plusieurs grimpes (liste de (T, 8)), côtés gauche et droit réunis :
     extrêmes, percentiles 1–99 %, part du temps hors butées (sous le min, au-dessus du max), excès médian quand
-    on est hors butées, part du temps à plus de 10° au-delà, part des grimpes avec un tour complet."""
+    on est hors butées (au-delà de ANGLE_TOLERANCE_DEG), pénétration max, part du temps à plus de 0.5° et de 10°
+    au-delà, part des grimpes avec un tour complet."""
     out = {}
     for t, kind in enumerate(KINDS):
         lo, hi = config.JOINT_LIMITS_DEG[kind]
         per = [a[:, [t, 4 + t]] for a in angles]
         x = np.concatenate([a.ravel() for a in per])
         excess = np.where(x < lo, lo - x, np.where(x > hi, x - hi, 0.0))
-        beyond = excess > 0
+        beyond = excess > ANGLE_TOLERANCE_DEG
+        lo, hi = lo - ANGLE_TOLERANCE_DEG, hi + ANGLE_TOLERANCE_DEG
         out[kind] = {
             "min": float(x.min()), "max": float(x.max()),
             "p1": float(np.percentile(x, 1)), "p99": float(np.percentile(x, 99)),
@@ -155,20 +160,27 @@ def joint_stats(angles):
             "au_dessus_max": float((x > hi).mean()),
             "exces_median": float(np.median(excess[beyond])) if beyond.any() else 0.0,
             "exces_max": float(excess.max()),
+            "plus_de_05": float((excess > 0.5).mean()),   # au-delà du critère de pénétration de B2
             "plus_de_10": float((excess > 10.0).mean()),
             "tour_complet": float(np.mean([np.any(np.ptp(a, axis=0) > 360.0) for a in per])),
         }
     return out
 
 
-def targets_out_of_bounds(pop):
-    """Part des cibles du génome (toute la population, K poses × 2 côtés) hors des butées, par type."""
+def _on_bound(x, lo, hi):
+    return (np.abs(x - lo) <= ANGLE_TOLERANCE_DEG) | (np.abs(x - hi) <= ANGLE_TOLERANCE_DEG)
+
+
+def targets_out_of_bounds(pop, on_bound=False):
+    """Part des cibles du génome (toute la population, K poses × 2 côtés) hors des butées, par type ;
+    on_bound : part des cibles posées sur une butée (à ANGLE_TOLERANCE_DEG près)."""
     T = np.degrees(pop.targets) + rest_offsets()          # (N, K, 8) en angles anatomiques
     out = {}
     for t, kind in enumerate(KINDS):
         lo, hi = config.JOINT_LIMITS_DEG[kind]
         x = T[:, :, [t, 4 + t]]
-        out[kind] = float(np.mean((x < lo) | (x > hi)))
+        hit = _on_bound(x, lo, hi) if on_bound else ((x < lo - ANGLE_TOLERANCE_DEG) | (x > hi + ANGLE_TOLERANCE_DEG))
+        out[kind] = float(np.mean(hit))
     return out
 
 
@@ -257,6 +269,7 @@ def audit(run_dir, gen=None, top=1, sample=0, energy=False, log=print):
         "butees_moteur": bool(config.JOINT_LIMITS),
         "repos_deg": rest_angles(), "plage_cibles_deg": target_range(),
         "creatures": rows, "groupes": groups, "cibles_hors_butees": targets_out_of_bounds(pop),
+        "cibles_sur_butee": targets_out_of_bounds(pop, on_bound=True),
         "identique": all(r["identique"] for r in rows), "secondes": time.perf_counter() - t0,
     }
     if log:
@@ -290,7 +303,9 @@ def report_lines(result):
                            for k, d in g["articulations"].items())
         lines.append(f"  groupe {name} ({g['n']} créatures, au sol {g['au_sol']:.0%}) : {cells}")
     lines.append("  cibles du génome hors butées (toute la population) : "
-                 + ", ".join(f"{k} {v:.0%}" for k, v in result["cibles_hors_butees"].items()))
+                 + ", ".join(f"{k} {v:.0%}" for k, v in result["cibles_hors_butees"].items())
+                 + " ; posées sur une butée : "
+                 + ", ".join(f"{k} {v:.1%}" for k, v in result["cibles_sur_butee"].items()))
     lines.append(f"  {len(result['creatures'])} grimpes rejouées en {result['secondes']:.0f} s ; hauteurs "
                  + ("identiques au run" if result["identique"] else "DIFFÉRENTES du run"))
     return lines
