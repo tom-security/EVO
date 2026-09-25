@@ -80,6 +80,27 @@ def test_batched_final_poses_and_miniatures(small_run):
     assert (np.abs(arr - body).max(axis=1) <= 2).any()             # vert de la silhouette
 
 
+def test_upright_pose_keeps_the_shape_head_up():
+    from evo import creature as cr, skeleton as sk
+    from evo.creature import diagonal_gait_genome
+
+    c = cr.Creature(diagonal_gait_genome())
+    P0 = c.world.pos.copy()
+    ref0 = 0.5 * (P0[sk.NECK] + P0[sk.PELVIS])
+    a = np.radians(100.0)                                           # couchée au sol, sur le côté
+    rot = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
+    lying = (P0 - ref0) @ rot.T + np.array([config.TRUNK_X, config.GROUND_Y + 0.3])
+    up = P.upright_pose(lying)
+    fwd = up[sk.NECK] - up[sk.PELVIS]
+    assert abs(fwd[0]) < 1e-9 and fwd[1] > 0                        # colonne verticale, tête en haut
+    dist = lambda X: np.hypot(*(X[:, None, :] - X[None, :, :]).transpose(2, 0, 1))   # noqa: E731
+    assert np.allclose(dist(up), dist(lying))                       # rotation seule
+    cross = lambda X: np.cross(X[sk.NECK] - X[sk.PELVIS], X[sk.L_SHOULDER] - X[sk.PELVIS])   # noqa: E731
+    assert np.sign(cross(up)) == np.sign(cross(lying))              # côtés gauche / droit conservés
+    assert up[:, 1].min() > config.GROUND_Y + 10                   # loin du sol : la queue n'est pas couchée
+    assert np.allclose(up, P.upright_pose(up))                     # déjà droite : inchangée
+
+
 def test_histogram_sums_to_n_and_clips_to_the_x_axis():
     rng = np.random.default_rng(0)
     h = rng.uniform(-25.0, 55.0, 1000)

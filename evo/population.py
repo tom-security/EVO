@@ -2,9 +2,10 @@
 
 Les poses finales viennent de l'évaluateur batché (evo/batch.py) : toute la génération en quelques
 secondes, au lieu de 1000 replays scalaires, avec la config du run. La hauteur batchée est comparée à
-la hauteur stockée. Chaque créature est une silhouette verte (LizardShape en mode silhouette) rendue
-une seule fois dans une petite surface ; une image de la vue ne coûte que le fond pré-rendu et un
-blit par miniature. Grille de l'image 24 (50 × 20) :
+la hauteur stockée. Chaque créature est une silhouette verte (LizardShape en mode silhouette) dans sa
+pose finale redressée tête en haut (images 24 et 25, y compris les créatures au sol), rendue une seule
+fois dans une petite surface ; une image de la vue ne coûte que le fond pré-rendu et un blit par
+miniature. Grille de l'image 24 (50 × 20) :
 - place de calcul = indice dans le npz, rangé en colonnes (les colonnes apparaissent de gauche à
   droite pendant l'évaluation, §7.1) ;
 - place triée = rang, en lecture par lignes (1 = en haut à gauche) ;
@@ -119,14 +120,31 @@ class Generation:
 # ---------------------------------------------------------------------------
 # Vue
 # ---------------------------------------------------------------------------
+def upright_pose(pos):
+    """Pose tournée autour du centre du torse pour mettre l'axe PELVIS → NECK à la verticale, tête en
+    haut (rotation seule : longueurs et côtés gauche / droit conservés), puis posée loin au-dessus du
+    sol pour que le dessin ne couche pas la queue sur un sol qui n'existe plus."""
+    P = np.asarray(pos, dtype=float)
+    ref = 0.5 * (P[sk.NECK] + P[sk.PELVIS])
+    fwd = P[sk.NECK] - P[sk.PELVIS]
+    phi = 0.5 * np.pi - np.arctan2(fwd[1], fwd[0])
+    c, s = np.cos(phi), np.sin(phi)
+    d = P - ref
+    rotated = np.column_stack([c * d[:, 0] - s * d[:, 1], s * d[:, 0] + c * d[:, 1]])
+    return rotated + np.array([config.TRUNK_X, config.GROUND_Y + config.POP_MINI_LIFT])
+
+
 def render_miniature(skel, pos, scale=None):
-    """Silhouette d'une créature dans sa pose (monde), centrée sur son point de référence (torse).
+    """Silhouette d'une créature dans sa pose finale, centrée sur son point de référence (torse),
+    redressée tête en haut si POP_MINI_UPRIGHT.
 
     Renvoie (surface, (dx, dy)) : coin haut gauche de la surface par rapport au centre de la case.
     """
     from evo.render_lizard import LizardShape
 
     scale = config.POP_MINI_SCALE if scale is None else scale
+    if config.POP_MINI_UPRIGHT:
+        pos = upright_pose(pos)
     ref = 0.5 * (pos[sk.NECK] + pos[sk.PELVIS])
     dot_color, dot_px = config.POP_MINI_DOT
     return LizardShape(skel).render(pos, (-ref[0] * scale, ref[1] * scale), scale,
@@ -248,21 +266,22 @@ def run_interactive(generation):
     pygame.quit()
 
 
-def _board(pygame, left, right, captions, font, zoom=None):
-    """Référence | nous, côte à côte ; `zoom` = (x, y, w, h, facteur) ajoute une rangée agrandie."""
+def _board(pygame, left, right, captions, font, zooms=()):
+    """Référence | nous, côte à côte ; chaque zoom (x, y, w, h, facteur, légende) ajoute une rangée agrandie."""
     from evo.replay import _caption
 
     w, h = left.get_size()
-    zh = 0 if zoom is None else zoom[3] * zoom[4]
-    board = pygame.Surface((2 * w, h + zh))
+    board = pygame.Surface((2 * w, h + sum(z[3] * z[4] for z in zooms)))
     board.fill((0, 0, 0))
     for k, img in enumerate((left, right)):
         board.blit(img, (k * w, 0))
-        if zoom is not None:
-            x, y, zw, zhh, f = zoom
-            crop = img.subsurface((x, y, zw, zhh)).copy()
-            board.blit(pygame.transform.scale(crop, (zw * f, zhh * f)), (k * w, h))
         _caption(pygame, board, [captions[k]], (k * w + 8, h - 44), font)
+        y0 = h
+        for x, y, zw, zh, f, label in zooms:
+            crop = img.subsurface((x, y, zw, zh)).copy()
+            board.blit(pygame.transform.scale(crop, (zw * f, zh * f)), (k * w, y0))
+            _caption(pygame, board, [label], (k * w + 8, y0 + zh * f - 44), font)
+            y0 += zh * f
     return board
 
 
@@ -314,7 +333,8 @@ def export(generation, out_dir, log=print):
     board = _board(pygame, ref_pop, shots["triee"],
                    [f"Référence : {os.path.basename(reference_image(10, 49))} (génération 0)",
                     f"Nous : graine {generation.seed}, génération {generation.gen}, triée"],
-                   small, zoom=(50, 45, 240, 130, 4))
+                   small, zooms=((50, 45, 320, 130, 4, "×4 : 4 premières lignes (les meilleures)"),
+                                 (50, 538, 320, 130, 4, "×4 : 4 dernières lignes (les pires, au sol)")))
     path = os.path.join(out_dir, "comparaison_population.png")
     pygame.image.save(board, path)
     paths.append(path)

@@ -451,6 +451,11 @@ POP_MINI_COLOR = "#7AA842"    # [DÉDUIT] image 24 : médiane du vert des miniat
 # [DÉDUIT] image 24 : un point clair par main et par pied (les doigts ne se distinguent pas à cette
 # taille) ; couleur et rayon (px) calés sur les pixels clairs (médiane #9FB480, 90e centile #AFC095)
 POP_MINI_DOT = ("#A8BC8C", 1.1)
+# [DÉDUIT] images 24 et 25 : toutes les miniatures sont tête en haut, queue vers le bas, y compris les
+# ≈ 450 créatures tombées de la génération 0 ; la pose finale est donc redressée (axe PELVIS → NECK
+# vertical, rotation autour du centre du torse), dans la grille seulement (ni replay ni physique).
+POP_MINI_UPRIGHT = True
+POP_MINI_LIFT = 100.0         # [CHOIX] pose redressée placée à 100 m du sol : la queue n'y est jamais couchée
 POP_SORT_DELAY_S = 0.5        # [CHOIX] attente avant le tri animé
 POP_SORT_S = 2.0              # [CHOIX] durée du tri (ease-in-out, toutes les miniatures ensemble)
 # [DÉDUIT] images 26, 27 et 28 : histogramme (§7.2) dans le style de la vidéo. Zone du graphe : x de −10 m
