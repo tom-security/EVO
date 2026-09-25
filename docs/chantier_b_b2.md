@@ -185,15 +185,46 @@ Aucun réglage d'écran n'a été modifié.
 | Analyse | forces : deltoïde 0 %, grand dorsal 40 %, biceps 24 %, fléchisseurs de hanche 0 %, fessiers 42 %, quadriceps 100 % | §9 : 22 %, 76 %, 57 %, 31 % |
 | Comparaison de générations | 4 champions (générations 0, 23, 100, 200 : +3,0 à +35,3 m à 10 s), tous à l'écran de 0,5 à 10 s, 15,3 px/m | image 37 |
 
-- **Temps de rendu** : plus élevés que lors des phases 5 et 6, mais c'est la machine : rechronométré dans les mêmes
-  conditions, l'ancien champion prend 14,7 ms par image en analyse (10,5 ms en phase 5c) et le nouveau 12,9 ms. Le
-  replay reste à 6,3 ms (0 % au-delà de 16,7 ms).
+- **Temps de rendu : pas de régression due à B2.** Ils sont plus élevés qu'aux phases 5 et 6, y compris pour le décor
+  seul, qui ne dépend pas de la créature. Mesure en mémoire, ancien et nouveau champion en alternance, deux passes
+  (ms par image · part au-delà de 16,7 ms) :
+
+  | écran | ancien champion (runs/2) | nouveau champion (runs/butees/2) |
+  |---|---|---|
+  | replay | 6,48 / 6,78 · 0,0 / 0,7 % | 6,49 / 6,55 · 0 / 0 % |
+  | analyse | 14,82 / 14,64 · 15,5 / 9,0 % | 13,28 / 12,52 · 8,8 / 2,5 % |
+  | comparaison | 15,18 / 15,09 · 14,6 / 14,0 % | 13,77 / 14,74 · 6,5 / 16,1 % |
+
+  Le nouveau champion n'est jamais plus lent que l'ancien ; l'ancien, lui, passe de 10,5 ms en analyse (phase 5c) à
+  14,7 ms avec le même code. La machine n'était pas chargée (charge 0,9 sur 4 cœurs, due à la mesure), mais la
+  session a changé d'hôte en cours de route (noyau fc-v37, puis fc-v42, puis fc-v37). La part au-delà de 16,7 ms
+  varie d'un facteur 3 entre deux passes d'une même créature : c'est une mesure bruitée, à refaire sur une machine
+  stable avant d'en tirer une conclusion sur le budget de 60 images par seconde.
 - **Nouveau constat : une morphologie trapue.** Toute la population de la graine 2 avec butées a une colonne à
   0,62 fois la référence (borne basse 0,6), un fémur à 0,60 (borne basse) et un demi-bassin à 1,36 (borne haute
   1,4) ; l'ancien champion avait une colonne à 0,89. Le lézard est plus court et plus large, sa queue (1,2 × la
   colonne) aussi, et il replie ses pattes contre le corps : les miniatures de la vue population sont compactes, et
   en analyse la queue disparaît derrière les pieds, qui se croisent sous le bassin (le point ouvert du §3). La
   vidéo montre un lézard allongé.
+- **Miniatures repliées, queue peu visible : effet du nouveau run, pas du rendu.** Mesuré sur les 200 meilleures
+  (lignes 0 à 3) et les 200 perdantes (lignes 16 à 19) de la génération 200 :
+
+  | | ancien, meilleures | ancien, perdantes | nouveau, meilleures | nouveau, perdantes |
+  |---|---|---|---|---|
+  | silhouette (px) | 12,0 × 19,0 | 11,5 × 18,0 | 11,0 × 13,0 | 10,0 × 13,0 |
+  | surface (px) | 67 | 65 | 62 | 62 |
+  | queue visible (px, rendu avec moins sans la queue) | 4 | 4 | 4 | 3 |
+  | longueur de la queue (px) | 7,4 | 7,4 | 5,0 | 5,2 |
+  | allongement des membres (1 = tendus) | 0,87 | 0,76 | 0,77 | 0,73 |
+
+  La queue n'est pas masquée (même surface visible) : elle est plus courte de 32 %, comme la colonne. La silhouette
+  perd 32 % de hauteur pour une surface presque égale, et les membres des meilleures sont plus repliés. Le motif est
+  le même en haut et en bas de la grille, parce que toute la population descend d'un seul ancêtre et partage la même
+  morphologie. Le rendu est hors de cause : le code actuel redonne la vue population de la phase 5b au pixel près
+  sur l'ancien run.
+- **Histogrammes** : pas d'enquête séparée. Les générations 0 et 1 comptent moins de créatures très bas qu'avant
+  B2, comme les chiffres déjà connus : au sol 430 → 383 (génération 0), 68 → 54 (génération 1), 88 → 51 (génération
+  200).
 
 **Écarts connus révisés** (champion de la graine 2, génération 200) :
 - période finale trop longue : **résolu** (0,58 s ; vidéo : 0,6 s) ;
