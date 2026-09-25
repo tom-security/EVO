@@ -9,6 +9,7 @@
     python main.py benchmark --pop 1000           # temps d'évaluation d'une génération (phase 3a)
     python main.py train --generations 200 --pop 1000 --seed 42 [--set TORQUE_SCALE=0.3 …]
     python main.py graphs --seed 42               # courbes + histogrammes du run en PNG
+    python main.py graphs --run-dir runs/butees/2 --compare runs/2   # deux runs superposés (chantier B2)
     python main.py histogram --seed 42 --gen 0 [--style video]
     python main.py population --seed 2 --gen 200    # vue population, tri animé (§7.1)
     python main.py population --seed 2 --gen 200 --export out/phase5b
@@ -64,6 +65,8 @@ def main(argv=None):
     graphs.add_argument("--seed", type=int, default=42)
     graphs.add_argument("--run-dir", default=None)
     graphs.add_argument("--out", default=None, help="dossier de sortie (défaut : <run>/graphes)")
+    graphs.add_argument("--compare", metavar="RUN_DIR", default=None,
+                        help="superpose ce run de référence (pointillés) aux courbes du run (chantier B2)")
 
     hist = sub.add_parser("histogram", help="histogramme des hauteurs d'une génération (PNG)")
     hist.add_argument("--seed", type=int, default=42)
@@ -176,6 +179,8 @@ def main(argv=None):
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
         gens = [args.gen] if args.command == "histogram" else None
         style = args.style if args.command == "histogram" else "calibration"
+        if args.command == "graphs" and args.compare:
+            print(charts.export_comparison(args.compare, run_dir, args.out))
         for path in charts.export_run(run_dir, args.out, gens=gens, curves=args.command == "graphs", style=style):
             print(path)
     elif args.command == "population":

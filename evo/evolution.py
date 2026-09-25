@@ -359,7 +359,6 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
     """Lance (ou reprend) un run jusqu'à la génération `generations` incluse."""
     generations = config.GENERATIONS if generations is None else generations
     run_dir = run_dir_for(seed) if run_dir is None else run_dir
-    audit_every = config.AUDIT_EVERY if audit_every is None else audit_every
     done = saved_generations(run_dir)
     snapshot_path = os.path.join(run_dir, "config.json")
 
@@ -374,6 +373,7 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
         for key, old, new in apply_config(saved, strict=False):
             log(f"  reprise : {key} = {new!r} (config du run ; config.py a {old!r})")
         start = done[-1]
+        audit_every = config.AUDIT_EVERY if audit_every is None else audit_every  # cadence du run repris
         pop, results, lineage, _ = load_generation(run_dir, start)
         root = lineage["root"] if "root" in lineage else roots_from_parents(run_dir, start)
         rows = read_stats(run_dir)[:start + 1]  # réécrites à l'identique (même format %.6g)
@@ -382,6 +382,7 @@ def train(seed, generations=None, pop_size=None, run_dir=None, overrides=None, a
         os.makedirs(run_dir, exist_ok=True)
         if overrides:
             apply_config(overrides)
+        audit_every = config.AUDIT_EVERY if audit_every is None else audit_every  # après les --set
         with open(snapshot_path, "w") as f:
             json.dump(config_snapshot(), f, indent=1, sort_keys=True)
         n = config.POP_SIZE if pop_size is None else pop_size

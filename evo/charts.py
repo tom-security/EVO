@@ -7,6 +7,10 @@ phase 5. Les repères du §9 sont dessinés en cercles creux étiquetés.
 
 Phase 5b : l'histogramme a aussi un style « vidéo » (images 26 à 28, fond à vignette partagé avec
 la vue population).
+
+Chantier B2 : comparison_chart superpose deux runs (même graine, avant et après les butées) sur les
+mêmes trois panneaux : l'ancien en pointillés gris (référence), le nouveau en trait plein coloré, avec
+légende et étiquettes de fin — l'identité ne tient pas à la couleur seule.
 """
 import os
 
@@ -27,6 +31,7 @@ GREEN = "#9CEC6C"     # distance
 PINK = "#F4546C"      # masse musculaire
 BAR = "#94F474"       # histogramme
 NEUTRAL = "#C8C8C8"   # seconde série (meilleure) et repères du §9
+REFERENCE_RUN = "#8C8C8C"  # run de référence d'une comparaison (pointillés, en retrait)
 
 # Repères du §9 (génération, valeur, étiquette). La courbe « distance » de la vidéo (0.4 → 3.8,
 # ÷10) correspond à la hauteur au-dessus du sol ; en hauteur HUD (départ = 0) : valeur×10 − START.
@@ -111,6 +116,25 @@ class _Panel:
             pygame.draw.lines(self.s, _c(hex_code), False, pts, width)
         return pts
 
+    def dashed(self, gens, values, hex_code, width=2, dash=8, gap=6):
+        """Même tracé que line(), en pointillés (dash px tracés, gap px vides le long de la courbe)."""
+        pts = [(self.x(g), self.y(v)) for g, v in zip(gens, values)]
+        on, left = True, dash
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            seg = float(np.hypot(x1 - x0, y1 - y0))
+            t = 0.0
+            while t < seg:
+                step = min(left, seg - t)
+                if on:
+                    a, b = t / seg, (t + step) / seg
+                    pygame.draw.line(self.s, _c(hex_code), (x0 + (x1 - x0) * a, y0 + (y1 - y0) * a),
+                                     (x0 + (x1 - x0) * b, y0 + (y1 - y0) * b), width)
+                t += step
+                left -= step
+                if left <= 0:
+                    on, left = not on, (dash if not on else gap)
+        return pts
+
     def end_label(self, pts, text):
         if pts:
             x, y = pts[-1]
@@ -173,6 +197,92 @@ def evolution_chart(rows, title, size=(1280, 1080), x_max=None):
     mp.end_label(mp.line(gens, muscle, PINK), f"{muscle[-1]:.1f}")
     _text(surface, fonts["small"], "génération", (w - 40, h - 14), TEXT_DIM, "bottomright")
     return surface
+
+
+def _end_labels(panel, items):
+    """Étiquettes de fin de plusieurs courbes [(points, texte)], écartées d'au moins 18 px en hauteur."""
+    items = sorted((it for it in items if it[0]), key=lambda it: it[0][-1][1])
+    placed = []
+    for pts, text in items:
+        x, y = pts[-1]
+        if placed and y - placed[-1] < 18:
+            y = placed[-1] + 18
+        placed.append(y)
+        panel.end_label(pts[:-1] + [(x, y)], text)
+
+
+def comparison_chart(rows_ref, rows_new, title, labels=("sans butées", "avec butées"), size=(1280, 1080)):
+    """Les trois panneaux d'evolution_chart, deux runs superposés : `rows_ref` (référence) en pointillés gris,
+    `rows_new` en trait plein coloré ; mêmes échelles pour les deux, repères du §9."""
+    surface = pygame.Surface(size)
+    surface.fill(_c(BG))
+    fonts = _fonts()
+    w, h = size
+    runs = ((rows_ref, labels[0], True), (rows_new, labels[1], False))
+    x_max = max(max(r["gen"] for r in rows) for rows, _, _ in runs)
+    x_max = max(x_max, 30)
+    _text(surface, fonts["title"], title, (24, 18))
+    _text(surface, fonts["small"], f"Pointillés gris : {labels[0]}. Trait plein : {labels[1]}. "
+          "Cercles creux : repères du §9 (vidéo).", (24, 52), TEXT_DIM)
+    panel_h = (h - 100) // 3
+    top = 84
+
+    def draw(panel, key, color, fmt, width=2):
+        items = []
+        for rows, label, ref in runs:
+            gens = [r["gen"] for r in rows]
+            values = [r[key] for r in rows]
+            pts = (panel.dashed if ref else panel.line)(gens, values, REFERENCE_RUN if ref else color, width)
+            items.append((pts, f"{label} {fmt(values[-1])}"))
+        return items
+
+    def legend(panel, color):
+        lx, ly = panel.r.right - 380, panel.r.top + 14
+        pygame.draw.line(surface, _c(REFERENCE_RUN), (lx, ly), (lx + 8, ly), 2)
+        pygame.draw.line(surface, _c(REFERENCE_RUN), (lx + 14, ly), (lx + 22, ly), 2)
+        _text(surface, fonts["small"], labels[0], (lx + 28, ly), TEXT, "midleft")
+        pygame.draw.line(surface, _c(color), (lx + 190, ly), (lx + 212, ly), 2)
+        _text(surface, fonts["small"], labels[1], (lx + 218, ly), TEXT, "midleft")
+
+    period_max = max(max(r["period_mean"] for r in rows) for rows, _, _ in runs)
+    p = _Panel(surface, fonts, (16, top, w - 32, panel_h - 12), x_max, 0.0, max(5.0, period_max * 1.05),
+               "Période d'horloge moyenne (s)")
+    p.references(REFERENCE["period"])
+    _end_labels(p, draw(p, "period_mean", CYAN, lambda v: f"{v:.2f} s"))
+    legend(p, CYAN)
+
+    top_h = max(5.0, max(max(max(r["best_height"], r["height_mean"]) for r in rows) for rows, _, _ in runs) * 1.1)
+    hp = _Panel(surface, fonts, (16, top + panel_h, w - 32, panel_h - 12), x_max, -10.0, top_h,
+                "Hauteur à 10 s (m) : moyenne de la population (2 px) et meilleure (1 px)")
+    hp.references(REFERENCE["height"])
+    items = draw(hp, "height_mean", GREEN, lambda v: f"moy. {v:+.1f} m")
+    items += draw(hp, "best_height", GREEN, lambda v: f"meill. {v:+.1f} m", width=1)
+    _end_labels(hp, items)
+    legend(hp, GREEN)
+
+    mp = _Panel(surface, fonts, (16, top + 2 * panel_h, w - 32, panel_h - 12), x_max, 0.0, 25.0,
+                "Masse musculaire moyenne")
+    mp.references(REFERENCE["muscle"])
+    _end_labels(mp, draw(mp, "muscle_mean", PINK, lambda v: f"{v:.1f}"))
+    legend(mp, PINK)
+    _text(surface, fonts["small"], "génération", (w - 40, h - 14), TEXT_DIM, "bottomright")
+    return surface
+
+
+def export_comparison(ref_dir, new_dir, out_dir=None, labels=("sans butées", "avec butées")):
+    """PNG des courbes de deux runs superposées ; renvoie le chemin."""
+    from evo import evolution as ev
+
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.display.init()
+    out_dir = out_dir or os.path.join(new_dir, "graphes")
+    os.makedirs(out_dir, exist_ok=True)
+    seed = os.path.basename(os.path.normpath(new_dir))
+    path = os.path.join(out_dir, "courbes_comparees.png")
+    surface = comparison_chart(ev.read_stats(ref_dir), ev.read_stats(new_dir),
+                               f"Graine {seed} : {ref_dir} contre {new_dir}", labels)
+    pygame.image.save(surface, path)
+    return path
 
 
 def diversity_chart(rows, title, size=(1280, 1080), x_max=None):

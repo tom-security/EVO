@@ -123,3 +123,13 @@ def test_audit_of_champion_writes_report(tmp_path):
     assert len(rows) == 1 and rows[0]["gen"] == "0"
     assert float(rows[0]["height"]) == pytest.approx(float(rows[0]["height_replay"]), abs=1e-6)
     assert float(rows[0]["created_height_m"]) < config.AUDIT_MAX_CREATED_HEIGHT
+    assert int(rows[0]["limit_engagements"]) >= 0 and float(rows[0]["limit_jump_max_J"]) >= 0.0   # colonnes B2
+
+
+def test_audit_cadence_set_on_the_command_line_is_applied(tmp_path, monkeypatch):
+    """--set AUDIT_EVERY=1 : la cadence appliquée est celle de la surcharge, pas la valeur de config.py."""
+    monkeypatch.setattr(config, "AUDIT_EVERY", config.AUDIT_EVERY)   # restaurée après le test
+    run = str(tmp_path / "run")
+    ev.train(0, generations=2, pop_size=12, run_dir=run, overrides={"AUDIT_EVERY": 1}, log=lambda *_: None)
+    with open(os.path.join(run, "audit.csv")) as f:
+        assert [r["gen"] for r in csv.DictReader(f)] == ["0", "1", "2"]
