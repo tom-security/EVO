@@ -4,7 +4,8 @@ Avant B2, le moteur n'avait aucune butée d'angle entre deux os ; depuis, il app
 aux runs entraînés avec JOINT_LIMITS (les runs plus anciens se rejouent sans). Cet audit rejoue des créatures
 d'un run (moteur scalaire, config du run, hauteur vérifiée au bit près), relève à chaque sous-pas l'angle
 anatomique des 8 articulations musclées et le compare aux butées : diagnostic de B1
-(docs/chantier_b_diagnostic.md), avant/après de B2 ; --energy ajoute les sauts d'énergie aux butées.
+(docs/chantier_b_diagnostic.md), avant/après de B2 ; --energy ajoute les sauts d'énergie aux butées ; --crossings
+les croisements entre membres (chantier C : côté de l'axe du corps, profondeur, paires de segments, cône de queue).
 
 Conventions (vue de dessus sur le mur, gauche et droite en miroir, ordre des articulations de creature.JOINTS) :
 - épaule, hanche : α = angle de l'humérus (du fémur) depuis l'axe latéral du corps, prolongement de la
@@ -122,6 +123,143 @@ def limb_crossings(pos):
     return float(same.mean()), float(left_right.mean())
 
 
+AXIS_ZONES = ("queue", "torse", "tête")   # le long de l'axe : derrière le bassin, entre bassin et cou, devant le cou
+TAIL_CONE_REFS_DEG = (6.0, 10.0, 30.0)     # cônes de queue de référence (C1) : part du temps où la queue en sort
+
+
+def axis_positions(pos):
+    """(lat, axial, colonne) : lat (T, 2, 4) = distance (m) du coude, de la main, du genou et du pied à l'axe
+    bassin–cou, positive du côté du membre ; axial (T, 2, 4) = position (m) le long de l'axe, 0 au bassin, colonne
+    au cou ; colonne (T,) = longueur bassin–cou."""
+    P, _ = _series(pos)
+    pelvis = P[:, sk.PELVIS]
+    axis = P[:, sk.NECK] - pelvis
+    spine = np.linalg.norm(axis, axis=1)
+    e = axis / spine[:, None]
+    lat = np.empty((len(P), 2, len(LIMB_POINTS)))
+    axial = np.empty_like(lat)
+    for i, (s, SH, EL, HA, HI, KN, FO) in enumerate(_SIDES):
+        for j, k in enumerate((EL, HA, KN, FO)):
+            r = P[:, k] - pelvis
+            lat[:, i, j] = -s * (e[:, 0] * r[:, 1] - e[:, 1] * r[:, 0])
+            axial[:, i, j] = e[:, 0] * r[:, 0] + e[:, 1] * r[:, 1]
+    return lat, axial, spine
+
+
+def tail_cone_angles(pos):
+    """(T, n) angle (°) de chaque point de queue vu du bassin, depuis le prolongement de la colonne vers l'arrière
+    (0 = queue dans l'axe) ; la queue tient dans un cône de ±τ si le maximum de chaque ligne est ≤ τ."""
+    P, _ = _series(pos)
+    pelvis = P[:, sk.PELVIS]
+    back = pelvis - P[:, sk.NECK]
+    return np.degrees(np.abs(_signed(back[:, None, :], P[:, sk.TAIL_START:] - pelvis[:, None, :])))
+
+
+def _segment_groups(n_points):
+    limbs = {}
+    for name, (s, SH, EL, HA, HI, KN, FO) in zip("GD", _SIDES):
+        limbs[name + "bras"] = (("humérus", (SH, EL)), ("avant-bras", (EL, HA)))
+        limbs[name + "jambe"] = (("fémur", (HI, KN)), ("tibia", (KN, FO)))
+    tail = [sk.PELVIS] + list(range(sk.TAIL_START, n_points))
+    body = {"colonne": ((sk.NECK, sk.PELVIS),),
+            "ceintures": ((sk.NECK, sk.L_SHOULDER), (sk.NECK, sk.R_SHOULDER), (sk.PELVIS, sk.L_HIP), (sk.PELVIS, sk.R_HIP)),
+            "tête": ((sk.NECK, sk.HEAD),),
+            "queue": tuple(zip(tail[:-1], tail[1:]))}
+    return limbs, body
+
+
+CROSSING_KINDS = ("jambe/queue", "fémur/queue", "tibia/queue", "bras/queue", "jambe G/jambe D", "bras G/bras D",
+                  "bras/jambe opposés", "bras/jambe même côté", "membres/colonne", "membres/ceintures", "membres/tête")
+
+
+def segment_crossings(pos):
+    """{paire : (T,) bool} instants où un segment de membre en croise un autre, ou croise la colonne, les ceintures,
+    la tête ou la queue (segments qui partagent un point exclus). Le modèle n'a pas de collision entre segments."""
+    P, _ = _series(pos)
+    limbs, body = _segment_groups(P.shape[1])
+    out = {k: np.zeros(len(P), bool) for k in CROSSING_KINDS}
+
+    def hit(a, b):
+        return _segments_cross(P[:, a[0]], P[:, a[1]], P[:, b[0]], P[:, b[1]])
+
+    for side, other in (("G", "D"), ("D", "G")):
+        for _, a in limbs[side + "bras"]:
+            for _, b in limbs[side + "jambe"]:
+                out["bras/jambe même côté"] |= hit(a, b)
+            for _, b in limbs[other + "jambe"]:
+                out["bras/jambe opposés"] |= hit(a, b)
+        for part in ("bras", "jambe"):
+            for bone, a in limbs[side + part]:
+                for name, segs in body.items():
+                    for b in segs:
+                        if {*a} & {*b}:
+                            continue
+                        h = hit(a, b)
+                        if name == "queue":
+                            out[f"{part}/queue"] |= h
+                            if part == "jambe":
+                                out[f"{bone}/queue"] |= h
+                        else:
+                            out[f"membres/{name}"] |= h
+    for part in ("bras", "jambe"):
+        for _, a in limbs["G" + part]:
+            for _, b in limbs["D" + part]:
+                out[f"{part} G/{part} D"] |= hit(a, b)
+    return out
+
+
+def crossing_measures(pos, held, lengths):
+    """(ligne, brut) d'une grimpe : côté de l'axe de chaque extrémité (part du temps de l'autre côté, profondeur,
+    zone, patte tenue), croisements par paire, cône de queue. `held` : (T, P) prises ; `lengths` : os du génome."""
+    lat, axial, spine = axis_positions(pos)
+    zone = np.where(axial < 0, 0, np.where(axial > spine[:, None, None], 2, 1))
+    limb_len = {"coude": lengths[2], "main": lengths[2] + lengths[3], "genou": lengths[5], "pied": lengths[5] + lengths[6]}
+    ends = np.array([[e for e in (EL, HA, KN, FO)] for (s, SH, EL, HA, HI, KN, FO) in _SIDES])   # (2, 4)
+    raw = {"axe": {}, "croisements": segment_crossings(pos), "queue": tail_cone_angles(pos).max(axis=1)}
+    row = {"axe": {}, "croisements": {k: float(v.mean()) for k, v in raw["croisements"].items()},
+           "queue_hors_cone": {f"{t:g}": float(np.mean(raw["queue"] > t)) for t in TAIL_CONE_REFS_DEG}}
+    for j, name in enumerate(LIMB_POINTS):
+        x = lat[:, :, j]
+        crossed = x < 0
+        raw["axe"][name] = {"profondeur": -x[crossed], "relative": -x[crossed] / limb_len[name],
+                            "zone": zone[:, :, j][crossed], "tenu": np.asarray(held)[:, ends[:, j]][crossed],
+                            "part": float(crossed.mean())}
+        row["axe"][name] = {"autre_cote": float(crossed.mean()),
+                            "profondeur_max": float(-x.min()) if crossed.any() else 0.0}
+    return row, raw
+
+
+def crossing_group(raws):
+    """Agrégat d'un groupe de grimpes : pour chaque extrémité, part du temps de l'autre côté (toutes grimpes
+    réunies, médiane et max par grimpe, part des grimpes au-delà de 10 %), profondeur (m et part de la longueur du
+    membre), zone et patte tenue ; pour chaque paire, part du temps (moyenne, médiane, max, grimpes au-delà de
+    5 %) ; queue hors des cônes de référence."""
+    out = {"axe": {}, "croisements": {}, "queue_hors_cone": {}}
+    for name in LIMB_POINTS:
+        parts = np.array([r["axe"][name]["part"] for r in raws])
+        depth = np.concatenate([r["axe"][name]["profondeur"] for r in raws])
+        rel = np.concatenate([r["axe"][name]["relative"] for r in raws])
+        zone = np.concatenate([r["axe"][name]["zone"] for r in raws])
+        held = np.concatenate([r["axe"][name]["tenu"] for r in raws])
+        d = {"autre_cote": float(parts.mean()), "mediane_grimpes": float(np.median(parts)), "max_grimpes": float(parts.max()),
+             "grimpes_plus_10": float(np.mean(parts > 0.1))}
+        if len(depth):
+            d.update(profondeur_mediane=float(np.median(depth)), profondeur_p95=float(np.percentile(depth, 95)),
+                     profondeur_max=float(depth.max()), relative_mediane=float(np.median(rel)),
+                     relative_p95=float(np.percentile(rel, 95)),
+                     zones={z: float(np.mean(zone == k)) for k, z in enumerate(AXIS_ZONES)}, tenu=float(np.mean(held)))
+        out["axe"][name] = d
+    for kind in CROSSING_KINDS:
+        v = np.array([r["croisements"][kind].mean() for r in raws])
+        out["croisements"][kind] = {"moyenne": float(v.mean()), "mediane": float(np.median(v)), "max": float(v.max()),
+                                    "grimpes_plus_5": float(np.mean(v > 0.05))}
+    tail = np.concatenate([r["queue"] for r in raws])
+    out["queue_angle"] = {"mediane": float(np.median(tail)), "p95": float(np.percentile(tail, 95)), "max": float(tail.max())}
+    for t in TAIL_CONE_REFS_DEG:
+        out["queue_hors_cone"][f"{t:g}"] = float(np.mean(tail > t))
+    return out
+
+
 def girdle_drift(pos):
     """Écart maximal (°) des angles des ceintures à leur valeur initiale (0 si les BRACES les tiennent)."""
     P, _ = _series(pos)
@@ -189,17 +327,21 @@ def use_run_config(run_dir):
     ev.use_run_config(run_dir)
 
 
-def record(genome):
-    """Rejoue `genome` SIM_DURATION s avec le moteur scalaire : positions à chaque sous-pas, créature finale."""
+def record(genome, holds=False):
+    """Rejoue `genome` SIM_DURATION s avec le moteur scalaire : positions à chaque sous-pas, créature finale
+    (holds : et les prises à chaque sous-pas, (T, P) bool)."""
     c = cr.Creature(genome)
     h = config.DT / config.SUBSTEPS
     n = int(round(config.SIM_DURATION / h))
     P = np.empty((n + 1, len(c.world.pos), 2))
+    held = np.zeros((n + 1, len(c.world.pos)), dtype=bool)
     P[0] = c.world.pos
+    held[0] = c.world.held
     for k in range(1, n + 1):
         c.substep(h)
         P[k] = c.world.pos
-    return P, c
+        held[k] = c.world.held
+    return (P, c, held) if holds else (P, c)
 
 
 def energy_at_limits(genome):
@@ -217,9 +359,9 @@ def energy_at_limits(genome):
     return out
 
 
-def audit_creature(genome, stored_height=None):
-    """(ligne de mesures, angles (T, 8)) d'une grimpe complète."""
-    P, c = record(genome)
+def audit_creature(genome, stored_height=None, crossings=False):
+    """(ligne de mesures, angles (T, 8), mesures brutes des croisements ou None) d'une grimpe complète."""
+    P, c, held = record(genome, holds=True)
     A = anatomical_angles(P)
     mid = midline_distances(P)
     same, left_right = limb_crossings(P)
@@ -231,12 +373,16 @@ def audit_creature(genome, stored_height=None):
         "croisements": {"meme_cote": same, "gauche_droite": left_right},
         "ceintures_deg": girdle_drift(P), "queue_deg": tail_swing(P),
     }
-    return row, A
+    raw = None
+    if crossings:
+        row["croisements_detail"], raw = crossing_measures(P, held, genome.lengths)
+    return row, A, raw
 
 
-def audit(run_dir, gen=None, top=1, sample=0, energy=False, log=print):
+def audit(run_dir, gen=None, top=1, sample=0, energy=False, crossings=False, log=print):
     """Rejoue les `top` meilleures créatures d'une génération (et `sample` tirées au hasard) et mesure leurs angles ;
-    energy : audit d'énergie de chacune en plus (sauts au moment où une butée s'engage)."""
+    energy : audit d'énergie de chacune en plus (sauts au moment où une butée s'engage) ; crossings : croisements
+    entre membres (côté de l'axe, paires de segments, cône de queue)."""
     use_run_config(run_dir)
     gens = ev.saved_generations(run_dir)
     if not gens:
@@ -253,9 +399,10 @@ def audit(run_dir, gen=None, top=1, sample=0, energy=False, log=print):
     t0 = time.perf_counter()
     rows, groups = [], {}
     for group, indices in picks.items():
-        angles = []
+        angles, raws = [], []
         for i in indices:
-            row, A = audit_creature(pop.genome(i), float(res["height"][i]))
+            row, A, raw = audit_creature(pop.genome(i), float(res["height"][i]), crossings=crossings)
+            raws.append(raw)
             row.update(groupe=group, indice=i, rang=int(rank_of[i]))
             if energy:
                 row["energie"] = energy_at_limits(pop.genome(i))
@@ -263,6 +410,8 @@ def audit(run_dir, gen=None, top=1, sample=0, energy=False, log=print):
             angles.append(A)
         groups[group] = {"n": len(indices), "articulations": joint_stats(angles),
                          "au_sol": float(np.mean([r["au_sol"] for r in rows if r["groupe"] == group]))}
+        if crossings:
+            groups[group]["croisements"] = crossing_group(raws)
     result = {
         "run": run_dir, "graine": os.path.basename(os.path.normpath(run_dir)), "gen": gen,
         "butees_deg": {k: list(v) for k, v in config.JOINT_LIMITS_DEG.items()},
@@ -302,12 +451,36 @@ def report_lines(result):
                            f"excès médian {d['exces_median']:.0f}°, max {d['exces_max']:.2f}°, tours {d['tour_complet']:.0%})"
                            for k, d in g["articulations"].items())
         lines.append(f"  groupe {name} ({g['n']} créatures, au sol {g['au_sol']:.0%}) : {cells}")
+        if "croisements" in g:
+            lines += crossing_lines(g["croisements"])
     lines.append("  cibles du génome hors butées (toute la population) : "
                  + ", ".join(f"{k} {v:.0%}" for k, v in result["cibles_hors_butees"].items())
                  + " ; posées sur une butée : "
                  + ", ".join(f"{k} {v:.1%}" for k, v in result["cibles_sur_butee"].items()))
     lines.append(f"  {len(result['creatures'])} grimpes rejouées en {result['secondes']:.0f} s ; hauteurs "
                  + ("identiques au run" if result["identique"] else "DIFFÉRENTES du run"))
+    return lines
+
+
+def crossing_lines(c):
+    """Lignes du tableau des croisements d'un groupe (crossing_group)."""
+    lines = []
+    for name, d in c["axe"].items():
+        if "profondeur_mediane" in d:
+            z = ", ".join(f"{k} {v:.0%}" for k, v in d["zones"].items())
+            lines.append(f"    {name:6s} de l'autre côté de l'axe {d['autre_cote']:6.1%} du temps (grimpes : médiane "
+                         f"{d['mediane_grimpes']:.1%}, max {d['max_grimpes']:.1%}, au-delà de 10 % : {d['grimpes_plus_10']:.0%}) | "
+                         f"profondeur médiane {d['profondeur_mediane']:.2f} m, p95 {d['profondeur_p95']:.2f}, max "
+                         f"{d['profondeur_max']:.2f} ({d['relative_mediane']:.0%} / {d['relative_p95']:.0%} du membre) | {z} | "
+                         f"tenu {d['tenu']:.0%}")
+        else:
+            lines.append(f"    {name:6s} de l'autre côté de l'axe 0 %")
+    cells = [f"{k} {d['moyenne']:.1%} (max {d['max']:.1%}, > 5 % : {d['grimpes_plus_5']:.0%})"
+             for k, d in c["croisements"].items() if d["max"] > 0]
+    lines.append("    segments croisés (part du temps) : " + (" | ".join(cells) if cells else "aucun"))
+    q = c["queue_angle"]
+    lines.append(f"    queue vue du bassin : angle max médian {q['mediane']:.0f}°, p95 {q['p95']:.0f}°, max {q['max']:.0f}° ; "
+                 + ", ".join(f"hors de ±{k}° {v:.0%}" for k, v in c["queue_hors_cone"].items()))
     return lines
 
 

@@ -26,6 +26,7 @@
     (replay, analyze, compare : --speed X et --slow ; population : --export-video aussi)
     python main.py decor --seed 2 --export out/chantierA/decor   # décor au-dessus de 23 m (image 08, 20 → 50 m)
     python main.py joints --seed 2 --gen 200 [--top 50] [--sample 50] [--export DIR]   # angles contre butées (chantier B)
+    python main.py joints --seed 2 --gen 200 --top 50 --sample 50 --crossings   # croisements entre membres (chantier C)
 """
 import argparse
 
@@ -142,6 +143,8 @@ def main(argv=None):
     joints.add_argument("--export", metavar="DIR", help="écrit les mesures en JSON dans DIR")
     joints.add_argument("--energy", action="store_true",
                         help="audit d'énergie de chaque créature en plus : sauts au moment où une butée s'engage")
+    joints.add_argument("--crossings", action="store_true",
+                        help="croisements entre membres : côté de l'axe du corps, paires de segments, cône de queue (chantier C)")
 
     args = parser.parse_args(argv)
     if args.command == "debug-physics":
@@ -273,7 +276,8 @@ def main(argv=None):
         import sys
         from evo import evolution, joint_audit
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
-        result = joint_audit.audit(run_dir, gen=args.gen, top=args.top, sample=args.sample, energy=args.energy)
+        result = joint_audit.audit(run_dir, gen=args.gen, top=args.top, sample=args.sample, energy=args.energy,
+                                   crossings=args.crossings)
         if args.export:
             print(joint_audit.export(result, args.export))
         if not result["identique"]:

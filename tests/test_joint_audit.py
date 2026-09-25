@@ -126,3 +126,66 @@ def test_audit_replays_the_run(small_run, tmp_path):
     assert "hauteurs identiques au run" in lines[-1]
     path = ja.export(result, str(tmp_path))
     assert path.endswith("angles_s0_g1.json")
+
+
+# Chantier C1 : croisements entre membres ------------------------------------------------------
+def test_axis_positions_sides_and_zones():
+    P = _rest()
+    lat, axial, spine = ja.axis_positions(P)
+    assert np.all(lat > 0)                                          # repos : chaque extrémité de son côté
+    feet, hands = axial[0, :, 3], axial[0, :, 1]
+    assert np.all(feet < 0) and np.all(hands > spine[0])            # pieds derrière le bassin, mains devant le cou
+    crossed = P.copy()
+    crossed[sk.L_FOOT, 0] = -crossed[sk.L_FOOT, 0]                  # pied gauche passé sous la queue, de l'autre côté
+    lat2, _, _ = ja.axis_positions(crossed)
+    assert lat2[0, 0, 3] == pytest.approx(-lat[0, 0, 3])
+
+
+def test_segment_crossings_find_the_leg_under_the_tail():
+    P = _rest()
+    assert not any(v.any() for v in ja.segment_crossings(P).values())
+    crossed = P.copy()
+    crossed[sk.L_FOOT, 0] = -crossed[sk.L_FOOT, 0]                  # le tibia gauche traverse la queue, dans l'axe
+    hits = {k: bool(v[0]) for k, v in ja.segment_crossings(crossed).items()}
+    assert hits["tibia/queue"] and hits["jambe/queue"]
+    assert not hits["fémur/queue"] and not hits["membres/colonne"] and not hits["bras/queue"]
+
+
+def test_tail_cone_angles():
+    P = _rest()
+    assert np.allclose(ja.tail_cone_angles(P), 0.0, atol=1e-9)      # queue au repos : dans l'axe
+    rotated = P.copy()
+    tail = list(range(sk.TAIL_START, len(P)))
+    a = math.radians(20.0)
+    rot = np.array([[math.cos(a), -math.sin(a)], [math.sin(a), math.cos(a)]])
+    rotated[tail] = P[sk.PELVIS] + (P[tail] - P[sk.PELVIS]) @ rot.T
+    assert np.allclose(ja.tail_cone_angles(rotated), 20.0)
+
+
+def test_crossing_measures_and_group():
+    rest = _rest()
+    crossed = rest.copy()
+    crossed[sk.L_FOOT, 0] = -crossed[sk.L_FOOT, 0]
+    P = np.stack([rest, crossed])
+    held = np.zeros((2, len(rest)), bool)
+    held[1, sk.L_FOOT] = True
+    lengths = cr.reference_lengths()
+    row, raw = ja.crossing_measures(P, held, lengths)
+    assert row["axe"]["pied"]["autre_cote"] == pytest.approx(0.25)  # 1 instant sur 2, 1 pied sur 2
+    assert row["croisements"]["tibia/queue"] == pytest.approx(0.5)
+    group = ja.crossing_group([raw, raw])
+    foot = group["axe"]["pied"]
+    assert foot["zones"]["queue"] == 1.0 and foot["tenu"] == 1.0
+    assert foot["profondeur_max"] == pytest.approx(ja.axis_positions(rest)[0][0, 0, 3])   # symétrique du repos
+    assert group["croisements"]["tibia/queue"]["grimpes_plus_5"] == 1.0
+    assert group["queue_hors_cone"]["6"] == 0.0
+    assert any("segments croisés" in line for line in ja.crossing_lines(group))
+
+
+def test_audit_measures_crossings_on_a_run(small_run):
+    result = ja.audit(small_run, gen=1, top=2, crossings=True, log=None)
+    group = result["groupes"]["meilleures"]["croisements"]
+    assert set(group["croisements"]) == set(ja.CROSSING_KINDS)
+    assert all(0.0 <= d["autre_cote"] <= 1.0 for d in group["axe"].values())
+    assert "croisements_detail" in result["creatures"][0]
+    assert any("queue vue du bassin" in line for line in ja.report_lines(result))
