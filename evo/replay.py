@@ -160,7 +160,10 @@ class JungleView:
     def draw(self, surface, frame, timings=None, speed=1.0, hud=True):
         t0 = time.perf_counter()
         self.scene.draw_back(surface, self.camera.shift)
-        self.scene.draw_markers(surface, self.camera.shift, self.marker_alphas(frame))
+        if not (hud and self.hud is not None):
+            # repères seulement sans HUD : avec HUD, l'étiquette de hauteur les remplace (images 03, 05, 09 ;
+            # repères visibles seulement dans les vues sans HUD, images 06 et 08)
+            self.scene.draw_markers(surface, self.camera.shift, self.marker_alphas(frame))
         t1 = time.perf_counter()
         self.lizard.draw(surface, self.replay.pos[frame], self.camera.origin(), self.framing.scale)
         t2 = time.perf_counter()

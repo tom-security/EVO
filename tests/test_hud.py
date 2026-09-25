@@ -99,3 +99,19 @@ def test_label_stays_visible_over_a_front_canopy(small_run, tmp_cache):
     view.hud.draw(surf, 5.0, 12.3, 4.2, ref_px, card=False)
     after = surf.get_at((rect.left + 4, rect.centery))
     assert np.mean(before[:3]) > 90 and np.mean(after[:3]) < 90   # sous la canopée, l'étiquette sombre est dessinée
+
+
+def test_markers_only_without_hud(small_run, tmp_cache):
+    pygame.display.init()
+    r = rp.Replay(small_run, gen=1, rank=1, log=None)
+    view = rp.JungleView(r)
+    view.crossings = {10.0: 0}                    # repère de 10 m franchi à la frame 0 (pleine opacité)
+    view.reset_camera()
+    surf = pygame.Surface(config.WINDOW_SIZE)
+    row = int(round(view.framing.y_px(config.GROUND_Y + config.START_HEIGHT + 10.0, view.camera.shift)))
+    x = int(view.framing.x_px(config.TRUNK_X + 0.35 * config.TRUNK_WIDTH))   # sur le tronc, loin de l'étiquette
+    white = tuple(pygame.Color(config.MARKER_COLOR))[:3]
+    view.draw(surf, 0, hud=False)
+    assert tuple(surf.get_at((x, row)))[:3] == white                          # sans HUD : le repère est là
+    view.draw(surf, 0, hud=True)
+    assert tuple(surf.get_at((x, row)))[:3] != white                          # avec HUD : pas de repère

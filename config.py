@@ -359,7 +359,8 @@ MARKER_LABEL_GAP_PX = 24      # [DÉDUIT] image 06 : libellé aligné à droite,
 MARKER_LINE_PX = 1            # [DÉDUIT] image 06
 # [DÉDUIT] images 06, 08, 09 : un repère n'est visible qu'au franchissement (image 09 : plus de ligne 20 m
 # 3.1 m ≈ 0.9 s après). Affiché au premier franchissement vers le haut de la hauteur HUD (point de
-# référence), jamais redéclenché, puis estompé.
+# référence), jamais redéclenché, puis estompé. [DÉDUIT] seulement quand le HUD est masqué : repères dans
+# les vues sans HUD (images 06, 08), étiquette de hauteur seule dans les vues avec HUD (images 03, 05, 09).
 MARKER_SHOW_S = 0.5           # [CHOIX] durée à pleine opacité (s)
 MARKER_FADE_S = 0.3           # [CHOIX] durée du fondu (s)
 
