@@ -181,19 +181,28 @@ class JungleView:
 # ---------------------------------------------------------------------------
 # Fenêtre interactive
 # ---------------------------------------------------------------------------
-def run_interactive(replay, use_cache=True, fps_report=False, speed=1.0, subtitle=None):
+def run_interactive(replay, use_cache=True, fps_report=False, speed=1.0, subtitle=None, make_view=None, slow=False):
     """Espace pause · R recommencer · S ralenti ×0.25 · F accéléré (×FAST_SPEED) · ←/→ image par image
-    (en pause) · Échap."""
+    (en pause) · Échap.
+
+    `make_view` : fabrique d'une autre vue à jouer avec les mêmes touches (mode analyse, comparaison de
+    générations), appelée une fois la fenêtre ouverte ; la vue fournit draw(), reset_camera(), scene, et
+    follow(frame) si sa caméra ne suit pas simplement `replay`.
+    """
     import pygame
 
     pygame.display.init()
     screen = pygame.display.set_mode(config.WINDOW_SIZE)
     pygame.display.set_caption(f"replay : {replay.label()}")
-    view = JungleView(replay, use_cache=use_cache, log=print, subtitle=subtitle)
+    if make_view is None:
+        view = JungleView(replay, use_cache=use_cache, log=print, subtitle=subtitle)
+    else:
+        view = make_view()
+    follow = getattr(view, "follow", None) or (lambda f: view.camera.update(replay.ref_y[f]))
     view.reset_camera()
     fast = speed if speed > 1 else config.FAST_SPEED
     clock = pygame.time.Clock()
-    frame_f, paused, slow = 0.0, False, False
+    frame_f, paused = 0.0, False
     stamps, durations, fps_windows, canopy = [], [], [], []
     last_caption = time.perf_counter()
     running = True
@@ -216,7 +225,7 @@ def run_interactive(replay, use_cache=True, fps_report=False, speed=1.0, subtitl
                 elif paused and event.key == pygame.K_LEFT:
                     frame_f = max(frame_f - 1, 0)
         frame = int(frame_f)
-        view.camera.update(replay.ref_y[frame])
+        follow(frame)
         view.draw(screen, frame, speed=speed)
         pygame.display.flip()
         clock.tick(config.FPS)
@@ -236,7 +245,7 @@ def run_interactive(replay, use_cache=True, fps_report=False, speed=1.0, subtitl
             pygame.display.set_caption(f"replay : {replay.label()} · t = {replay.t[frame]:.1f} s · "
                                        f"{fps_now:.0f} fps (min {low:.0f})")
         if not paused:
-            frame_f += (0.25 if slow else 1.0) * speed
+            frame_f += (config.SLOW_SPEED if slow else 1.0) * speed
             if frame_f > replay.n_frames - 1:
                 if fps_report:
                     running = False

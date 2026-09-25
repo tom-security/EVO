@@ -477,3 +477,62 @@ HIST_VIDEO = {
     "y_label_right": 145,
     "y_label_dy": -3,
 }
+
+# ---------------------------------------------------------------------------
+# Mode analyse biomécanique (§7.4, surcouche §5.5) et comparaison de générations (§7.5), phase 5c
+# ---------------------------------------------------------------------------
+# [DÉDUIT] image 11 : colonne NECK–PELVIS de 177 px à l'écran, centre du torse à y 389. Pour la colonne du
+# champion de la graine 2 (2.89 m) : 61.3 px/m, 3 × la vue normale ; tronc de 754 px (x 263–1017), décor visible
+# sur les bords (image 11 : tronc de x 147 à 1143, notre lézard est plus grand par rapport au tronc).
+ANALYSIS_SCALE = 61.3
+ANALYSIS_TORSO_PX = 389
+ANALYSIS_FRONT_LAYER = False  # [CHOIX] sans premier plan : à ce zoom, une canopée cacherait toute la surcouche (images 11, 12 : aucune)
+ANALYSIS_BONE = "#FCECD4"     # [VU] §5.5 — os et articulations crème (images 11, 12 : #FAECD4)
+# [DÉDUIT] image 11 : largeur des os, rayon des articulations et rayon de NECK / PELVIS, × diamètre de
+# l'humérus dessiné (30 px) : os de 6 px, articulations de 12 px, NECK et PELVIS de 25 px de diamètre
+ANALYSIS_BONE_SIZES = (0.2, 0.2, 0.42)
+ANALYSIS_MUSCLE_REST = "#FC5464"     # [VU] §5.5 — muscle relâché (image 11 : #FF5465)
+ANALYSIS_MUSCLE_ACTIVE = "#FC0434"   # [VU] §5.5 — contraction à 100 % de la force max (image 11 : #FF0E3E)
+ANALYSIS_FIBER = (0.22, 0.06)        # [CHOIX] fibres plus claires (images 11, 14) : part de blanc, largeur (× diamètre de l'humérus)
+# [DÉDUIT] images 11, 12, 14 : formes des muscles.
+# - Triangles (grand dorsal NECK–épaule–colonne, fléchisseurs de hanche PELVIS–hanche–colonne) : pointe sur la
+#   colonne à depth × colonne depuis NECK / PELVIS pour une force de S_MAX, min × depth pour une force nulle
+#   (image 11 : 0.51 pour un dorsal à 76 % ; image 12 : 0.34 pour des fléchisseurs à 31 %) ; bord extérieur
+#   bombé (dorsal) ou creusé (fléchisseurs) de bulge × sa longueur.
+# - Ovales (deltoïde sur l'épaule, fessiers sur la hanche) et fuseaux de part et d'autre de l'os (biceps /
+#   triceps sur l'humérus, ischios / quadriceps sur le fémur) : début et fin (× longueur de l'os), demi-largeur
+#   à S_MAX (× diamètre de l'humérus dessiné), proportionnelle à la force max évoluée (§5.5).
+ANALYSIS_TRIANGLE = {"depth": 0.55, "min": 0.5, "bulge": (0.08, -0.1)}
+ANALYSIS_OVAL = (-0.05, 0.5, 0.55)
+ANALYSIS_SPINDLE = (0.35, 1.0, 0.45)
+# [DÉDUIT] image 12 : « 31% » blanc de 82 × 29 px d'encre, traits de ≈ 5 px ; Nunito Sans SemiBold 40 (83 × 32,
+# traits de 3–4 px) est plus proche de cette graisse que Questrial 44 (81 × 29, traits de 3 px). Trait de rappel
+# blanc de 3 px qui s'arrête 13 px avant le texte et 6 px sous le milieu de l'encre. Texte à 280 px de l'axe du
+# lézard [CHOIX] (image 12 : 200 px, mais les membres de notre champion vont jusqu'à ±230 px).
+ANALYSIS_LABEL_FONT = ("nunito_semibold", 40)
+ANALYSIS_LABEL_LINE = 3
+ANALYSIS_LABEL_GAP = (13, 6)
+ANALYSIS_LABEL_DX = 280
+# [CHOIX] un libellé par muscle (valeur commune aux deux côtés, SYMMETRIC_MORPHOLOGY) : (articulation 0–3,
+# sens 0 = « + » / 1 = « − », côté de l'écran +1 droite / −1 gauche, milieu de l'encre en px par rapport au centre
+# du torse), dans l'ordre d'apparition (§9 : deltoïde, grand dorsal, biceps, puis la hanche ; image 12 :
+# fléchisseurs à droite, 34 px au-dessus du centre du torse). Le trait va au muscle du même côté de l'écran.
+ANALYSIS_LABELS = ((0, 0, 1, -190), (0, 1, -1, -150), (1, 0, 1, -112), (1, 1, -1, -72),
+                   (2, 0, 1, -34), (2, 1, -1, 30), (3, 0, 1, 90), (3, 1, -1, 130))
+# [CHOIX] §7.4 « un par un » : premier libellé à 1 s de replay, un de plus toutes les 1.1 s (le dernier à 8.7 s) ;
+# chacun reste affiché ; son trait se déroule du muscle vers le texte pendant que le texte apparaît en fondu
+ANALYSIS_LABEL_TIMES = (1.0, 1.1, 0.3)
+SLOW_SPEED = 0.25             # [VU] §7.4 — ralenti ×0.25 (touche S du replay et du mode analyse, ou --slow)
+
+COMPARE_GENS = (0, 23, 100, 200)   # [CHOIX] générations repères du §9
+COMPARE_GHOST_ALPHA = 0.55         # [CHOIX] fantômes semi-transparents (image 37 : le tronc se voit à travers les doigts)
+# [CHOIX] §7.5 (détail non montré) : tous les champions partent ensemble et sont montrés au même instant t,
+# chacun à sa propre hauteur. La caméra (lerp du replay) suit le plus haut en gardant les autres à l'écran tant
+# que l'écart le permet : centre visé entre le plus haut et le plus bas, sans laisser le plus haut à moins de
+# 7 m du haut de l'écran (tête et libellé).
+COMPARE_TOP_MARGIN = 7.0
+COMPARE_FRONT_LAYER = False   # [CHOIX] sans premier plan : ses canopées cacheraient les fantômes (image 37 : aucune)
+# [DÉDUIT] image 37 : « Génération 200 » en Questrial 22 (146 px d'encre ; Questrial 22 : 149), souligné de 2 px
+# 3 px sous l'encre, de 8 px avant à 7 px après le texte ; trait de rappel de 2 px du NECK au début du souligné,
+# décalé de (87, −49) px. Sur la génération la plus récente (la plus avancée dans l'évolution).
+COMPARE_LABEL = {"font": ("questrial", 22), "offset": (87, -49), "underline": (2, 3, 8, 7), "line": 2}

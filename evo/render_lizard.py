@@ -7,6 +7,7 @@ Le dessin est fait dans une petite surface autour du lézard, en supersampling �
 puis réduit : bords lissés, sans jointure entre les pièces. Le mode silhouette (une couleur, sans
 doigts ni yeux) sert aux miniatures de la vue population (§7.1).
 """
+import itertools
 import math
 
 import numpy as np
@@ -32,6 +33,11 @@ def _unit(v):
 
 def _rot90(v):
     return np.array([-v[1], v[0]])
+
+
+def _coords(shape):
+    """Sommets d'un polygone, centre d'un cercle ou points d'une ligne."""
+    return shape[1] if isinstance(shape, tuple) else shape
 
 
 def _catmull_rom(points, samples=8):
@@ -69,6 +75,8 @@ class LizardShape:
         self.head_len = aspect * 2 * self.head_half
         angles, f_len, f_width, pad, palm = config.LIZARD_FINGERS
         self.finger_angles = [math.radians(a) for a in angles]
+        self.finger_cos = np.array([math.cos(a) for a in self.finger_angles])
+        self.finger_sin = np.array([math.sin(a) for a in self.finger_angles])
         self.finger_len = f_len * self.w_distal
         self.finger_width = f_width * self.w_distal
         self.pad_radius = 0.5 * pad * self.w_distal
@@ -147,16 +155,13 @@ class LizardShape:
                 continue
             axis = _unit(P[hand] - P[elbow])
             out.append((limb_colors[side], ("cercle", P[hand], self.palm_radius)))
-            tips = []
-            for ang in self.finger_angles:
-                c, s = math.cos(ang), math.sin(ang)
-                d = np.array([axis[0] * c - axis[1] * s, axis[0] * s + axis[1] * c])
-                tip = P[hand] + d * self.finger_len
-                n = _rot90(d) * self.finger_width / 2
-                out.append((config.LIZARD_FINGER, np.array([P[hand] + n, tip + n, tip - n, P[hand] - n])))
-                tips.append(tip)
-            for tip in tips:
-                out.append((config.LIZARD_PAD, ("cercle", tip, self.pad_radius)))
+            c, s = self.finger_cos, self.finger_sin   # les 5 doigts d'un coup
+            d = np.column_stack([axis[0] * c - axis[1] * s, axis[0] * s + axis[1] * c])
+            tips = P[hand] + d * self.finger_len
+            n = np.column_stack([-d[:, 1], d[:, 0]]) * self.finger_width / 2
+            rays = np.stack([P[hand] + n, tips + n, tips - n, P[hand] - n], axis=1)
+            out.extend((config.LIZARD_FINGER, ray) for ray in rays)
+            out.extend((config.LIZARD_PAD, ("cercle", tip, self.pad_radius)) for tip in tips)
 
         # 4. torse ovoïde de NECK à PELVIS, partagé sur l'axe de la colonne
         prof = self.torso_profile
@@ -219,18 +224,35 @@ class LizardShape:
         if drawn is not None:
             surface.blit(*drawn)
 
-    def render(self, pos, origin, scale, clip=None, silhouette=None):
+    def render(self, pos, origin, scale, clip=None, silhouette=None, extra=()):
         """(toile SRCALPHA, coin haut gauche en px) du lézard, ou None s'il sort de `clip` = (w, h).
 
         Sans `clip`, la toile peut commencer à des coordonnées négatives (miniatures : origine au point
-        de référence). `silhouette` : voir `polygons`.
+        de référence). `silhouette` : voir `polygons`. `extra` : formes (couleur, forme) dessinées par-dessus
+        dans la même toile (surcouche anatomique du mode analyse, §5.5) ; en plus des polygones et des
+        cercles, elles peuvent être des lignes ('ligne', points (n, 2), largeur en m).
         """
         P = np.asarray(pos, dtype=float)
         ox, oy = origin
-        pts_x, pts_y = ox + P[:, 0] * scale, oy - P[:, 1] * scale
-        m = self.margin * scale + 4
-        x0, y0 = int(math.floor(pts_x.min() - m)), int(math.floor(pts_y.min() - m))
-        x1, y1 = int(math.ceil(pts_x.max() + m)), int(math.ceil(pts_y.max() + m))
+        # formes à dessiner et leur emprise : la toile est cadrée sur les formes (+2 px), pas sur les points
+        # + une marge fixe. Un sommet non fini figerait pygame.draw.polygon : un seul test dans le cas
+        # courant, forme par forme sinon.
+        items = list(itertools.chain(self.polygons(P, silhouette), extra))
+        if not np.isfinite(np.concatenate([_coords(s) for _, s in items], axis=None)).all():
+            items = [(c, s) for c, s in items if np.all(np.isfinite(_coords(s)))]
+        if not items:
+            return None
+        polys = [_coords(s) for _, s in items if not isinstance(s, tuple) or s[0] == "ligne"]
+        circles = [s for _, s in items if isinstance(s, tuple) and s[0] == "cercle"]
+        ext = [np.concatenate(polys)] if polys else []
+        if circles:
+            c = np.array([s[1] for s in circles])
+            r = np.maximum(np.array([s[2] for s in circles]), 1.0 / scale)[:, None]
+            ext += [c - r, c + r]
+        ext = np.concatenate(ext)
+        lo, hi = ext.min(axis=0), ext.max(axis=0)
+        x0, x1 = int(math.floor(ox + lo[0] * scale)) - 2, int(math.ceil(ox + hi[0] * scale)) + 2
+        y0, y1 = int(math.floor(oy - hi[1] * scale)) - 2, int(math.ceil(oy - lo[1] * scale)) + 2
         if clip is not None:
             x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, clip[0]), min(y1, clip[1])
         if x1 <= x0 or y1 <= y0:
@@ -242,13 +264,18 @@ class LizardShape:
         k = scale * ss
         cx, cy = (ox - x0) * ss, (oy - y0) * ss   # origine du monde dans la toile supersamplée
         colors = {}
-        for color, shape in self.polygons(P, silhouette):
+        for color, shape in items:
             rgb = colors.get(color) or colors.setdefault(color, pygame.Color(color))
             if isinstance(shape, tuple):
-                _, center, radius = shape
-                if np.all(np.isfinite(center)):
+                kind, center, radius = shape
+                if kind == "ligne":
+                    pts = np.empty_like(center)
+                    pts[:, 0] = cx + center[:, 0] * k
+                    pts[:, 1] = cy - center[:, 1] * k
+                    pygame.draw.lines(canvas, rgb, False, pts.tolist(), max(1, int(round(radius * k))))
+                else:
                     pygame.draw.circle(canvas, rgb, (cx + center[0] * k, cy - center[1] * k), max(1.0, radius * k))
-            elif np.all(np.isfinite(shape)):   # un sommet non fini figerait pygame.draw.polygon
+            else:
                 pts = np.empty_like(shape)
                 pts[:, 0] = cx + shape[:, 0] * k
                 pts[:, 1] = cy - shape[:, 1] * k

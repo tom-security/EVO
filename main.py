@@ -16,6 +16,9 @@
     python main.py replay --seed 2 --gen 200 --rank 1 --export out/phase4
     python main.py replay --seed 2 --gen 200 --rank 1 --fps-report   # vérifie les 60 fps en fenêtre
     python main.py replay --seed 2 --gen 0 --creature 1 --title-card "Le commencement" --speed 4
+    python main.py analyze --seed 2 --gen 200 --rank 1 [--slow]   # zoom biomécanique + % (§7.4)
+    python main.py analyze --seed 2 --gen 200 --rank 1 --export out/phase5c
+    python main.py compare --seed 2 --gens 0 23 100 200 [--export out/phase5c]   # fantômes (§7.5)
 """
 import argparse
 
@@ -84,6 +87,24 @@ def main(argv=None):
     replay.add_argument("--fps-report", action="store_true",
                         help="joue le replay une fois à vitesse normale puis affiche le fps moyen et minimum")
 
+    analyze = sub.add_parser("analyze", help="mode analyse biomécanique : zoom, muscles + os, % (§7.4)")
+    analyze.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
+    analyze.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    analyze.add_argument("--gen", type=int, default=None, help="génération (défaut : la dernière sauvegardée)")
+    analyze.add_argument("--rank", type=int, default=1, help="rang au classement (1 = meilleure)")
+    analyze.add_argument("--slow", action="store_true", help="démarre au ralenti ×0.25 (touche S)")
+    analyze.add_argument("--export", metavar="DIR", help="sans écran : PNG aux instants clés, comparaisons, temps")
+    analyze.add_argument("--no-cache", action="store_true", help="régénère le décor au lieu de relire le cache")
+    analyze.add_argument("--fps-report", action="store_true", help="joue une fois puis affiche le fps")
+
+    comp = sub.add_parser("compare", help="champions de plusieurs générations en fantômes (§7.5)")
+    comp.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
+    comp.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    comp.add_argument("--gens", type=int, nargs="+", default=None, help="générations (défaut : COMPARE_GENS)")
+    comp.add_argument("--export", metavar="DIR", help="sans écran : PNG à quelques instants, comparaison, temps")
+    comp.add_argument("--no-cache", action="store_true", help="régénère le décor au lieu de relire le cache")
+    comp.add_argument("--fps-report", action="store_true", help="joue une fois puis affiche le fps")
+
     args = parser.parse_args(argv)
     if args.command == "debug-physics":
         if args.calibrate:
@@ -151,6 +172,37 @@ def main(argv=None):
                                subtitle=args.title_card)
         if not r.ok:
             print("ALERTE : la hauteur rejouée diffère de la hauteur stockée")
+            sys.exit(1)
+    elif args.command == "analyze":
+        import sys
+        from evo import analysis, evolution, replay as rp
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        r = rp.Replay(run_dir, gen=args.gen, rank=args.rank)
+        if args.export:
+            paths, _ = analysis.export(r, args.export, use_cache=not args.no_cache)
+            for path in paths:
+                print(path)
+        else:
+            rp.run_interactive(r, fps_report=args.fps_report, slow=args.slow,
+                               make_view=lambda: analysis.AnalysisView(r, use_cache=not args.no_cache, log=print))
+        if not r.ok:
+            print("ALERTE : la hauteur rejouée diffère de la hauteur stockée")
+            sys.exit(1)
+    elif args.command == "compare":
+        import sys
+        import config
+        from evo import compare, evolution, replay as rp
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        replays = compare.load_champions(run_dir, args.gens or list(config.COMPARE_GENS))
+        if args.export:
+            paths, _ = compare.export(replays, args.export, use_cache=not args.no_cache)
+            for path in paths:
+                print(path)
+        else:
+            rp.run_interactive(max(replays, key=lambda r: r.gen), fps_report=args.fps_report,
+                               make_view=lambda: compare.CompareView(replays, use_cache=not args.no_cache, log=print))
+        if not all(r.ok for r in replays):
+            print("ALERTE : une hauteur rejouée diffère de la hauteur stockée")
             sys.exit(1)
     elif args.command == "debug-creature":
         from evo import debug_creature
