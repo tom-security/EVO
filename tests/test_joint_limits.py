@@ -1,6 +1,7 @@
 """Chantier B, phase B2 : butées articulaires dans le moteur (contrainte à sens unique sur l'angle)."""
 import json
 import math
+import os
 
 import numpy as np
 import pytest
@@ -223,3 +224,29 @@ def test_new_run_records_the_flag_and_keeps_targets_in_range(tmp_path):
         assert np.all((pop.targets >= low - 1e-12) & (pop.targets <= high + 1e-12))
     children = ev.mutate(pop, np.random.default_rng(0))
     assert np.all((children.targets >= low - 1e-12) & (children.targets <= high + 1e-12))
+
+
+@pytest.fixture
+def run_config_restored():
+    """Un replay applique la config de son run à tout le processus : on la remet telle quelle après le test."""
+    saved = {k: getattr(config, k) for k in dir(config) if k.isupper()}
+    yield
+    for k, v in saved.items():
+        setattr(config, k, v)
+    cr._torque_unit.cache_clear()
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_local_runs_replay_with_their_own_flag(seed, run_config_restored):
+    """Runs locaux (hors git, test ignoré s'ils manquent) : runs/<graine>, le défaut, entraîné avec butées ;
+    runs/legacy_no_limits/<graine>, d'avant B2, sans butées. Chacun se rejoue au bit près avec sa propre config."""
+    from evo import replay as rp
+
+    cases = [(ev.run_dir_for(seed), True), (os.path.join(config.RUNS_DIR, "legacy_no_limits", str(seed)), False)]
+    present = [(d, flag) for d, flag in cases if os.path.exists(os.path.join(d, "config.json"))]
+    if not present:
+        pytest.skip("pas de runs locaux")
+    for run_dir, flag in present:
+        r = rp.Replay(run_dir, rank=1, log=None)
+        assert r.ok, run_dir                              # hauteur rejouée = hauteur stockée
+        assert config.JOINT_LIMITS is flag, run_dir       # butées selon le run, pas selon config.py

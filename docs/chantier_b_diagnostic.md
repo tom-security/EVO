@@ -9,6 +9,8 @@ Reproduire les mesures : `python main.py joints --seed S --gen G [--top N] [--sa
 (`evo/joint_audit.py`). Rejeu au moteur scalaire avec la config du run, hauteurs vérifiées identiques au run
 (1e-9 m), un angle par sous-pas (4 800 par grimpe de 10 s), côtés gauche et droit réunis. Mesuré ici, pour
 les graines 0, 1 et 2 : `--gen 200 --top 50` et `--gen 0 --sample 50` (303 grimpes, ≈ 5 min).
+Depuis B2, ces runs sans butées sont dans `runs/legacy_no_limits/S` (et `runs/S` contient les runs avec butées) :
+pour refaire ces mesures, `python main.py joints --run-dir runs/legacy_no_limits/S …`.
 
 ## Conventions d'angle
 

@@ -9,7 +9,7 @@
     python main.py benchmark --pop 1000           # temps d'évaluation d'une génération (phase 3a)
     python main.py train --generations 200 --pop 1000 --seed 42 [--set TORQUE_SCALE=0.3 …]
     python main.py graphs --seed 42               # courbes + histogrammes du run en PNG
-    python main.py graphs --run-dir runs/butees/2 --compare runs/2   # deux runs superposés (chantier B2)
+    python main.py graphs --seed 2 --compare runs/legacy_no_limits/2   # avec / sans butées superposés (chantier B2)
     python main.py histogram --seed 42 --gen 0 [--style video]
     python main.py population --seed 2 --gen 200    # vue population, tri animé (§7.1)
     python main.py population --seed 2 --gen 200 --export out/phase5b

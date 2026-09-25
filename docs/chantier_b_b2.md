@@ -168,6 +168,12 @@ conséquence énergétique ; 24 passes ne suffisent pas non plus (1,27 %) et co�
 
 ## 7. Écrans refaits sur runs/butees/2
 
+> **Note : les chemins cités dans ce rapport ont depuis été réorganisés.** Après la validation de B2, les runs avec
+> butées sont devenus les runs par défaut, cohérents avec `JOINT_LIMITS = True` : `runs/butees/<graine>` est devenu
+> `runs/<graine>`, et les anciens runs sans butées ont été déplacés de `runs/<graine>` vers
+> `runs/legacy_no_limits/<graine>`. Dans tout le rapport, lire `runs/butees/S` comme `runs/S`, et `runs/S` (sans
+> butées) comme `runs/legacy_no_limits/S`. Les dossiers `out/…` ne changent pas.
+
 Mêmes commandes et mêmes jeux d'images que les phases 4 à 6 et le chantier A, avec `--run-dir runs/butees/2`
 (sorties dans `out/chantierB/ecrans/`, hors git) : `replay --gen 200 --export`, `population --gen 200 --export`,
 `population --gen 0 --cycle --export`, `histogram --gen 0 / 1 / 200 --style video`, `analyze --gen 200 --export`,
@@ -238,7 +244,8 @@ Aucun réglage d'écran n'a été modifié.
 
 ## 8. Pour la suite
 
-- Ramener le chantier B sur `claude/modest-ritchie-mkwjnd`, et choisir alors le run de référence par défaut : les
+- *(Fait : chantier B ramené sur `claude/modest-ritchie-mkwjnd`, runs réorganisés, voir la note du §7.)*
+  Ramener le chantier B sur `claude/modest-ritchie-mkwjnd`, et choisir alors le run de référence par défaut : les
   commandes lisent `runs/<graine>`, c'est-à-dire les anciens runs sans butées ; les nouveaux sont dans
   `runs/butees/<graine>` (hors git, dans ce conteneur).
 - Points à discuter : la morphologie trapue (longueurs collées aux bornes de `LENGTH_FACTOR_RANGE`), les pieds qui
