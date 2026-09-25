@@ -4,6 +4,9 @@ Style du §7 (fond #1C1C1C, couleurs de courbes du §5.2) mais, pour la calibrat
 échelle par graphe : trois panneaux alignés sur les générations (période, hauteur, masse
 musculaire) au lieu de la superposition « distance ÷10 » de la vidéo, qui reviendra en
 phase 5. Les repères du §9 sont dessinés en cercles creux étiquetés.
+
+Phase 5b : l'histogramme a aussi un style « vidéo » (images 26 à 28, fond à vignette partagé avec
+la vue population).
 """
 import os
 
@@ -209,10 +212,91 @@ def diversity_chart(rows, title, size=(1280, 1080), x_max=None):
     return surface
 
 
-def histogram_chart(row, title, size=(1280, 720), stats_lines=(), reference=None):
-    """Histogramme §7.2 : barres de 1 m de −10 à 40 m, axe Y 0–500 (agrandi si besoin)."""
+def vignette(size):
+    """Fond des écrans d'analyse (§7.1, §7.2) : gris sombre à vignette (ANALYSIS_BG_STOPS), pré-rendu."""
+    w, h = size
+    yy, xx = np.mgrid[0:h, 0:w]
+    d = np.hypot((xx + 0.5 - w / 2) / (w / 2), (yy + 0.5 - h / 2) / (h / 2))
+    stops_d, stops_v = zip(*config.ANALYSIS_BG_STOPS)
+    gray = np.round(np.interp(d, stops_d, stops_v)).astype(np.uint8)
+    return pygame.surfarray.make_surface(np.repeat(gray.T[:, :, None], 3, axis=2))
+
+
+def hist_video_x(m):
+    """Abscisse (px) d'une hauteur (m) dans l'histogramme au style de la vidéo."""
+    x0, _, x1, _ = config.HIST_VIDEO["plot"]
+    lo, hi = config.HIST_RANGE
+    return x0 + (m - lo) * (x1 - x0) / (hi - lo)
+
+
+def hist_video_y(count):
+    """Ordonnée (px) d'un effectif dans l'histogramme au style de la vidéo (tronqué à l'axe Y)."""
+    hv = config.HIST_VIDEO
+    _, y_top, _, y0 = hv["plot"]
+    return y0 - min(count, hv["y_max"]) * (y0 - y_top) / hv["y_max"]
+
+
+def _histogram_video(counts, size):
+    """§7.2 d'après les images 26 à 28 : vignette, grille fine, barres jointives, libellés blancs, sans titre."""
+    from evo import fonts
+
+    hv = config.HIST_VIDEO
+    surface = vignette(size)
+    x0, y_top, x1, y0 = hv["plot"]
+    lo, hi = config.HIST_RANGE
+    font = fonts.load(hv["font"], hv["font_px"])
+    grid = _c(hv["grid"])
+    xs = range(lo, hi + 1, hv["x_step"])
+    ys = range(0, hv["y_max"] + 1, hv["y_step"])
+    for m in xs:
+        x = round(hist_video_x(m))
+        pygame.draw.line(surface, grid, (x, y_top), (x, y0))
+    for v in ys:
+        y = round(hist_video_y(v))
+        pygame.draw.line(surface, grid, (x0, y), (x1, y))
+    bar = _c(BAR)
+    for k, cnt in enumerate(counts):   # barres de 1 m jointives, par-dessus la grille
+        if cnt <= 0:
+            continue
+        left, right = round(hist_video_x(lo + k)), round(hist_video_x(lo + k + 1))
+        top = round(hist_video_y(cnt))
+        surface.fill(bar, pygame.Rect(left, top, right - left, y0 - top))
+    for dy, color in hv["axis_bottom"]:
+        surface.fill(_c(color), pygame.Rect(x0, y0 + dy, x1 - x0 + 1, 1))
+    for dx, color in hv["axis_left"]:
+        surface.fill(_c(color), pygame.Rect(x0 + dx, y_top, 1, y0 - y_top))
+    label = _c(hv["label"])
+
+    def blit_ink(s, **where):
+        img = font.render(s, True, label)
+        ink = img.get_bounding_rect()
+        # right : dernière colonne d'encre (Rect.right est exclusif)
+        x = where["center_x"] - ink.centerx if "center_x" in where else where["right"] + 1 - ink.right
+        surface.blit(img, (round(x), where["top"] - ink.top))
+
+    for m in xs:
+        blit_ink(f"{m:.1f}", center_x=hist_video_x(m), top=hv["x_label_top"])
+    for v in ys:
+        blit_ink(f"{v}", right=hv["y_label_right"], top=round(hist_video_y(v)) + hv["y_label_dy"])
+    return surface
+
+
+def clipped_bars(counts):
+    """Barres qui dépassent l'axe Y fixe du style vidéo : [(hauteur de début de barre en m, effectif)]."""
+    lo = config.HIST_RANGE[0]
+    return [(lo + k, int(c)) for k, c in enumerate(counts) if c > config.HIST_VIDEO["y_max"]]
+
+
+def histogram_chart(row, title=None, size=(1280, 720), stats_lines=(), reference=None, style="calibration"):
+    """Histogramme §7.2 : barres de 1 m de −10 à 40 m, axe Y 0–500.
+
+    style="calibration" (phase 3b) : titre, encart de stats, axe Y agrandi si besoin.
+    style="video" (phase 5b) : rendu des images 26 à 28, axe Y fixe (une barre plus haute est tronquée).
+    """
     from evo.evolution import HIST_COLUMNS, HIST_EDGES
 
+    if style == "video":
+        return _histogram_video([row[c] for c in HIST_COLUMNS], size)
     surface = pygame.Surface(size)
     surface.fill(_c(BG))
     fonts = _fonts()
@@ -258,7 +342,7 @@ def histogram_chart(row, title, size=(1280, 720), stats_lines=(), reference=None
     return surface
 
 
-def export_run(run_dir, out_dir=None, gens=None, curves=True):
+def export_run(run_dir, out_dir=None, gens=None, curves=True, style="calibration"):
     """Courbes + histogrammes (gén. 0, 1, dernière) d'un run, en PNG. Renvoie les chemins."""
     from evo import evolution as ev
 
@@ -280,9 +364,13 @@ def export_run(run_dir, out_dir=None, gens=None, curves=True):
     last = int(rows[-1]["gen"])
     for g in gens if gens is not None else sorted({0, min(1, last), last}):
         row = rows[g]
-        path = os.path.join(out_dir, f"histogramme_gen{g:04d}.png")
-        pygame.image.save(histogram_chart(row, f"Génération {g} : distribution des hauteurs à 10 s",
-                                          stats_lines=summary_lines(row), reference=REFERENCE_HIST.get(g)), path)
+        if style == "video":
+            path = os.path.join(out_dir, f"histogramme_gen{g:04d}_video.png")
+            pygame.image.save(histogram_chart(row, style="video"), path)
+        else:
+            path = os.path.join(out_dir, f"histogramme_gen{g:04d}.png")
+            pygame.image.save(histogram_chart(row, f"Génération {g} : distribution des hauteurs à 10 s",
+                                              stats_lines=summary_lines(row), reference=REFERENCE_HIST.get(g)), path)
         paths.append(path)
     return paths
 

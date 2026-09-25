@@ -4,7 +4,8 @@ Ordre de dessin : queue, pattes (capsules), mains et pieds (doigts en éventail)
 yeux. Deux tons séparés par l'axe de la colonne : moitié gauche claire, moitié droite foncée ;
 « gauche » est le côté des points L_* ([CHOIX] côté anatomique, stable quand le lézard tourne).
 Le dessin est fait dans une petite surface autour du lézard, en supersampling ×LIZARD_SUPERSAMPLE,
-puis réduit : bords lissés, sans jointure entre les pièces.
+puis réduit : bords lissés, sans jointure entre les pièces. Le mode silhouette (une couleur, sans
+doigts ni yeux) sert aux miniatures de la vue population (§7.1).
 """
 import math
 
@@ -39,13 +40,12 @@ def _catmull_rom(points, samples=8):
     if len(p) < 3:
         return p
     ext = np.vstack([p[0], p, p[-1]])
-    out = [p[0]]
     t = np.linspace(0.0, 1.0, samples + 1)[1:, None]
-    for i in range(1, len(ext) - 2):
-        p0, p1, p2, p3 = ext[i - 1], ext[i], ext[i + 1], ext[i + 2]
-        out.extend(0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t ** 2
-                          + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
-    return np.array(out)
+    # tous les segments d'un coup : (segments, échantillons, 2)
+    p0, p1, p2, p3 = (ext[k:len(ext) - 3 + k, None, :] for k in range(4))
+    seg = 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t ** 2
+                 + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3)
+    return np.vstack([p[:1], seg.reshape(-1, 2)])
 
 
 class LizardShape:
@@ -77,10 +77,29 @@ class LizardShape:
         tail_len = sum(length for name, length in zip(skel.link_names, skel.rest) if name == "tail")
         self.tail_extra = max(0.0, config.TAIL_VISUAL_FACTOR * self.spine - tail_len)   # prolongement dessiné (m)
         self.margin = max(self.w_hip, self.w_sh, self.finger_len + self.pad_radius, self.head_len) + self.w_limb
+        # profils lissés du torse (le long de la colonne depuis PELVIS) et de la tête (depuis NECK),
+        # et ellipse des yeux : ne dépendent que des proportions, calculés une fois
+        L = self.spine
+        self.torso_profile = _catmull_rom([(-0.14 * L, self.w_tail), (0.0, 0.82 * self.w_hip), (0.22 * L, self.w_hip),
+                                           (0.55 * L, self.w_waist), (0.86 * L, self.w_sh), (L, 0.86 * self.w_sh),
+                                           (1.06 * L, 0.8 * self.head_half)], samples=6)
+        H, hw = self.head_len, self.head_half
+        self.head_profile = _catmull_rom([(-0.08 * H, 0.8 * hw), (0.2 * H, hw), (0.55 * H, 0.97 * hw),
+                                          (0.82 * H, 0.66 * hw), (0.95 * H, 0.3 * hw), (H, 0.0)], samples=6)
+        e_pos, e_along, e_across, e_inset = config.LIZARD_EYE
+        self.eye_u = e_pos * H
+        self.eye_v = float(np.interp(self.eye_u, self.head_profile[:, 0], self.head_profile[:, 1])) * e_inset
+        ang = np.linspace(0, 2 * math.pi, 18, endpoint=False)
+        self.eye_along = np.array([[e_along * H * math.cos(a)] for a in ang])
+        self.eye_across = np.array([[e_across * hw * math.sin(a)] for a in ang])
 
     # ------------------------------------------------------------------
-    def polygons(self, pos):
-        """Liste ordonnée (couleur, polygone en m) ou (couleur, ('cercle', centre, rayon))."""
+    def polygons(self, pos, silhouette=None):
+        """Liste ordonnée (couleur, polygone en m) ou (couleur, ('cercle', centre, rayon)).
+
+        silhouette = (couleur, couleur des points, rayon des points en m) : miniature de la vue population
+        (§7.1), d'une seule couleur, sans doigts ni yeux, avec un point clair par main et par pied.
+        """
         P = np.asarray(pos, dtype=float)
         neck, pelvis = P[sk.NECK], P[sk.PELVIS]
         fwd = _unit(neck - pelvis)
@@ -88,7 +107,13 @@ class LizardShape:
         if np.dot(P[sk.L_SHOULDER] - neck, left) < 0:   # côté des points L_*
             left = -left
         sigma = 1.0 if np.allclose(left, _rot90(fwd)) else -1.0
-        light, dark = config.LIZARD_LIGHT, config.LIZARD_DARK
+        if silhouette:
+            body, dot, dot_radius = silhouette
+            light = dark = body
+            limb_colors = (body, body)
+        else:
+            light, dark = config.LIZARD_LIGHT, config.LIZARD_DARK
+            limb_colors = config.LIZARD_LIMB_COLORS
         out = []
 
         # 1. queue : ligne médiane lissée, prolongée au-delà du dernier point (dessin seulement),
@@ -109,14 +134,19 @@ class LizardShape:
         out.append((dark, np.vstack([edge_r, chain[::-1]])))
 
         # 2. pattes : capsules (ceinture et os proximal épais, os distal à 70 %)
-        for side, color in ((0, config.LIZARD_LIMB_COLORS[0]), (1, config.LIZARD_LIMB_COLORS[1])):
+        for side, color in ((0, limb_colors[0]), (1, limb_colors[1])):
             for a, b, proximal in _LIMBS[side]:
                 out.extend(self._capsule(P[a], P[b], self.w_limb if proximal else self.w_distal, color))
 
         # 3. mains et pieds : paume, 5 rayons clairs en éventail, disque au bout de chaque doigt
+        #    (silhouette : un seul point clair, dessiné en dernier pour rester visible sur le torse)
+        dots = []
         for elbow, hand, side in _EXTREMITIES:
+            if silhouette:
+                dots.append((dot, ("cercle", P[hand], max(self.palm_radius, dot_radius))))
+                continue
             axis = _unit(P[hand] - P[elbow])
-            out.append((config.LIZARD_LIMB_COLORS[side], ("cercle", P[hand], self.palm_radius)))
+            out.append((limb_colors[side], ("cercle", P[hand], self.palm_radius)))
             tips = []
             for ang in self.finger_angles:
                 c, s = math.cos(ang), math.sin(ang)
@@ -129,35 +159,25 @@ class LizardShape:
                 out.append((config.LIZARD_PAD, ("cercle", tip, self.pad_radius)))
 
         # 4. torse ovoïde de NECK à PELVIS, partagé sur l'axe de la colonne
-        L = self.spine
-        profile = [(-0.14 * L, self.w_tail), (0.0, 0.82 * self.w_hip), (0.22 * L, self.w_hip),
-                   (0.55 * L, self.w_waist), (0.86 * L, self.w_sh), (L, 0.86 * self.w_sh),
-                   (1.06 * L, 0.8 * self.head_half)]
-        prof = _catmull_rom(profile, samples=6)
+        prof = self.torso_profile
         axis_pts = np.array([pelvis + fwd * uu for uu in (prof[-1, 0], prof[0, 0])])
         for sign, color in ((1.0, light), (-1.0, dark)):
-            half = np.array([pelvis + fwd * uu + sign * left * vv for uu, vv in prof])
+            half = pelvis + fwd * prof[:, :1] + (sign * left) * prof[:, 1:]
             out.append((color, np.vstack([half, axis_pts])))
 
         # 5. tête : ogive dans la direction NECK → HEAD, deux tons, deux yeux noirs
         hax = _unit(P[sk.HEAD] - neck)
         hleft = sigma * _rot90(hax)
-        H, hw = self.head_len, self.head_half
-        hprof = _catmull_rom([(-0.08 * H, 0.8 * hw), (0.2 * H, hw), (0.55 * H, 0.97 * hw),
-                              (0.82 * H, 0.66 * hw), (0.95 * H, 0.3 * hw), (H, 0.0)], samples=6)
+        hprof = self.head_profile
         haxis = np.array([neck + hax * hprof[-1, 0], neck + hax * hprof[0, 0]])
         for sign, color in ((1.0, light), (-1.0, dark)):
-            half = np.array([neck + hax * uu + sign * hleft * vv for uu, vv in hprof])
+            half = neck + hax * hprof[:, :1] + (sign * hleft) * hprof[:, 1:]
             out.append((color, np.vstack([half, haxis])))
-        e_pos, e_along, e_across, e_inset = config.LIZARD_EYE
-        ue = e_pos * H
-        ve = float(np.interp(ue, hprof[:, 0], hprof[:, 1])) * e_inset
-        ang = np.linspace(0, 2 * math.pi, 18, endpoint=False)
+        if silhouette:
+            return out + dots
         for sign in (1.0, -1.0):
-            center = neck + hax * ue + sign * hleft * ve
-            ell = np.array([center + hax * (e_along * H * math.cos(a)) + hleft * (e_across * hw * math.sin(a))
-                            for a in ang])
-            out.append((config.LIZARD_EYE_COLOR, ell))
+            center = neck + hax * self.eye_u + sign * hleft * self.eye_v
+            out.append((config.LIZARD_EYE_COLOR, center + hax * self.eye_along + hleft * self.eye_across))
         return out
 
     def _visual_tail(self, tail):
@@ -195,23 +215,34 @@ class LizardShape:
     # ------------------------------------------------------------------
     def draw(self, surface, pos, origin, scale):
         """Dessine le lézard sur `surface`. Écran : x_px = ox + x·scale, y_px = oy − y·scale (origin = (ox, oy))."""
+        drawn = self.render(pos, origin, scale, clip=surface.get_size())
+        if drawn is not None:
+            surface.blit(*drawn)
+
+    def render(self, pos, origin, scale, clip=None, silhouette=None):
+        """(toile SRCALPHA, coin haut gauche en px) du lézard, ou None s'il sort de `clip` = (w, h).
+
+        Sans `clip`, la toile peut commencer à des coordonnées négatives (miniatures : origine au point
+        de référence). `silhouette` : voir `polygons`.
+        """
         P = np.asarray(pos, dtype=float)
         ox, oy = origin
         pts_x, pts_y = ox + P[:, 0] * scale, oy - P[:, 1] * scale
         m = self.margin * scale + 4
-        sw, sh = surface.get_size()
-        x0, y0 = max(int(math.floor(pts_x.min() - m)), 0), max(int(math.floor(pts_y.min() - m)), 0)
-        x1, y1 = min(int(math.ceil(pts_x.max() + m)), sw), min(int(math.ceil(pts_y.max() + m)), sh)
+        x0, y0 = int(math.floor(pts_x.min() - m)), int(math.floor(pts_y.min() - m))
+        x1, y1 = int(math.ceil(pts_x.max() + m)), int(math.ceil(pts_y.max() + m))
+        if clip is not None:
+            x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, clip[0]), min(y1, clip[1])
         if x1 <= x0 or y1 <= y0:
-            return
+            return None
         ss = config.LIZARD_SUPERSAMPLE
         canvas = pygame.Surface(((x1 - x0) * ss, (y1 - y0) * ss), pygame.SRCALPHA)
-        base = pygame.Color(config.LIZARD_DARK)
+        base = pygame.Color(silhouette[0] if silhouette else config.LIZARD_DARK)
         canvas.fill((base.r, base.g, base.b, 0))
         k = scale * ss
         cx, cy = (ox - x0) * ss, (oy - y0) * ss   # origine du monde dans la toile supersamplée
         colors = {}
-        for color, shape in self.polygons(P):
+        for color, shape in self.polygons(P, silhouette):
             rgb = colors.get(color) or colors.setdefault(color, pygame.Color(color))
             if isinstance(shape, tuple):
                 _, center, radius = shape
@@ -224,4 +255,4 @@ class LizardShape:
                 pygame.draw.polygon(canvas, rgb, pts.tolist())
         if ss > 1:
             canvas = pygame.transform.smoothscale(canvas, (x1 - x0, y1 - y0))
-        surface.blit(canvas, (x0, y0))
+        return canvas, (x0, y0)

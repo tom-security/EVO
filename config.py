@@ -431,3 +431,44 @@ TITLE_CARD_FADE_S = 0.5           # [CHOIX] fondu de sortie
 # Replay accéléré (§6) : icône ⏩ (deux triangles blancs) en bas à gauche
 FAST_SPEED = 4                    # [CHOIX] vitesse de la touche F
 FAST_ICON = (20, 686, 34, 20)     # [CHOIX] x, y, largeur, hauteur de l'icône (aucune image de référence)
+
+# ---------------------------------------------------------------------------
+# Écrans d'analyse (§7) : vue population et histogramme (phase 5b), px d'une fenêtre 1280×720
+# ---------------------------------------------------------------------------
+# [DÉDUIT] images 24, 26 et 28 (même fond) : gris (0–255) selon la distance au centre, normalisée par la
+# demi-largeur et la demi-hauteur de l'image : 35 au centre, 24 au milieu des bords, 19 dans les coins
+# (§5.2 : #1C1C1C avec vignette).
+ANALYSIS_BG_STOPS = ((0.0, 35), (0.4, 34), (0.6, 31), (0.8, 28.5), (1.0, 24), (1.2, 21), (1.42, 19))
+# [DÉDUIT] image 24 (génération 0) : 50 colonnes × 20 lignes, et non 40 × 25 comme l'écrit le §7.1.
+POPULATION_GRID = (50, 20)
+POP_ORIGIN = (67.5, 64.5)     # [DÉDUIT] image 24 : centre de la première case (en haut à gauche)
+POP_PITCH = (23.43, 30.68)    # [DÉDUIT] image 24 : pas de la grille (x 67.5 → 1215.6, y 64.5 → 647.4)
+# [DÉDUIT] image 24 : miniature ≈ 24 px de la tête au bout de la queue (−10.7 / +13.7 px autour du centre
+# de la case) et 11 px de large ; notre lézard dessiné fait ≈ 11.4 × 5.6 m, soit 2.2 px/m. Le point de
+# référence (centre du torse) est au centre de la case.
+POP_MINI_SCALE = 2.2
+POP_MINI_COLOR = "#7AA842"    # [DÉDUIT] image 24 : médiane du vert des miniatures (#7AA842)
+# [DÉDUIT] image 24 : un point clair par main et par pied (les doigts ne se distinguent pas à cette
+# taille) ; couleur et rayon (px) calés sur les pixels clairs (médiane #9FB480, 90e centile #AFC095)
+POP_MINI_DOT = ("#A8BC8C", 1.1)
+POP_SORT_DELAY_S = 0.5        # [CHOIX] attente avant le tri animé
+POP_SORT_S = 2.0              # [CHOIX] durée du tri (ease-in-out, toutes les miniatures ensemble)
+# [DÉDUIT] images 26, 27 et 28 : histogramme (§7.2) dans le style de la vidéo. Zone du graphe : x de −10 m
+# et de 40 m, y de 500 et de 0 (19.48 px/m, 0.96 px par créature) ; grille de 1 px tous les 5 m et tous
+# les 100 ; axes (décalage en px, couleur) : bas sur y 599–600, gauche sur x 153 (lissé sur x 152) ;
+# libellés blancs en Questrial : « -10.0 » centrés sous les lignes (haut de l'encre à y 610), « 500 »
+# alignés à droite sur x 145, haut de l'encre 3 px au-dessus de la ligne.
+HIST_VIDEO = {
+    "plot": (153, 120, 1127, 600),
+    "y_max": 500,                 # [VU] §7.2 — axe Y de 0 à 500
+    "x_step": 5, "y_step": 100,   # [VU] §7.2
+    "grid": "#5D5D5D",
+    "axis_bottom": ((-1, "#C0C0C0"), (0, "#C0C0C0")),
+    "axis_left": ((0, "#FFFFFF"), (-1, "#6A6A6A")),
+    "label": "#FFFFFF",
+    "font": "questrial",
+    "font_px": 15,                # Questrial 15 : « 15.0 » 25 × 10 px d'encre (image 28 : 24 × 10)
+    "x_label_top": 610,
+    "y_label_right": 145,
+    "y_label_dy": -3,
+}

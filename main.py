@@ -9,7 +9,9 @@
     python main.py benchmark --pop 1000           # temps d'évaluation d'une génération (phase 3a)
     python main.py train --generations 200 --pop 1000 --seed 42 [--set TORQUE_SCALE=0.3 …]
     python main.py graphs --seed 42               # courbes + histogrammes du run en PNG
-    python main.py histogram --seed 42 --gen 0
+    python main.py histogram --seed 42 --gen 0 [--style video]
+    python main.py population --seed 2 --gen 200    # vue population, tri animé (§7.1)
+    python main.py population --seed 2 --gen 200 --export out/phase5b
     python main.py replay --seed 2 --gen 200 --rank 1   # rejoue une créature dans la jungle (§5, §8)
     python main.py replay --seed 2 --gen 200 --rank 1 --export out/phase4
     python main.py replay --seed 2 --gen 200 --rank 1 --fps-report   # vérifie les 60 fps en fenêtre
@@ -59,6 +61,14 @@ def main(argv=None):
     hist.add_argument("--run-dir", default=None)
     hist.add_argument("--gen", type=int, default=0)
     hist.add_argument("--out", default=None)
+    hist.add_argument("--style", default="calibration", choices=["calibration", "video"],
+                      help="calibration (phase 3b, encart de stats) ou video (images 26 à 28)")
+
+    popv = sub.add_parser("population", help="vue population : miniatures en poses finales et tri animé (§7.1)")
+    popv.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
+    popv.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    popv.add_argument("--gen", type=int, default=None, help="génération (défaut : la dernière sauvegardée)")
+    popv.add_argument("--export", metavar="DIR", help="sans écran : vue avant / pendant / après le tri, histogramme, comparaisons")
 
     replay = sub.add_parser("replay", help="rejoue une créature sauvegardée dans le décor jungle (§5, §8)")
     replay.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
@@ -109,8 +119,23 @@ def main(argv=None):
         from evo import charts, evolution
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
         gens = [args.gen] if args.command == "histogram" else None
-        for path in charts.export_run(run_dir, args.out, gens=gens, curves=args.command == "graphs"):
+        style = args.style if args.command == "histogram" else "calibration"
+        for path in charts.export_run(run_dir, args.out, gens=gens, curves=args.command == "graphs", style=style):
             print(path)
+    elif args.command == "population":
+        import sys
+        from evo import evolution, population
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        generation = population.Generation(run_dir, gen=args.gen)
+        if args.export:
+            paths, _ = population.export(generation, args.export)
+            for path in paths:
+                print(path)
+        else:
+            population.run_interactive(generation)
+        if not generation.ok:
+            print("ALERTE : les hauteurs batchées diffèrent des hauteurs stockées")
+            sys.exit(1)
     elif args.command == "replay":
         import sys
         from evo import evolution, replay as rp
