@@ -24,6 +24,7 @@
     python main.py analyze --seed 2 --gen 200 --slow --export-video out/phase6/analyse.mp4
     (replay, analyze, compare : --speed X et --slow ; population : --export-video aussi)
     python main.py decor --seed 2 --export out/chantierA/decor   # décor au-dessus de 23 m (image 08, 20 → 50 m)
+    python main.py joints --seed 2 --gen 200 [--top 50] [--sample 50] [--export DIR]   # angles contre butées (chantier B)
 """
 import argparse
 
@@ -128,6 +129,14 @@ def main(argv=None):
     decor.add_argument("--rank", type=int, default=1, help="rang de la créature qui passe +30 m (1 = meilleure)")
     decor.add_argument("--export", metavar="DIR", required=True, help="dossier des images et des mesures")
     decor.add_argument("--no-cache", action="store_true", help="régénère le décor au lieu de relire le cache")
+
+    joints = sub.add_parser("joints", help="angles articulaires réels contre les butées JOINT_LIMITS_DEG (chantier B)")
+    joints.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
+    joints.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    joints.add_argument("--gen", type=int, default=None, help="génération (défaut : la dernière sauvegardée)")
+    joints.add_argument("--top", type=int, default=1, help="meilleures créatures rejouées (défaut : 1, le champion)")
+    joints.add_argument("--sample", type=int, default=0, help="en plus, N créatures tirées au hasard dans la génération")
+    joints.add_argument("--export", metavar="DIR", help="écrit les mesures en JSON dans DIR")
 
     args = parser.parse_args(argv)
     if args.command == "debug-physics":
@@ -253,6 +262,16 @@ def main(argv=None):
         paths, _ = decor_check.export(r, args.export, use_cache=not args.no_cache)
         for path in paths:
             print(path)
+    elif args.command == "joints":
+        import sys
+        from evo import evolution, joint_audit
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        result = joint_audit.audit(run_dir, gen=args.gen, top=args.top, sample=args.sample)
+        if args.export:
+            print(joint_audit.export(result, args.export))
+        if not result["identique"]:
+            print("ALERTE : une hauteur rejouée diffère de la hauteur stockée")
+            sys.exit(1)
     elif args.command == "debug-creature":
         from evo import debug_creature
         if args.export:

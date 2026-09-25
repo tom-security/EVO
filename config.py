@@ -141,6 +141,24 @@ PERIOD_INIT = (0.5, 5.0)      # [DÉDUIT] §2.4 — période d'horloge tirée un
 PERIOD_BOUNDS = (0.3, 8.0)    # [CHOIX] §2.4 — bornes de la période (mutation, phase 3)
 LENGTH_FACTOR_RANGE = (0.6, 1.4)  # [CHOIX] §2.5 — longueurs d'os = référence × BODY_SCALE × U(0.6, 1.4)
 TARGET_RANGE_DEG = 90.0       # [CHOIX] §2.5 — angles cibles dans ±90° autour de la posture de repos
+# Butées articulaires (chantier B, validées en B1 ; docs/chantier_b_diagnostic.md), en degrés d'angle
+# anatomique, vue de dessus sur le mur, gauche et droite en miroir (evo/joint_audit.py) :
+# - épaule, hanche : α = angle de l'humérus / du fémur depuis l'axe latéral (prolongement de la clavicule /
+#   du demi-bassin) ; + = protraction (vers la tête), − = rétraction ; ±90° = os parallèle à la colonne.
+# - coude, genou : β = flexion (0 = tendu) ; + = pli naturel, celui du repos (avant-bras tourné vers la
+#   tête, tibia tourné vers la queue) ; − = pli à l'envers.
+# En B1, seul l'audit `joints` les lit : le moteur n'a encore aucune butée (phase B2).
+# - épaule −60 [CHOIX] fin de poussée (vidéo : −49°) ; +90 [CHOIX] humérus parallèle à la colonne, au-delà
+#   le bras passe devant la tête.
+# - coude, genou 0 [DÉDUIT] images 11, 12 et 16 : les 12 membres lus plient tous du côté du repos ;
+#   140 [CHOIX] au-delà, repli sur l'os voisin (vidéo : 116° au plus).
+# - hanche −80 [CHOIX] fin de poussée, sans fémur parallèle à la queue ; +75 [DÉDUIT] image 11 : fémur ≈ +70°.
+JOINT_LIMITS_DEG = {
+    "épaule": (-60.0, 90.0),
+    "coude": (0.0, 140.0),
+    "hanche": (-80.0, 75.0),
+    "genou": (0.0, 140.0),
+}
 # [CHOIX] §2.5 — probabilité qu'une patte tienne dans une pose aléatoire. Grille 2 (génération 0,
 # graines 0/1/2, au sol sur 1000) : TS 0.25 → prise 0.5 : 700–737, 0.6 : 530–542, 0.7 : 315–361 ;
 # départ 10.3 m : −5 % seulement. Retenu 0.62 (voir TORQUE_SCALE, grille 3).
