@@ -36,3 +36,8 @@ def load(name, size):
 
 def available(name):
     return os.path.exists(path(name))
+
+
+# Une police pygame n'est plus valable après pygame.quit() (l'utiliser plante le processus) : le cache est
+# vidé à chaque arrêt de pygame, pour qu'un export suivi d'un autre dans le même processus recharge ses polices.
+pygame.register_quit(load.cache_clear)

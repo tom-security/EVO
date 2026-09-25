@@ -12,6 +12,7 @@
     python main.py histogram --seed 42 --gen 0 [--style video]
     python main.py population --seed 2 --gen 200    # vue population, tri animé (§7.1)
     python main.py population --seed 2 --gen 200 --export out/phase5b
+    python main.py population --seed 2 --gen 0 --cycle [--export DIR]   # apparition, tri, élimination, enfants
     python main.py replay --seed 2 --gen 200 --rank 1   # rejoue une créature dans la jungle (§5, §8)
     python main.py replay --seed 2 --gen 200 --rank 1 --export out/phase4
     python main.py replay --seed 2 --gen 200 --rank 1 --fps-report   # vérifie les 60 fps en fenêtre
@@ -22,6 +23,7 @@
     python main.py replay --seed 2 --gen 200 --rank 1 --export-video out/phase6/replay.mp4   # MP4 (phase 6)
     python main.py analyze --seed 2 --gen 200 --slow --export-video out/phase6/analyse.mp4
     (replay, analyze, compare : --speed X et --slow ; population : --export-video aussi)
+    python main.py decor --seed 2 --export out/chantierA/decor   # décor au-dessus de 23 m (image 08, 20 → 50 m)
 """
 import argparse
 
@@ -76,6 +78,9 @@ def main(argv=None):
     popv.add_argument("--gen", type=int, default=None, help="génération (défaut : la dernière sauvegardée)")
     popv.add_argument("--export", metavar="DIR", help="sans écran : vue avant / pendant / après le tri, histogramme, comparaisons")
     popv.add_argument("--export-video", metavar="MP4", help="sans écran : tri animé puis histogramme en MP4 (ffmpeg)")
+    popv.add_argument("--cycle", action="store_true",
+                      help="cycle complet (§7.1) : apparition des colonnes, tri, histogramme, élimination des perdantes, "
+                           "enfants (génération N+1 sauvegardée)")
 
     replay = sub.add_parser("replay", help="rejoue une créature sauvegardée dans le décor jungle (§5, §8)")
     replay.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
@@ -115,6 +120,14 @@ def main(argv=None):
     comp.add_argument("--export-video", metavar="MP4", help="sans écran : toute la comparaison en MP4 (ffmpeg)")
     comp.add_argument("--no-cache", action="store_true", help="régénère le décor au lieu de relire le cache")
     comp.add_argument("--fps-report", action="store_true", help="joue une fois puis affiche le fps")
+
+    decor = sub.add_parser("decor", help="décor au-dessus de 23 m : image 08 (30 m) et cohérence de 20 à 50 m (§5.6)")
+    decor.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
+    decor.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    decor.add_argument("--gen", type=int, default=None, help="génération (défaut : la dernière sauvegardée)")
+    decor.add_argument("--rank", type=int, default=1, help="rang de la créature qui passe +30 m (1 = meilleure)")
+    decor.add_argument("--export", metavar="DIR", required=True, help="dossier des images et des mesures")
+    decor.add_argument("--no-cache", action="store_true", help="régénère le décor au lieu de relire le cache")
 
     args = parser.parse_args(argv)
     if args.command == "debug-physics":
@@ -159,15 +172,19 @@ def main(argv=None):
         from evo import evolution, population
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
         generation = population.Generation(run_dir, gen=args.gen)
+        offspring = population.Offspring(generation) if args.cycle else None
         if args.export:
-            paths, _ = population.export(generation, args.export)
+            if offspring is None:
+                paths, _ = population.export(generation, args.export)
+            else:
+                paths, _ = population.export_cycle(generation, offspring, args.export)
             for path in paths:
                 print(path)
         if args.export_video:
             from evo import video
-            video.record_population(generation, args.export_video)
+            video.record_population(generation, args.export_video, offspring=offspring)
         if not (args.export or args.export_video):
-            population.run_interactive(generation)
+            population.run_interactive(generation, offspring)
         if not generation.ok:
             print("ALERTE : les hauteurs batchées diffèrent des hauteurs stockées")
             sys.exit(1)
@@ -229,6 +246,13 @@ def main(argv=None):
         if not all(r.ok for r in replays):
             print("ALERTE : une hauteur rejouée diffère de la hauteur stockée")
             sys.exit(1)
+    elif args.command == "decor":
+        from evo import decor_check, evolution, replay as rp
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        r = rp.Replay(run_dir, gen=args.gen, rank=args.rank)
+        paths, _ = decor_check.export(r, args.export, use_cache=not args.no_cache)
+        for path in paths:
+            print(path)
     elif args.command == "debug-creature":
         from evo import debug_creature
         if args.export:

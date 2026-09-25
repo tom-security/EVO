@@ -552,3 +552,19 @@ VIDEO_CRF = 18                # [CHOIX] qualité x264 (18 : pertes à peine visi
 VIDEO_PRESET = "medium"       # [CHOIX] compromis vitesse d'encodage / taille
 VIDEO_HOLD_S = 1.0            # [CHOIX] dernière image tenue en fin de vidéo
 VIDEO_HIST_S = 2.0            # [CHOIX] vidéo de la vue population : histogramme après le tri
+
+# ---------------------------------------------------------------------------
+# Vue population, cycle complet (§7.1, chantier A) : apparition, tri, histogramme, élimination, enfants
+# ---------------------------------------------------------------------------
+# [CHOIX] Animation 1 : les colonnes de la place de calcul (indice du npz rangé en colonnes, l'ordre dans lequel
+# les génomes sont passés à l'évaluateur batché) apparaissent de gauche à droite à cadence fixe, chacune en fondu.
+# L'évaluateur calcule tout d'un bloc : cette cadence est une présentation, sans lien avec le temps de calcul.
+POP_APPEAR_S = 2.5
+POP_FADE_S = 0.15
+POP_PAUSE_S = 0.6             # [CHOIX] pause entre deux phases
+POP_CYCLE_HIST_S = 2.0        # [CHOIX] histogramme entre le tri et l'élimination (vidéo : t = 11:12 puis 11:20)
+# [CHOIX] Animation 3 : les perdantes (cases 500 à 999) disparaissent colonne par colonne, de gauche à droite, d'un
+# bloc (image 25 : colonnes 0 à 5 du bas déjà vides, les autres intactes) ; puis l'enfant de la survivante de rang j
+# apparaît de même dans la case 500 + j, juste sous son parent, dans sa posture de repos (pas encore évalué).
+POP_ELIM_S = 1.5
+POP_CHILD_S = 1.5

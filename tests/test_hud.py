@@ -115,3 +115,19 @@ def test_markers_only_without_hud(small_run, tmp_cache):
     assert tuple(surf.get_at((x, row)))[:3] == white                          # sans HUD : le repère est là
     view.draw(surf, 0, hud=True)
     assert tuple(surf.get_at((x, row)))[:3] != white                          # avec HUD : pas de repère
+
+
+def test_fonts_survive_pygame_quit():
+    """Un export suivi d'un autre dans le même processus (--export puis --export-video) : après pygame.quit(),
+    le cache de polices est vidé (une police périmée ferait planter le processus). Lancé à part pour qu'un
+    plantage n'emporte pas la suite de tests."""
+    import subprocess
+    import sys
+    code = ("import os; os.environ['SDL_VIDEODRIVER'] = 'dummy'\n"
+            "import pygame\nfrom evo import fonts\n"
+            "pygame.display.init(); pygame.font.init(); f = fonts.load('questrial', 20); f.render('a', True, (255, 255, 255))\n"
+            "pygame.quit(); pygame.display.init(); pygame.font.init()\n"
+            "g = fonts.load('questrial', 20); assert g is not f; g.render('a', True, (255, 255, 255))\n")
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    run = subprocess.run([sys.executable, "-c", code], cwd=root, capture_output=True, timeout=60)
+    assert run.returncode == 0, run.stderr.decode(errors="replace")

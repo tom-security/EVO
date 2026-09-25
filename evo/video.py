@@ -157,18 +157,31 @@ def record_view(make_view, replay, path, speed=1.0, slow=False, log=print, max_f
     return stats
 
 
-def record_population(generation, path, log=print):
-    """Vue population : tri animé, grille triée tenue VIDEO_HOLD_S, puis l'histogramme VIDEO_HIST_S."""
+def record_population(generation, path, log=print, offspring=None):
+    """Vue population : tri animé, grille triée tenue VIDEO_HOLD_S, puis l'histogramme VIDEO_HIST_S.
+    Avec `offspring` : cycle complet (apparition, tri, histogramme, élimination, enfants)."""
     import pygame
     from evo import population as pop
 
     screen = _open_screen()
+    render_s, t0 = 0.0, time.perf_counter()
+    if offspring is not None:
+        view = pop.CycleView(generation, offspring)
+        times = np.arange(0.0, view.duration, config.DT)
+        with VideoWriter(path, screen.get_size(), log=log) as out:
+            for t in times:
+                a = time.perf_counter()
+                view.draw(screen, t)
+                render_s += time.perf_counter() - a
+                out.write(screen)
+        stats = _report(path, len(times), render_s, time.perf_counter() - t0, log)
+        pygame.quit()
+        return stats
     view = pop.PopulationView(generation)
     hist, _ = pop._histogram_surface(generation)
     hist = hist.convert()
     times = np.arange(0.0, pop.sort_end() + config.VIDEO_HOLD_S, config.DT)
     n_hist = int(round(config.VIDEO_HIST_S * config.FPS))
-    render_s, t0 = 0.0, time.perf_counter()
     with VideoWriter(path, screen.get_size(), log=log) as out:
         for t in times:
             a = time.perf_counter()

@@ -185,6 +185,126 @@ class PopulationView:
 
 
 # ---------------------------------------------------------------------------
+# Cycle complet (§7.1) : apparition, tri, histogramme, élimination des perdantes, enfants
+# ---------------------------------------------------------------------------
+class Offspring:
+    """La génération N+1 vue depuis la génération N (lignée des .npz) : les survivantes sont les S meilleures de
+    N, dans l'ordre (elles gardent leur case triée) ; l'enfant de la survivante de rang j apparaît dans la case
+    libérée S + j, juste sous son parent. Les enfants ne sont pas encore évalués : posture de repos."""
+
+    def __init__(self, generation):
+        run_dir, gen = generation.run_dir, generation.gen + 1
+        if gen not in ev.saved_generations(run_dir):
+            raise FileNotFoundError(f"pas de génération {gen} dans {run_dir} : le cycle de la génération "
+                                    f"{generation.gen} montre ses enfants (choisis --gen N avec N+1 sauvegardée)")
+        pop, _, lineage, _ = ev.load_generation(run_dir, gen)
+        order = ev.ranking(generation.results["score"])
+        child = lineage["is_child"]
+        s = int(np.sum(~child))
+        parents = lineage["parent"]
+        if not (np.array_equal(parents[:s], order[:s]) and child[s:].all()
+                and np.array_equal(parents[s:], order[:len(parents) - s])):
+            raise ValueError(f"lignée inattendue entre les générations {generation.gen} et {gen}")
+        self.gen, self.n_survivors = gen, s
+        self.index = np.arange(s, len(parents))                 # indices des enfants dans la génération N+1
+        self.parent_rank = np.arange(len(parents) - s)          # rang (génération N) du parent de chaque enfant
+        self.slots = s + self.parent_rank                       # case libérée sous le parent
+        self.skeletons, self.poses = [], []
+        for i in self.index:
+            c = cr.Creature(pop.genome(i))                      # posture de repos, au départ
+            self.skeletons.append(c.skel)
+            self.poses.append(c.world.pos.copy())
+
+
+def cycle_phases():
+    """{phase: (début, fin)} en s : apparition, tri, histogramme, élimination, enfants, fin (tenue)."""
+    spans = (("apparition", config.POP_APPEAR_S + config.POP_FADE_S), ("tri", config.POP_SORT_S),
+             ("histogramme", config.POP_CYCLE_HIST_S), ("elimination", config.POP_ELIM_S),
+             ("enfants", config.POP_CHILD_S), ("fin", config.VIDEO_HOLD_S))
+    out, t = {}, 0.0
+    for name, duration in spans:
+        out[name] = (t, t + duration)
+        t += duration + (config.POP_PAUSE_S if name != "fin" else 0.0)
+    return out
+
+
+def sweep_time(start, duration, col, n_cols):
+    """Instant où un balayage de gauche à droite commencé à `start` atteint la colonne `col`."""
+    return start + duration * col / n_cols
+
+
+class CycleView:
+    """Cycle complet de la génération N ; `draw(surface, t)` pour t de 0 à `duration`."""
+
+    def __init__(self, generation, offspring, size=None):
+        import pygame
+
+        self.base = PopulationView(generation, size)
+        convert = pygame.display.get_surface() is not None
+        t0 = time.perf_counter()
+        self.children = []
+        for skel, pos in zip(offspring.skeletons, offspring.poses):
+            surf, offset = render_miniature(skel, pos)
+            self.children.append((surf.convert_alpha() if convert else surf, offset))
+        self.render_seconds = self.base.render_seconds + time.perf_counter() - t0
+        hist, _ = _histogram_surface(generation)
+        self.hist = hist.convert() if convert else hist
+        self.offspring = offspring
+        self.phases = cycle_phases()
+        self.duration = self.phases["fin"][1]
+        cols, rows = config.POPULATION_GRID
+        n = len(generation)
+        self.n_cols = cols
+        self.n_appear_cols = int(np.ceil(n / rows))
+        self.appear_col = np.arange(n) // rows                   # colonne de la place de calcul
+        self.sorted_col = generation.slots % cols
+        self.loser = generation.slots >= offspring.n_survivors
+        self.child_col = offspring.slots % cols
+        self.child_xy = np.rint(slot_centers(offspring.slots)).astype(int)
+
+    def alphas(self, t):
+        """Opacité de chaque créature de la génération N et de chaque enfant à l'instant t."""
+        ph = self.phases
+        a0, _ = ph["apparition"]
+        reveal = a0 + config.POP_APPEAR_S * self.appear_col / self.n_appear_cols
+        alpha = np.clip((t - reveal) / config.POP_FADE_S, 0.0, 1.0)
+        gone = t >= sweep_time(ph["elimination"][0], config.POP_ELIM_S, self.sorted_col, self.n_cols)
+        alpha = np.where(self.loser & gone, 0.0, alpha)
+        born = t >= sweep_time(ph["enfants"][0], config.POP_CHILD_S, self.child_col, self.n_cols)
+        return alpha, born.astype(float)
+
+    def positions(self, t):
+        s0, _ = self.phases["tri"]
+        u = min(max((t - s0) / config.POP_SORT_S, 0.0), 1.0)
+        u = u * u * (3.0 - 2.0 * u)
+        return self.base.start + (self.base.end - self.base.start) * u
+
+    def draw(self, surface, t):
+        h0, h1 = self.phases["histogramme"]
+        if h0 <= t < h1:
+            surface.blit(self.hist, (0, 0))
+            return
+        surface.blit(self.base.background, (0, 0))
+        xy = np.rint(self.positions(t)).astype(int)
+        alpha, born = self.alphas(t)
+        minis = self.base.minis
+        solid, fading = [], []
+        for i in self.base.draw_order:
+            if alpha[i] >= 1.0:
+                solid.append((minis[i][0], (xy[i, 0] + minis[i][1][0], xy[i, 1] + minis[i][1][1])))
+            elif alpha[i] > 0.0:
+                fading.append(i)
+        surface.blits(solid, doreturn=False)
+        for i in fading:                                        # fondu d'apparition : opacité de surface
+            surf, (dx, dy) = minis[i]
+            surf.set_alpha(int(round(255 * alpha[i])))
+            surface.blit(surf, (xy[i, 0] + dx, xy[i, 1] + dy))
+            surf.set_alpha(255)          # et non None, qui couperait aussi la transparence par pixel
+        surface.blits([(surf, (x + dx, y + dy)) for (surf, (dx, dy)), (x, y), b
+                       in zip(self.children, self.child_xy, born) if b], doreturn=False)
+
+
+# ---------------------------------------------------------------------------
 # Mesures de comparaison (image 24 contre notre vue)
 # ---------------------------------------------------------------------------
 def measure_grid(surface):
@@ -233,14 +353,15 @@ def _histogram_surface(generation):
     return charts.histogram_chart(dict(zip(ev.HIST_COLUMNS, counts)), style="video"), counts
 
 
-def run_interactive(generation):
-    """Fenêtre 1280×720 à 60 fps. R : recommencer le tri, Espace : pause, H : histogramme, Échap : quitter."""
+def run_interactive(generation, offspring=None):
+    """Fenêtre 1280×720 à 60 fps. R : recommencer, Espace : pause, H : histogramme, Échap : quitter.
+    Avec `offspring` (Offspring) : cycle complet au lieu du tri seul."""
     import pygame
 
     pygame.display.init()
     screen = pygame.display.set_mode(config.WINDOW_SIZE)
     pygame.display.set_caption(f"Population, génération {generation.gen} (graine {generation.seed})")
-    view = PopulationView(generation)
+    view = PopulationView(generation) if offspring is None else CycleView(generation, offspring)
     hist, _ = _histogram_surface(generation)
     hist = hist.convert()
     clock = pygame.time.Clock()
@@ -372,5 +493,65 @@ def export(generation, out_dir, log=print):
     ref = charts.REFERENCE_HIST.get(generation.gen)
     log(f"histogramme : somme {hs['sum']}, barre −10 m {hs['bin_min10']}, {hs['share_30_35'] * 100:.0f} % entre 30 et "
         f"35 m, au sol {hs['fallen']}, max {hs['height_max']:.1f} m" + (f" ({ref})" if ref else ""))
+    pygame.quit()
+    return paths, stats
+
+
+def export_cycle(generation, offspring, out_dir, log=print):
+    """Cycle complet : images clés, comparaison avec l'image 25 (élimination), temps (JSON)."""
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    import pygame
+    from evo.replay import reference_image
+
+    pygame.display.init()
+    pygame.font.init()
+    os.makedirs(out_dir, exist_ok=True)
+    screen = pygame.display.set_mode(config.WINDOW_SIZE)
+    view = CycleView(generation, offspring)
+    ph = view.phases
+    frame_ms = []
+    for t in np.arange(0.0, view.duration, config.DT):
+        t0 = time.perf_counter()
+        view.draw(screen, t)
+        frame_ms.append((time.perf_counter() - t0) * 1000.0)
+    frame_ms = np.array(frame_ms)
+    cols = view.n_cols
+    # élimination à 6 colonnes (image 25 : colonnes 0 à 5 du bas déjà vides)
+    t_elim6 = sweep_time(ph["elimination"][0], config.POP_ELIM_S, 6, cols) - 1e-6
+    keys = (("1_apparition_mi", ph["apparition"][0] + config.POP_APPEAR_S / 2),
+            ("2_apparition_finie", ph["apparition"][1]),
+            ("3_triee", ph["tri"][1]),
+            ("4_histogramme", ph["histogramme"][0] + 0.1),
+            ("5_elimination_6_colonnes", t_elim6),
+            ("6_elimination_finie", ph["elimination"][1]),
+            ("7_enfants_mi", sweep_time(ph["enfants"][0], config.POP_CHILD_S, cols // 2, cols) - 1e-6),
+            ("8_fin", ph["fin"][0]))
+    tag = f"s{generation.seed}_g{generation.gen}"
+    paths, shots = [], {}
+    for name, t in keys:
+        view.draw(screen, t)
+        shots[name] = screen.copy()
+        path = os.path.join(out_dir, f"cycle_{tag}_{name}.png")
+        pygame.image.save(screen, path)
+        paths.append(path)
+    small = pygame.font.SysFont(config.FONT_SANS, 18)
+    ref = reference_image(11, 20)
+    board = _board(pygame, pygame.image.load(ref).convert(), shots["5_elimination_6_colonnes"],
+                   [f"Référence : {os.path.basename(ref)}",
+                    f"Nous : graine {generation.seed}, génération {generation.gen}, 6 colonnes éliminées"],
+                   small, zooms=((50, 330, 320, 130, 4, "×4 : lignes 9 à 12, colonnes 0 à 13 (survivantes en haut, perdantes éliminées dans les colonnes 0 à 5)"),))
+    path = os.path.join(out_dir, "comparaison_t11m20.png")
+    pygame.image.save(board, path)
+    paths.append(path)
+    stats = {"gen": generation.gen, "next_gen": offspring.gen, "survivors": offspring.n_survivors,
+             "children": len(offspring.index), "phases_s": {k: [round(a, 3), round(b, 3)] for k, (a, b) in ph.items()},
+             "duration_s": view.duration, "miniatures_s": view.render_seconds,
+             "frame_ms_mean": float(frame_ms.mean()), "frame_ms_p95": float(np.percentile(frame_ms, 95)),
+             "frame_ms_max": float(frame_ms.max())}
+    with open(os.path.join(out_dir, f"temps_cycle_{tag}.json"), "w") as fh:
+        json.dump(stats, fh, indent=1)
+    log(f"cycle gén. {generation.gen} → {offspring.gen} : {offspring.n_survivors} survivantes gardent leur case, "
+        f"{len(offspring.index)} enfants sous leur parent ; {view.duration:.1f} s ; miniatures {view.render_seconds:.2f} s ; "
+        f"une image {stats['frame_ms_mean']:.2f} ms (p95 {stats['frame_ms_p95']:.2f}, max {stats['frame_ms_max']:.2f})")
     pygame.quit()
     return paths, stats
