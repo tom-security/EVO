@@ -231,3 +231,47 @@ Lancés à 15:00 UTC :
 - `pytest` avec `source_run_id` (rejeu C2) ;
 - `--tail`, `--crossings`, `--energy` et `--fallen` sur C2 ;
 - critère de repli.
+
+## Étape 5 bis : mesures de référence B2, ARRÊT
+
+Les 4 analyses sont vertes et rapatriées. Toutes les hauteurs rejouées sont identiques au run.
+
+**`joints --tail` sur B2** (aucun cône dans le moteur, mesure faite contre 6°), 50 meilleures de la génération 200 :
+
+| Graine | Os de queue, max | Grimpes étirées | Oscillation | Écart max à l'axe (médiane / p95) | Verdict |
+|---|---|---|---|---|---|
+| 0 | 0,70 % | 0 % | médiane 0,3 %, max 0,4 % | 71,8° / 164,3° | garder 6° |
+| 1 | 1,09 % | 0 % | médiane 0,3 %, max 0,5 % | 32,8° / 64,3° | garder 6° |
+| 2 | 0,49 % | 0 % | médiane 0,3 %, max 0,4 % | 22,0° / 42,5° | garder 6° |
+
+Le verdict « garder 6° » est attendu en B2, puisque le cône n'existe pas encore dans le moteur. Ce sont les chiffres
+de référence du critère.
+
+**`joints --fallen` sur B2 : seuil d'audit d'énergie dépassé (5 cm), condition d'arrêt.**
+
+| Run B2 | Tombées | > 5 cm | Max (J / équivalent hauteur) | Queue > 5 % | Os du corps, max |
+|---|---|---|---|---|---|
+| graine 0, gén. 0 | 392 | 5 | 200 J / 85 cm | 6 | 5,1 % |
+| graine 0, gén. 200 | 61 | 0 | — | 0 | 1,8 % |
+| graine 1, gén. 0 | 408 | 3 | 151 J / 61 cm | 1 | 3,7 % |
+| graine 1, gén. 200 | 121 | 7 | **825 J / 4,25 m** | 9 | 4,7 % |
+| graine 2, gén. 0 | 383 | 6 | **1 292 J / 6,45 m** | 6 | 6,4 % |
+| graine 2, gén. 200 | 51 | 0 | 0,003 J | 0 | 2,7 % |
+
+- Ce sont des runs **B2**, sans butées du corps : c'est un phénomène du moteur déjà validé, jamais mesuré, parce que
+  les audits ne portaient que sur les champions et sur des échantillons.
+- Les créatures en cause finissent couchées à une hauteur normale (−7,86 à −9,67 m) : l'énergie créée ne les fait pas
+  remonter. Leurs rangs vont de 499 à 1 000 ; une seule est au rang 499, juste sous la limite des 500 survivantes
+  (graine 2, gén. 0).
+- Ce sont des créatures dont les muscles continuent d'agir au sol (masse musculaire 6 à 18). Le mécanisme précis
+  reste à établir ; ce sera un rejeu étape par étape, sur le runner.
+
+**Pendant ce temps** : le run complet C2 `butees_corps` (38266975229) continue. La graine 1 est terminée, les graines
+0 et 2 tournent. Ses artefacts seront conservés 30 jours.
+
+**Non commité** : `evo/morphology.py` (étiquettes de fin sans chevauchement, via `charts._end_labels`).
+
+**Décision attendue de Tom** :
+- la règle d'arrêt (5 cm) s'applique-t-elle aussi aux créatures tombées des runs B2 de référence, ou seulement à C2 ?
+- faut-il diagnostiquer ce mécanisme du moteur validé (rejeu étape par étape des pires cas, n°868 et n°760) avant de
+  continuer ?
