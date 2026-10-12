@@ -1,0 +1,168 @@
+# Entraînements et contrôles d'EVO sur les runners GitHub (Linux, 4 vCPU).
+# Lancement depuis le PC (le fichier doit être sur main pour que workflow_dispatch apparaisse) :
+#   gh workflow run train.yml --ref main -f mode=reproductibilite
+#   gh workflow run train.yml --ref <branche> -f mode=pytest
+#   gh workflow run train.yml --ref <branche> -f mode=train -f run_name=essai -f generations=5
+#   gh run watch <id> ; gh run download <id> -D artefacts/
+# Environnement figé pendant tout le chantier : ubuntu-24.04, Python 3.11 et les versions des runs de
+# référence (PASSATION §3.1) : numpy 2.4.6, numba 0.67.0, pygame 2.6.1.
+
+name: train
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "train : entraînement ; reproductibilite : rejeu des champions B2 ; pytest : suite de tests"
+        type: choice
+        options: [train, reproductibilite, pytest]
+        default: train
+      run_name:
+        description: "nom du run (runs/<run_name>/<graine>)"
+        type: string
+        default: butees_corps
+      generations:
+        description: "nombre de générations"
+        type: string
+        default: "200"
+      seeds:
+        description: "graines, en liste JSON"
+        type: string
+        default: "[0, 1, 2]"
+      extra_set:
+        description: "surcharges --set supplémentaires, séparées par des espaces (ex. TAIL_CONE_DEG=30)"
+        type: string
+        default: ""
+
+env:
+  PIP_DEPS: numpy==2.4.6 numba==0.67.0 pygame==2.6.1
+  SDL_VIDEODRIVER: dummy
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  train:
+    if: inputs.mode == 'train'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: ${{ fromJSON(inputs.seeds) }}
+    env:
+      SEED: ${{ matrix.seed }}
+      RUN_NAME: ${{ inputs.run_name }}
+      GENERATIONS: ${{ inputs.generations }}
+      EXTRA_SET: ${{ inputs.extra_set }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install $PIP_DEPS
+          python --version
+          nproc
+      - name: Entraînement
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_dir="runs/$RUN_NAME/$SEED"
+          log="runs/train_${RUN_NAME}_s${SEED}.log"
+          mkdir -p "$run_dir"
+          pip freeze > "$run_dir/pip_freeze.txt"
+          sets=(--set AUDIT_EVERY=10)
+          for s in $EXTRA_SET; do sets+=(--set "$s"); done
+          start=$(date +%s)
+          python -u main.py train --seed "$SEED" --generations "$GENERATIONS" --pop 1000 \
+            --run-dir "$run_dir" "${sets[@]}" 2>&1 | tee "$log"
+          echo "durée totale : $(( $(date +%s) - start )) s" | tee -a "$log"
+      - name: Archive et SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="runs_${RUN_NAME}_${SEED}.tar.gz"
+          tar -czf "$archive" "runs/$RUN_NAME/$SEED" "runs/train_${RUN_NAME}_s${SEED}.log"
+          sha256sum "$archive" | tee "$archive.sha256"
+          echo "$(cat "$archive.sha256")" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runs_${{ inputs.run_name }}_${{ matrix.seed }}
+          path: |
+            runs_${{ inputs.run_name }}_${{ matrix.seed }}.tar.gz
+            runs_${{ inputs.run_name }}_${{ matrix.seed }}.tar.gz.sha256
+          retention-days: 30
+          compression-level: 0
+
+  reproductibilite:
+    # Prouve que le runner rejoue les runs de B2 (graines 0, 1, 2, génération 200, champion) à la hauteur stockée.
+    if: inputs.mode == 'reproductibilite'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install $PIP_DEPS
+      - name: Restauration des runs B2 (branche sauvegarde-runs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin sauvegarde-runs
+          for s in 0 1 2; do git show "FETCH_HEAD:runs_$s.tar.gz" > "runs_$s.tar.gz"; done
+          cat > runs.sha256 <<'FIN'
+          4cfee42c86d3b1f510bb61f5a6cbf99df0a955e3d1e2c9a5279e662f82422e23  runs_0.tar.gz
+          93f89aca6b9668bbd7db65ceb7e31a5ef283277d900dc6f4a128eafd913ffb3e  runs_1.tar.gz
+          e4a321392f7af91e92d89e05f51157663f299a0a4a3a707e736517ac0107080b  runs_2.tar.gz
+          FIN
+          sha256sum -c runs.sha256
+          for s in 0 1 2; do tar -xzf "runs_$s.tar.gz"; done
+      - name: Rejeu des champions de la génération 200
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "| graine | résultat |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          for s in 0 1 2; do
+            python main.py replay --seed "$s" --gen 200 --rank 1 --export "out/repro_$s" 2>&1 | tee "repro_$s.log"
+            code=${PIPESTATUS[0]}
+            line=$(grep "^replay graine" "repro_$s.log" || echo "pas de ligne de rejeu")
+            echo "| $s | ${line//|//} (code $code) |" >> "$GITHUB_STEP_SUMMARY"
+            [ "$code" -eq 0 ] || status=1
+          done
+          exit $status
+
+  pytest:
+    if: inputs.mode == 'pytest'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install $PIP_DEPS pytest imageio-ffmpeg
+      - name: Restauration des runs B2 (branche sauvegarde-runs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin sauvegarde-runs
+          for s in 0 1 2; do git show "FETCH_HEAD:runs_$s.tar.gz" > "runs_$s.tar.gz"; done
+          cat > runs.sha256 <<'FIN'
+          4cfee42c86d3b1f510bb61f5a6cbf99df0a955e3d1e2c9a5279e662f82422e23  runs_0.tar.gz
+          93f89aca6b9668bbd7db65ceb7e31a5ef283277d900dc6f4a128eafd913ffb3e  runs_1.tar.gz
+          e4a321392f7af91e92d89e05f51157663f299a0a4a3a707e736517ac0107080b  runs_2.tar.gz
+          FIN
+          sha256sum -c runs.sha256
+          for s in 0 1 2; do tar -xzf "runs_$s.tar.gz"; done
+      - name: Tests
+        run: python -m pytest -q -rs tests/
