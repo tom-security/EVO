@@ -165,6 +165,32 @@ JOINT_LIMITS = True
 # [CHOIX] B2 — une butée entre dans le solveur à moins de ça (comme CONTACT_MARGIN pour le sol), ou si elle serait
 # franchie dans le sous-pas. Même schéma que le contact au sol : terme spéculatif, biais BETA (0), projection seule.
 JOINT_LIMIT_MARGIN_DEG = 2.0
+# Butées du corps (chantier C2, validées en C1 ; docs/chantier_c_diagnostic.md) : même primitive que les butées
+# articulaires, sur des triplets (NECK, PELVIS, X), l'angle étant celui de X vu du bassin depuis l'axe bassin→cou.
+# - pieds : chaque pied reste de son côté de l'axe bassin–cou (prolongé dans les deux sens), à au moins
+#   FOOT_AXIS_MARGIN_DEG de l'axe ;
+# - queue : chaque point de la queue reste dans un cône de ±TAIL_CONE_DEG autour du prolongement de la colonne vers
+#   l'arrière (au repos, la queue est dans l'axe, au centre du cône).
+# [CHOIX] C2 — appliquées si JOINT_LIMITS et BODY_LIMITS. Absent de la config d'un run (runs d'avant C2) : False.
+BODY_LIMITS = True
+FOOT_AXIS_MARGIN_DEG = 0.0  # [CHOIX] C2 — pied jusque sur l'axe, pas au-delà
+# [DÉDUIT] C1 — écart queue/axe mesuré sur les images 11, 12 et 40 : 1.7°, 5.7°, 3.3°, queue droite (résidu < 1 px).
+# Repli prévu à 30 [CHOIX] si le critère ci-dessous se déclenche après réentraînement.
+TAIL_CONE_DEG = 6.0
+# [CHOIX] C2 — critère de repli du cône de queue (commande `joints --tail`, sur les 50 meilleures de la gén. 200) :
+# - longueur : « systématique » si, pour au moins une graine, plus de TAIL_FALLBACK_SHARE des grimpes ont un os de
+#   queue au-delà de TAIL_LENGTH_LIMIT d'erreur pendant plus de TAIL_FALLBACK_TIME de leur durée ;
+# - oscillation numérique contre la butée : alternance au sous-pas n quand les pas δ(n+1) − δ(n) et δ(n) − δ(n−1) de
+#   l'écart à l'axe d'un point de queue sont de signes opposés et dépassent tous deux TAIL_CHATTER_MIN_DEG, comptée
+#   pendant le contact (|δ| ≥ TAIL_CONE_DEG − TAIL_CHATTER_CONTACT_DEG) ; constatée si elle dépasse TAIL_CHATTER_MAX
+#   des sous-pas de contact chez plus de TAIL_FALLBACK_SHARE des grimpes (un balancement physique à 5 Hz alterne sur
+#   ≈ 2 % des sous-pas, une oscillation numérique sur près de 100 %).
+TAIL_FALLBACK_SHARE = 0.10
+TAIL_FALLBACK_TIME = 0.01
+TAIL_LENGTH_LIMIT = 0.01
+TAIL_CHATTER_MIN_DEG = 0.01
+TAIL_CHATTER_CONTACT_DEG = 2.0
+TAIL_CHATTER_MAX = 0.10
 # [CHOIX] §2.5 — probabilité qu'une patte tienne dans une pose aléatoire. Grille 2 (génération 0,
 # graines 0/1/2, au sol sur 1000) : TS 0.25 → prise 0.5 : 700–737, 0.6 : 530–542, 0.7 : 315–361 ;
 # départ 10.3 m : −5 % seulement. Retenu 0.62 (voir TORQUE_SCALE, grille 3).

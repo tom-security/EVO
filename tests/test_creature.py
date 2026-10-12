@@ -56,8 +56,10 @@ def test_limp_creature_falls_and_lies_on_ground():
     c = bench.creature
     assert c.fallen
     assert bench.min_y >= config.GROUND_Y - 1e-9
-    assert -config.START_HEIGHT < c.height() < -config.START_HEIGHT + 2.0
-    assert -9.0 <= c.height() <= -7.8  # §1.7 : une créature au sol affiche entre −7.8 et −9 m
+    # §1.7 : une créature au sol affiche entre −7.8 et −9 m. Avant C2 (queue libre), la créature inerte finissait
+    # à −8.73 m ; avec les butées du corps (C2), la queue tenue dans son cône cale le corps : −7.95 m (−8.45 m avec
+    # un cône de 30°), toujours dans la plage de la vidéo.
+    assert -9.0 <= c.height() <= -7.8
     # Couchée et stable : sur les 3 dernières secondes, la hauteur ne bouge que de ±0.25 m, et les
     # points restés au contact du sol ne glissent pas (frottement fort). Les bras, sans muscles et
     # sans frottement aux articulations, oscillent encore comme des pendules et font tanguer le
@@ -71,7 +73,15 @@ def test_limp_creature_falls_and_lies_on_ground():
     assert bench.max_body < 0.01
     # La queue, droite et légère, touche le sol la première à ~7 m/s : pic de compression
     # passager (~5 % pendant ~30 ms avec SUBSTEPS = 8, moitié moins avec 16), puis < 1 %.
-    assert bench.max_tail < 0.08
+    tail_limit = 0.08
+    if config.JOINT_LIMITS and config.BODY_LIMITS:
+        # Effet accepté par Tom en C2, moteur inchangé : après la chute, la queue est à la fois en butée de cône et
+        # posée au sol, et la projection (ordre validé : liens, butées, sol) l'étire en la ramenant dans le cône puis
+        # sur le sol. Mesuré sur ce banc : B2 (sans cône) 7.05 % au plus (impact), > 1 % pendant 25 ms, > 5 % pendant
+        # 10 ms ; C2 à 6° 9.37 %, > 1 % pendant 1 310 ms, > 5 % pendant 662 ms ; C2 à 30° 7.85 %, 90 ms, 58 ms.
+        # Seuil propre à ce cas : 10 %. Entre 6° et 30°, seul juge le critère de repli, mesuré sur les grimpeuses.
+        tail_limit = 0.10
+    assert bench.max_tail < tail_limit
     err = np.abs(c.world.link_lengths() - c.world.rest) / c.world.rest
     assert err.max() < 0.01
 
@@ -264,7 +274,15 @@ def test_no_mechanism_but_muscles_creates_energy(name):
     fall_energy = c.world.mass.sum() * config.G * config.START_HEIGHT
     # Énergie apparue dans un sous-pas au-delà de l'apport des muscles. Seul reste : la
     # projection qui décomprime la queue à l'impact de la créature inerte (≈ 0.14 J sur 1 900 J).
-    assert ledger["hors_muscles+"] < 1e-4 * fall_energy
+    limit = 1e-4 * fall_energy   # 0.23 J
+    if name == "inerte" and config.JOINT_LIMITS and config.BODY_LIMITS:
+        # Effet accepté par Tom en C2, moteur inchangé : après la chute, la queue est à la fois en butée de cône et
+        # posée au sol ; la projection (ordre validé : liens, butées, sol) la ramène dans le cône puis la remonte au
+        # sol, et chaque passe y gagne un peu d'énergie potentielle (famille du cas « posture sur-contrainte » de B2).
+        # Mesuré : 4.39 J (≈ 2 cm) à 6°, 0.30 J à 30°, à 84 % entre 2 et 4 s. Seuil propre à ce cas : 6 J (≈ 2.7 cm),
+        # bien sous le seuil d'audit (5 cm) qui masquerait une régression ; inchangé pour tous les autres cas.
+        limit = 6.0
+    assert ledger["hors_muscles+"] < limit
     assert ledger["hold+"] == 0.0 and ledger["hold2+"] == 0.0  # prendre / lâcher ne crée rien
     assert ledger["liens_contacts+"] < 1e-9                    # liens + contacts sol : dissipatifs
     # tout ce qui est gagné (hauteur, vitesse) a été payé par les muscles

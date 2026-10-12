@@ -157,3 +157,15 @@ ne s'était pas montrée au premier passage, parce que le test s'arrêtait à l'
 - ou autre chose.
 
 **Prochaine étape** : selon la décision, puis commit 2, `pytest` sur le runner et la suite de C2.
+
+## Étape 2 ter : commit 2
+
+**Décision de Tom** :
+- erreur de longueur de la queue du cas inerte avec `BODY_LIMITS` : seuil propre de 10 % ;
+- le critère de repli reste le seul juge entre 6° et 30° ;
+- si un troisième test ou une troisième mesure tombe pour ce même mécanisme, repli direct à 30° ;
+- si une créature tombée d'une vraie population dépasse les seuils d'audit (énergie 5 cm, queue 5 %), arrêt.
+
+**pytest local** : 145 passent ; les 3 échecs sont les rejeux Windows connus ; 211 s.
+
+**Prochaine étape** : `mode=pytest` sur le runner, puis commit 3 (mesures `--tail`, `morpho`, `planche`).

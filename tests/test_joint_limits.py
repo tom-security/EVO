@@ -106,7 +106,7 @@ def test_batch_matches_scalar_bit_for_bit_with_limits_engaged():
         c = cr.Creature(g)
         for _ in range(int(round(10.0 / H))):
             c.substep(H)
-            engaged += c.world.limit_active
+            engaged += c.world.limit_active[:8]   # les 8 butées articulaires (C2 en ajoute 14 à la suite)
         scalar.append(c)
     assert np.all(engaged > 100)          # chacune des 8 butées est entrée dans le solveur, souvent
     res = batch.evaluate(genomes)
@@ -238,15 +238,19 @@ def run_config_restored():
 
 @pytest.mark.parametrize("seed", [0, 1, 2])
 def test_local_runs_replay_with_their_own_flag(seed, run_config_restored):
-    """Runs locaux (hors git, test ignoré s'ils manquent) : runs/<graine>, le défaut, entraîné avec butées ;
-    runs/legacy_no_limits/<graine>, d'avant B2, sans butées. Chacun se rejoue au bit près avec sa propre config."""
+    """Runs locaux (hors git, test ignoré s'ils manquent), chacun rejoué au bit près avec sa propre config :
+    runs/butees_corps/<graine> (C2, butées articulaires et du corps) ; runs/<graine>, le défaut, entraîné avec les
+    butées articulaires (B2) ; runs/legacy_no_limits/<graine>, d'avant B2, sans butées."""
     from evo import replay as rp
 
-    cases = [(ev.run_dir_for(seed), True), (os.path.join(config.RUNS_DIR, "legacy_no_limits", str(seed)), False)]
-    present = [(d, flag) for d, flag in cases if os.path.exists(os.path.join(d, "config.json"))]
+    cases = [(os.path.join(config.RUNS_DIR, "butees_corps", str(seed)), True, True),
+             (ev.run_dir_for(seed), True, False),
+             (os.path.join(config.RUNS_DIR, "legacy_no_limits", str(seed)), False, False)]
+    present = [case for case in cases if os.path.exists(os.path.join(case[0], "config.json"))]
     if not present:
         pytest.skip("pas de runs locaux")
-    for run_dir, flag in present:
+    for run_dir, joint_flag, body_flag in present:
         r = rp.Replay(run_dir, rank=1, log=None)
         assert r.ok, run_dir                              # hauteur rejouée = hauteur stockée
-        assert config.JOINT_LIMITS is flag, run_dir       # butées selon le run, pas selon config.py
+        assert config.JOINT_LIMITS is joint_flag, run_dir  # butées selon le run, pas selon config.py
+        assert config.BODY_LIMITS is body_flag, run_dir
