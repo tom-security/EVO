@@ -45,7 +45,8 @@ def test_chatter_is_found_on_a_tail_flickering_against_the_cone():
 def test_a_5_hz_swing_is_not_chatter():
     tau = config.TAIL_CONE_DEG
     t = np.arange(T) * H
-    delta = (tau * np.sin(2 * np.pi * 5.0 * t))[:, None]         # balancement physique qui touche les bords
+    # balancement physique à 5 Hz arrêté par le bord du cône (butée inélastique : la queue y reste, puis repart)
+    delta = np.clip(1.3 * tau * np.sin(2 * np.pi * 5.0 * t), -tau, tau)[:, None]
     share, n_contact, _ = ta.chatter(delta, tau)
     assert n_contact > 0 and share < 0.05
 
@@ -76,16 +77,17 @@ def test_tail_stretched_two_percent_for_a_fifth_of_a_second_triggers_the_length_
 def test_tail_bent_beyond_the_cone_is_measured_as_penetration_and_posture():
     c = cr.Creature(cr.diagonal_gait_genome())
     P = _rest_series(c)
-    a = math.radians(10.0)
+    bent = config.TAIL_CONE_DEG + 4.0                          # 4° au-delà du bord du cône
+    a = math.radians(bent)
     rot = np.array([[math.cos(a), -math.sin(a)], [math.sin(a), math.cos(a)]])
     pelvis = P[0, sk.PELVIS]
-    P[:, sk.TAIL_START:] = pelvis + (P[0, sk.TAIL_START:] - pelvis) @ rot.T   # queue entière à 10° de l'axe
+    P[:, sk.TAIL_START:] = pelvis + (P[0, sk.TAIL_START:] - pelvis) @ rot.T   # queue entière hors du cône
     m = ta.tail_measures(P, c)
-    assert m["penetration_deg"]["queue"] == pytest.approx(10.0 - config.TAIL_CONE_DEG, abs=1e-6)
+    assert m["penetration_deg"]["queue"] == pytest.approx(4.0, abs=1e-6)
     assert m["penetration_deg"]["pieds"] == 0.0 and m["penetration_deg"]["articulations"] < 1e-6
-    assert m["ecart_median"] == pytest.approx(10.0, abs=1e-6) and m["collee"] == 1.0
+    assert m["ecart_median"] == pytest.approx(bent, abs=1e-6) and m["collee"] == 1.0
     assert m["courbure_mediane"] == pytest.approx(0.0, abs=1e-6)
-    np.testing.assert_allclose(np.abs(ta.signed_tail_angles(P[:1])), 10.0, atol=1e-6)
+    np.testing.assert_allclose(np.abs(ta.signed_tail_angles(P[:1])), bent, atol=1e-6)
 
 
 def test_joints_tail_on_a_small_run(small_run):

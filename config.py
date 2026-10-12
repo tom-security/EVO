@@ -174,9 +174,15 @@ JOINT_LIMIT_MARGIN_DEG = 2.0
 # [CHOIX] C2 — appliquées si JOINT_LIMITS et BODY_LIMITS. Absent de la config d'un run (runs d'avant C2) : False.
 BODY_LIMITS = True
 FOOT_AXIS_MARGIN_DEG = 0.0  # [CHOIX] C2 — pied jusque sur l'axe, pas au-delà
-# [DÉDUIT] C1 — écart queue/axe mesuré sur les images 11, 12 et 40 : 1.7°, 5.7°, 3.3°, queue droite (résidu < 1 px).
-# Repli prévu à 30 [CHOIX] si le critère ci-dessous se déclenche après réentraînement.
-TAIL_CONE_DEG = 6.0
+# [CHOIX] C2 — repli à 30° (consigne de Tom : repli direct si une troisième mesure échoue à cause du mécanisme « queue
+# en butée de cône et posée au sol »). Point de départ : 6° [DÉDUIT] C1, écart queue/axe mesuré sur les images 11, 12
+# et 40 (1.7°, 5.7°, 3.3°). Mesuré avec 6° (runs/butees_corps, run 38266975229) : le critère de repli sur les
+# grimpeuses disait « garder 6° » (0 % de grimpes étirées, oscillation ≤ 0.4 %), mais
+# - créature inerte : énergie créée 4.39 J (B2 0.13 J), queue étirée > 5 % pendant 662 ms (B2 10 ms) ;
+# - créatures tombées des vraies populations, gén. 0 : 77 à 82 par graine avec un os de queue au-delà de 5 % (B2 :
+#   1 à 6), jusqu'à 26 % ; 100 % de ces sous-pas avec la queue en butée de cône ET au sol.
+# Avec 30°, créature inerte : 0.30 J, queue > 5 % pendant 58 ms. Les runs à 6° sont gardés pour le rapport.
+TAIL_CONE_DEG = 30.0
 # [CHOIX] C2 — critère de repli du cône de queue (commande `joints --tail`, sur les 50 meilleures de la gén. 200) :
 # - longueur : « systématique » si, pour au moins une graine, plus de TAIL_FALLBACK_SHARE des grimpes ont un os de
 #   queue au-delà de TAIL_LENGTH_LIMIT d'erreur pendant plus de TAIL_FALLBACK_TIME de leur durée ;

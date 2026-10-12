@@ -112,11 +112,23 @@ def test_tail_thrown_against_the_cone_stops_without_bounce_or_energy_gain(speed)
     c = _free_creature()
     w = c.world
     w.vel[sk.TAIL_START:] = (speed, 0.0)
-    energies, margins = _run(w, 1.0, TAIL)
-    assert margins.min() >= -TOL                               # aucun point de queue hors du cône de plus de 0.5°
-    hit = int(np.argmax(margins < math.radians(0.01)))
-    assert margins[hit] < math.radians(0.01)                   # la queue arrive sur le bord du cône
-    assert margins[hit:hit + 24].max() < math.radians(0.5)     # et y reste (pas de rebond dans les 0.05 s)
+    energies, C = [w.kinetic_energy()], [w.limit_violation()[TAIL]]   # marge de chaque butée de queue
+    for _ in range(int(round(1.0 / H))):
+        physics.substep(w, H)
+        energies.append(w.kinetic_energy())
+        C.append(w.limit_violation()[TAIL])
+    C = np.array(C)
+    assert C.min() >= -TOL                                     # aucun point de queue hors du cône de plus de 0.5°
+    # première butée de queue à toucher le bord, suivie seule (le minimum sur la chaîne saute d'un point à l'autre) ;
+    # un contact arrive pile sur la borne (terme spéculatif : C ≈ 1e-12), un point qui l'effleure seulement non
+    hit, q = np.unravel_index(np.argmax(C < 1e-8), C.shape)
+    assert C[hit, q] < 1e-8 and hit >= 1                       # la queue arrive sur le bord du cône
+    approach = C[max(hit - 2, 0), q] - C[hit - 1, q]           # vitesse d'approche juste avant (rad par sous-pas)
+    assert approach > 0
+    # pas de rebond : le point ne repart pas du bord (départ < 5 % de l'approche), ou n'en sort pas de plus de 0.5°
+    # pendant 0.05 s ; un rebond ferait les deux. Cône étroit : la chaîne lancée vite écarte un peu le point de la
+    # borne en le gardant contre elle ; cône large : elle s'en éloigne ensuite en douceur.
+    assert C[hit + 1, q] - C[hit, q] < 0.05 * approach or C[hit:hit + 24, q].max() < math.radians(0.5)
     assert np.all(np.diff(energies) <= 1e-9)
     tail = np.array([name == "tail" for name in c.skel.link_names])
     err = np.abs(w.link_lengths() - w.rest) / w.rest
@@ -126,7 +138,8 @@ def test_tail_thrown_against_the_cone_stops_without_bounce_or_energy_gain(speed)
 def test_start_beyond_the_body_limits_recovers_by_the_short_side():
     c = cr.Creature(cr.diagonal_gait_genome())
     P = c.world.pos
-    _rotate(P, list(range(sk.TAIL_START, len(P))), P[sk.PELVIS].copy(), 40.0)     # queue pliée à 40°
+    bent = config.TAIL_CONE_DEG + 34.0                         # queue pliée 34° au-delà du cône (40° pour 6°)
+    _rotate(P, list(range(sk.TAIL_START, len(P))), P[sk.PELVIS].copy(), bent)
     _cross_left_foot(P)                                                            # pied de l'autre côté
     assert c.world.limit_violation()[TAIL].min() < -math.radians(30.0)
     assert c.world.limit_violation()[8] < 0
@@ -140,7 +153,7 @@ def test_start_beyond_the_body_limits_recovers_by_the_short_side():
         if k >= 60:                                                                # 1/8 s plus tard : revenu
             assert c.world.limit_violation()[8:].min() >= -TOL
     swing = np.degrees(np.unwrap(swing))
-    assert np.abs(swing).max() < 45.0                          # revenue par le côté court (40° → 6°), sans tour
+    assert np.abs(swing).max() < bent + 5.0                    # revenue par le côté court, sans tour
     assert np.hypot(*c.world.vel[c.body_points].T).max() < config.AUDIT_MAX_SPEED
 
 

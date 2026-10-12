@@ -275,3 +275,57 @@ de référence du critère.
 - la règle d'arrêt (5 cm) s'applique-t-elle aussi aux créatures tombées des runs B2 de référence, ou seulement à C2 ?
 - faut-il diagnostiquer ce mécanisme du moteur validé (rejeu étape par étape des pires cas, n°868 et n°760) avant de
   continuer ?
+
+## Étape 6 : run C2 à 6°, mesures, repli à 30°
+
+**Décisions de Tom** :
+- règle relative pour l'énergie des créatures tombées : arrêt seulement si C2 fait plus du double de B2 (en nombre
+  au-delà de 5 cm, ou en maximum) ;
+- diagnostic en lecture seule des créatures 868 et 760, après le rapport C2 et avant le nettoyage.
+
+**Run complet à 6°** (38266975229) :
+- durée : 53,5 / 20,6 / 55,8 min ; SHA-256 OK ; runs extraits dans `runs/butees_corps/S` ;
+- champions à la gén. 200 : **+38,89 / +33,85 / +48,50 m** (B2 : 34,24 / 33,45 / 35,32), moyennes +29,3 / +25,9 /
+  +40,1 m ;
+- audits : 0 J créé hors muscles, aucune alerte ; os ≤ 0,24 %, queue ≤ 0,63 %.
+
+**`pytest` avec les runs à 6°** (38274214543) : 156 passent. Les runs C2 se rejouent au bit près.
+
+**`--tail --crossings`, 50 meilleures** (38274228073) :
+
+| Graine | Critère de repli | Pied de l'autre côté | Jambe/queue (C1) | Os de queue, max | Oscillation |
+|---|---|---|---|---|---|
+| 0 | garder 6° | 0 % (C1 : 0 %) | 0,0 % (14,0 %) | 0,16 % | ≤ 0,3 % |
+| 1 | garder 6° | 0,0 % (C1 : 84 %) | 0,2 % (72,0 %) | 0,68 % | ≤ 0,4 % |
+| 2 | garder 6° | 0 % (C1 : 38 %) | 0,0 % (50,1 %) | 0,18 % | ≤ 0,2 % |
+
+- Pénétration ≤ 0,001° pour les meilleures.
+- Au hasard, graine 2, n°541 (tombée, rang 995) : queue jusqu'à 161° au-delà du cône, brièvement (au 95e percentile,
+  l'écart reste à 6°).
+
+**Créatures tombées, C2 (6°) contre B2** (38274241300 / 38274255041 / 38274268492) :
+
+| Graine, gén. | Tombées B2 / C2 | > 5 cm B2 / C2 | Max B2 / C2 (cm) | Queue > 5 % B2 / C2 | Queue max B2 / C2 |
+|---|---|---|---|---|---|
+| 0, 0 | 392 / 360 | 5 / 3 | 85,1 / 65,8 | 6 / **82** | 12,2 / 26,1 % |
+| 0, 200 | 61 / 120 | 0 / 0 | 3,8 / 2,3 | 0 / 8 | 3,0 / 17,1 % |
+| 1, 0 | 408 / 384 | 3 / 6 | 61,3 / 64,1 | 1 / **81** | 6,3 / 24,2 % |
+| 1, 200 | 121 / 75 | 7 / 0 | 424,5 / 3,9 | 9 / 3 | 9,8 / 9,5 % |
+| 2, 0 | 383 / 353 | 6 / 5 | 645,3 / 46,3 | 6 / **77** | 11,4 / 24,7 % |
+| 2, 200 | 51 / 83 | 0 / 0 | 0,0 / 0,0 | 0 / 5 | 2,7 / 22,4 % |
+
+- **Énergie** : la règle relative ne se déclenche pas (au plus 6 contre 3, soit le double et non plus du double).
+- **Queue** : nettement pire. Les 12 pires créatures de la gén. 0 (graine 0) ont été rejouées sous Windows (maxima
+  identiques à ceux du runner) : **100 % des 4 318 sous-pas au-delà de 5 % ont la queue en butée de cône ET au
+  sol.**
+- C'est la troisième mesure qui tombe pour ce mécanisme, d'où le **repli direct à 30°** (règle de Tom).
+
+**Repli** :
+- `TAIL_CONE_DEG = 30.0` [CHOIX], avec la raison mesurée en commentaire ;
+- tests rendus indépendants de l'angle, verts à 6° et à 30° ;
+- pytest local : 153 passent ; les 3 échecs sont les rejeux Windows connus.
+
+**Prochaine étape** :
+- `pytest` sur le runner ;
+- run `butees_corps_30` (200 générations) ;
+- puis les mêmes mesures. S'il se déclenche aussi à 30° : arrêt.
