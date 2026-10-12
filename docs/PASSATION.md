@@ -52,10 +52,11 @@ Les autres documents du dépôt restent la référence pour le détail :
   - graine 2 par défaut pour les écrans ;
   - **hors git** dans les branches de code, mais sauvegardés en archives sur la branche `sauvegarde-runs` (voir
     §3.3).
-- **Branches :**
-  - `claude/modest-ritchie-mkwjnd` : phases 1 à 6 et chantiers A et B ;
-  - `claude/chantier-c-collisions` : la même chose + le chantier C1 + ce document ;
-  - `main` : seulement le commit initial (spec et images).
+- **Branches (après le ménage du 12 octobre 2026) :**
+  - `main` : tout le code, phases 1 à 6, chantiers A, B et C1, ce document ;
+  - `sauvegarde-runs` : archives des runs par défaut (§3.3).
+  Les anciennes branches `claude/modest-ritchie-mkwjnd`, `claude/chantier-b-limites-articulaires` et
+  `claude/chantier-c-collisions` étaient toutes contenues dans `main` ; elles ont été supprimées.
 - **Prochaine étape :** C2, des butées « du corps » (pied de son côté de l'axe, queue dans un cône de ±6°) avec un
   critère de repli objectif vers ±30°. Le plan validé est au §12.
 - **Tests :** 133 passent (`pytest -q tests/`) ; les tests vidéo demandent ffmpeg (voir §3).
@@ -179,9 +180,10 @@ remplacée en phase 1 par la règle de nommage des images.
 - Aucun identifiant de modèle dans le code, les commits ou les docs.
 - Push avec `git push -u origin <branche>`.
 - **Pas de pull request** sauf demande explicite.
-- Branche de travail de la session : `claude/modest-ritchie-mkwjnd`. L'utilisateur a demandé une **nouvelle branche
-  par chantier** pour B (`claude/chantier-b-limites-articulaires`) et pour C (`claude/chantier-c-collisions`) ; une
-  fois validé, le chantier est ramené par avance rapide sur `claude/modest-ritchie-mkwjnd`, sur sa demande.
+- Branche de référence : `main`. L'utilisateur demande une **nouvelle branche par chantier** (ce fut le cas pour B
+  et C) ; une fois validé, le chantier est ramené par avance rapide sur `main`, sur sa demande. Jusqu'au
+  12 octobre 2026, la branche de référence s'appelait `claude/modest-ritchie-mkwjnd` : les rapports plus anciens
+  la citent encore.
 - Un « stop hook » de l'environnement refuse la fin d'un tour s'il reste des modifications non commitées : commiter
   et pousser avant de rendre la main.
 
@@ -260,13 +262,13 @@ d'≈ 25 Mo par graine et un README (SHA-256, restauration).
 
 | Branche | Dernier commit | Contenu |
 |---|---|---|
-| `main` | 90d519e | commit initial : spec, images, `CLAUDE.md` |
-| `claude/modest-ritchie-mkwjnd` | 2a9b55d | phases 1 à 6, chantiers A et B, réorganisation des runs |
-| `claude/chantier-b-limites-articulaires` | 86f7a7f | chantier B (déjà fusionné, un commit derrière) |
-| `claude/chantier-c-collisions` | après b29a010 | modest-ritchie + C1 (outil `joints --crossings`, diagnostic) + ce document |
+| `main` | ce commit | tout : phases 1 à 6, chantiers A, B et C1, ce document |
 | `sauvegarde-runs` | 8ff6ab2 | pas de code : archives des runs par défaut 0, 1 et 2 (§3.3) |
 
-Le chantier C n'est pas encore ramené sur `claude/modest-ritchie-mkwjnd` : l'utilisateur le décidera après C2.
+Ménage du 12 octobre 2026, validé par l'utilisateur : `main` (qui ne contenait que le commit initial) a été avancée
+jusqu'au dernier commit de `claude/chantier-c-collisions`, puis `claude/modest-ritchie-mkwjnd`,
+`claude/chantier-b-limites-articulaires` et `claude/chantier-c-collisions` ont été supprimées : chacune était
+entièrement contenue dans `main`, rien n'a été perdu.
 
 ---
 
@@ -1070,7 +1072,7 @@ créée ; l'alerte d'audit reste active.
 > repasse à 30° [CHOIX] comme prévu dans ton repli. Vérifie aussi visuellement, une fois les écrans refaits, que la
 > queue n'a pas l'air raide plutôt que naturellement tenue. Lance C2.
 
-### 12.2 Plan validé (rien n'est codé ; travail sur `claude/chantier-c-collisions`)
+### 12.2 Plan validé (rien n'est codé ; à faire sur une nouvelle branche de chantier partie de `main`)
 
 **Moteur : même primitive que B2, sur d'autres triplets**
 - **`physics.py` :**
@@ -1173,7 +1175,7 @@ meilleures et 50 créatures au hasard de la génération 200 :
 
 ### 12.3 Après C2 (à décider par l'utilisateur)
 
-- Ramener le chantier C sur `claude/modest-ritchie-mkwjnd`, et faire des runs C2 les runs par défaut, comme après B.
+- Ramener la branche de C2 sur `main`, et faire des runs C2 les runs par défaut, comme après B.
 - Le résidu jambe–queue de la graine 2 : collision ciblée ou non.
 - Les écarts de calibration (§11) : génération 0 trop bonne, chute de période trop précoce, créatures au sol,
   morphologie trapue.
