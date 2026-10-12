@@ -111,6 +111,19 @@ def test_fallen_audit_on_a_small_run(small_run):
     assert ta.fallen_lines(result)[0].startswith("créatures tombées")
 
 
+def test_trace_replays_a_creature_step_by_step(small_run, tmp_path):
+    from evo import trace
+
+    _, res, _, _ = ev.load_generation(small_run, 0)
+    i = int(np.flatnonzero(res["fallen"])[0])
+    r = trace.trace(small_run, 0, i, log=None, out_dir=str(tmp_path))
+    assert r["identique"] and r["tombee_a"] is not None
+    assert len(r["rows"]) == T - 1 and os.path.getsize(r["csv"]) > 0
+    assert sum(x["cree_J"] for x in r["rows"]) == pytest.approx(r["cree_J"])
+    lines = trace.summary_lines(r)
+    assert lines[0].startswith("trace") and "identique" in lines[0]
+
+
 def test_morphology_factors_stay_within_the_genome_bounds(small_run, tmp_path):
     table = morphology.factors(small_run, gens=(0, 1, 5))
     assert sorted(table) == [0, 1]                              # générations absentes ignorées

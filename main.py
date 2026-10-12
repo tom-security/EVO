@@ -31,6 +31,7 @@
     python main.py joints --seed 2 --gen 0 --fallen --run-dir runs/butees_corps/2   # créatures tombées (C2)
     python main.py morpho --seed 2 --run-dir runs/butees_corps/2 --compare runs/2   # longueurs d'os par génération
     python main.py planche A.png B.png --labels "B2" "C2" --out planche.png   # images côte à côte
+    python main.py trace --seed 2 --gen 0 --creature 868 --export out/diag   # rejeu pas à pas audité (diagnostic)
 """
 import argparse
 
@@ -82,6 +83,13 @@ def main(argv=None):
     morpho.add_argument("--gens", type=int, nargs="+", default=None,
                         help="générations (défaut : 0 10 25 50 100 150 200)")
     morpho.add_argument("--out", default=None, help="dossier de sortie (défaut : <run>/graphes)")
+
+    tr = sub.add_parser("trace", help="rejeu pas à pas d'une créature avec l'audit d'énergie à chaque sous-pas (diagnostic)")
+    tr.add_argument("--seed", type=int, default=2)
+    tr.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    tr.add_argument("--gen", type=int, required=True)
+    tr.add_argument("--creature", type=int, required=True, help="indice de la créature dans la génération (npz)")
+    tr.add_argument("--export", metavar="DIR", default=None, help="écrit le CSV par sous-pas dans DIR")
 
     planche = sub.add_parser("planche", help="assemble des images côte à côte, légendées (chantier C2)")
     planche.add_argument("images", nargs="+")
@@ -332,6 +340,14 @@ def main(argv=None):
         gens = tuple(args.gens) if args.gens else morphology.GENERATIONS
         for path in morphology.export(run_dir, compare=args.compare, out_dir=args.out, gens=gens):
             print(path)
+    elif args.command == "trace":
+        import sys
+        from evo import evolution, trace
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        result = trace.trace(run_dir, args.gen, args.creature, out_dir=args.export)
+        if not result["identique"]:
+            print("ALERTE : la hauteur rejouée diffère de la hauteur stockée")
+            sys.exit(1)
     elif args.command == "planche":
         from evo import planches
         print(planches.export(args.images, args.out, labels=args.labels, height=args.height, crop=args.crop))
