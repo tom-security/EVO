@@ -359,8 +359,9 @@ def energy_at_limits(genome):
     return out
 
 
-def audit_creature(genome, stored_height=None, crossings=False):
-    """(ligne de mesures, angles (T, 8), mesures brutes des croisements ou None) d'une grimpe complète."""
+def audit_creature(genome, stored_height=None, crossings=False, tail=False):
+    """(ligne de mesures, angles (T, 8), mesures brutes des croisements ou None) d'une grimpe complète ;
+    tail : mesures de la queue et des butées du corps (evo/tail_audit.py, chantier C2)."""
     P, c, held = record(genome, holds=True)
     A = anatomical_angles(P)
     mid = midline_distances(P)
@@ -376,13 +377,17 @@ def audit_creature(genome, stored_height=None, crossings=False):
     raw = None
     if crossings:
         row["croisements_detail"], raw = crossing_measures(P, held, genome.lengths)
+    if tail:
+        from evo import tail_audit
+        row["queue"] = tail_audit.tail_measures(P, c)
     return row, A, raw
 
 
-def audit(run_dir, gen=None, top=1, sample=0, energy=False, crossings=False, log=print):
+def audit(run_dir, gen=None, top=1, sample=0, energy=False, crossings=False, tail=False, log=print):
     """Rejoue les `top` meilleures créatures d'une génération (et `sample` tirées au hasard) et mesure leurs angles ;
     energy : audit d'énergie de chacune en plus (sauts au moment où une butée s'engage) ; crossings : croisements
-    entre membres (côté de l'axe, paires de segments, cône de queue)."""
+    entre membres (côté de l'axe, paires de segments, cône de queue) ; tail : queue et butées du corps, avec le
+    verdict du critère de repli de C2 sur les meilleures."""
     use_run_config(run_dir)
     gens = ev.saved_generations(run_dir)
     if not gens:
@@ -401,7 +406,7 @@ def audit(run_dir, gen=None, top=1, sample=0, energy=False, crossings=False, log
     for group, indices in picks.items():
         angles, raws = [], []
         for i in indices:
-            row, A, raw = audit_creature(pop.genome(i), float(res["height"][i]), crossings=crossings)
+            row, A, raw = audit_creature(pop.genome(i), float(res["height"][i]), crossings=crossings, tail=tail)
             raws.append(raw)
             row.update(groupe=group, indice=i, rang=int(rank_of[i]))
             if energy:
@@ -412,10 +417,14 @@ def audit(run_dir, gen=None, top=1, sample=0, energy=False, crossings=False, log
                          "au_sol": float(np.mean([r["au_sol"] for r in rows if r["groupe"] == group]))}
         if crossings:
             groups[group]["croisements"] = crossing_group(raws)
+        if tail:
+            from evo import tail_audit
+            groups[group]["queue"] = tail_audit.tail_group([r for r in rows if r["groupe"] == group])
     result = {
         "run": run_dir, "graine": os.path.basename(os.path.normpath(run_dir)), "gen": gen,
         "butees_deg": {k: list(v) for k, v in config.JOINT_LIMITS_DEG.items()},
         "butees_moteur": bool(config.JOINT_LIMITS),
+        "butees_corps": bool(config.JOINT_LIMITS and config.BODY_LIMITS),
         "repos_deg": rest_angles(), "plage_cibles_deg": target_range(),
         "creatures": rows, "groupes": groups, "cibles_hors_butees": targets_out_of_bounds(pop),
         "cibles_sur_butee": targets_out_of_bounds(pop, on_bound=True),
@@ -431,6 +440,8 @@ def report_lines(result):
     """Tableau lisible : une ligne par créature, puis les groupes et les cibles du génome."""
     lims = ", ".join(f"{k} [{lo:+.0f}, {hi:+.0f}]" for k, (lo, hi) in result["butees_deg"].items())
     engine = "appliquées par le moteur" if result["butees_moteur"] else "non appliquées par le moteur (run d'avant B2)"
+    if result.get("butees_corps"):
+        engine += f", avec les butées du corps (cône de queue ±{config.TAIL_CONE_DEG:g}°)"
     lines = [f"angles articulaires — graine {result['graine']}, gén. {result['gen']} ; butées (°) : {lims}, {engine}",
              "  min..max (°), part du temps hors butées ; côtés gauche et droit réunis"]
     for r in result["creatures"]:
@@ -453,6 +464,9 @@ def report_lines(result):
         lines.append(f"  groupe {name} ({g['n']} créatures, au sol {g['au_sol']:.0%}) : {cells}")
         if "croisements" in g:
             lines += crossing_lines(g["croisements"])
+        if "queue" in g:
+            from evo import tail_audit
+            lines += tail_audit.tail_lines(g["queue"], verdict=(name == "meilleures"))
     lines.append("  cibles du génome hors butées (toute la population) : "
                  + ", ".join(f"{k} {v:.0%}" for k, v in result["cibles_hors_butees"].items())
                  + " ; posées sur une butée : "

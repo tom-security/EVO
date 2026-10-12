@@ -169,3 +169,30 @@ ne s'était pas montrée au premier passage, parce que le test s'arrêtait à l'
 **pytest local** : 145 passent ; les 3 échecs sont les rejeux Windows connus ; 211 s.
 
 **Prochaine étape** : `mode=pytest` sur le runner, puis commit 3 (mesures `--tail`, `morpho`, `planche`).
+
+**Runner** : `mode=pytest`, 148 passent (run 38264932068). Commit 2 validé ; les runs B2 se rejouent au bit près
+sans les butées du corps.
+
+## Étape 3 : commit 3 (outils de mesure)
+
+**Fait** :
+- `joints --tail` et `joints --fallen` (`evo/tail_audit.py`) ;
+- `morpho` (`evo/morphology.py`) ;
+- `planche` (`evo/planches.py`) ;
+- `graphs --labels` ;
+- le workflow de la branche accepte deux runs sources pour `pytest` et `analyse` ;
+- 8 tests dans `tests/test_tail_audit.py`.
+
+**Chiffres** :
+- pytest local : 153 passent ; les 3 échecs sont les rejeux Windows connus.
+- Benchmark `--pop 1000` sur le PC, en alternance :
+
+  | Code | Mesures | Médiane |
+  |---|---|---|
+  | `main` (B2) | 13,75 / 12,01 / 11,71 s | 12,0 s |
+  | branche (C2) | 25,99 / 25,68 / 27,80 s | 26,0 s |
+
+  Soit **×2,2** avec les 14 butées du corps. L'estimation du plan était de +40 à +60 % : la queue est presque
+  toujours en contact.
+
+**Prochaine étape** : `pytest` sur le runner, puis l'essai de 5 générations (lancé en parallèle).

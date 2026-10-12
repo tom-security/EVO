@@ -1,0 +1,135 @@
+"""Outils de mesure du chantier C2 (evo/tail_audit.py, evo/morphology.py, evo/planches.py), sur des signaux construits
+et sur un petit run."""
+import math
+import os
+
+import numpy as np
+import pytest
+
+import config
+from evo import creature as cr
+from evo import evolution as ev
+from evo import morphology
+from evo import planches
+from evo import skeleton as sk
+from evo import tail_audit as ta
+
+H = config.DT / config.SUBSTEPS
+T = int(round(config.SIM_DURATION / H)) + 1
+
+
+@pytest.fixture(autouse=True)
+def limits_on(monkeypatch):
+    monkeypatch.setattr(config, "JOINT_LIMITS", True)
+    monkeypatch.setattr(config, "BODY_LIMITS", True)
+
+
+@pytest.fixture(scope="module")
+def small_run(tmp_path_factory):
+    saved = (config.JOINT_LIMITS, config.BODY_LIMITS)
+    config.JOINT_LIMITS = config.BODY_LIMITS = True
+    run = str(tmp_path_factory.mktemp("run") / "0")
+    ev.train(0, generations=1, pop_size=24, run_dir=run, audit_every=0, log=lambda *_: None)
+    config.JOINT_LIMITS, config.BODY_LIMITS = saved
+    return run
+
+
+def test_chatter_is_found_on_a_tail_flickering_against_the_cone():
+    tau = config.TAIL_CONE_DEG
+    n = np.arange(T)
+    delta = (tau - 0.05 * (n % 2))[:, None]                    # contre la borne, change de sens à chaque sous-pas
+    share, n_contact, amp = ta.chatter(delta, tau)
+    assert n_contact == T - 2 and share > 0.99 and amp == pytest.approx(0.05)
+
+
+def test_a_5_hz_swing_is_not_chatter():
+    tau = config.TAIL_CONE_DEG
+    t = np.arange(T) * H
+    delta = (tau * np.sin(2 * np.pi * 5.0 * t))[:, None]         # balancement physique qui touche les bords
+    share, n_contact, _ = ta.chatter(delta, tau)
+    assert n_contact > 0 and share < 0.05
+
+
+def _rest_series(c):
+    return np.repeat(c.world.pos[None], T, axis=0)
+
+
+def test_tail_stretched_two_percent_for_a_fifth_of_a_second_triggers_the_length_criterion():
+    c = cr.Creature(cr.diagonal_gait_genome())
+    P = _rest_series(c)
+    last = len(c.world.pos) - 1
+    bone = P[0, last] - P[0, last - 1]
+    stretched = slice(1000, 1000 + int(round(0.2 / H)))
+    P[stretched, last] += 0.02 * bone                           # dernier os de la queue +2 % pendant 0.2 s
+    m = ta.tail_measures(P, c)
+    assert m["longueur_max"] == pytest.approx(0.02, rel=1e-6)
+    assert m["temps_plus_1"] == pytest.approx(0.2, abs=H) and m["temps_plus_5"] == 0.0
+    assert m["os_le_plus_touche"] == config.TAIL_SEGMENTS - 1
+    assert m["os_corps_max"] < 1e-12 and m["penetration_deg"]["queue"] == 0.0
+    g = ta.tail_group([{"queue": m}])
+    assert g["repli_longueur"] and not g["repli_oscillation"]
+    assert ta.verdict_line(g).endswith("repli à 30°")
+    calm = ta.tail_group([{"queue": ta.tail_measures(_rest_series(c), c)}])
+    assert ta.verdict_line(calm).endswith(f"garder {config.TAIL_CONE_DEG:g}°")
+
+
+def test_tail_bent_beyond_the_cone_is_measured_as_penetration_and_posture():
+    c = cr.Creature(cr.diagonal_gait_genome())
+    P = _rest_series(c)
+    a = math.radians(10.0)
+    rot = np.array([[math.cos(a), -math.sin(a)], [math.sin(a), math.cos(a)]])
+    pelvis = P[0, sk.PELVIS]
+    P[:, sk.TAIL_START:] = pelvis + (P[0, sk.TAIL_START:] - pelvis) @ rot.T   # queue entière à 10° de l'axe
+    m = ta.tail_measures(P, c)
+    assert m["penetration_deg"]["queue"] == pytest.approx(10.0 - config.TAIL_CONE_DEG, abs=1e-6)
+    assert m["penetration_deg"]["pieds"] == 0.0 and m["penetration_deg"]["articulations"] < 1e-6
+    assert m["ecart_median"] == pytest.approx(10.0, abs=1e-6) and m["collee"] == 1.0
+    assert m["courbure_mediane"] == pytest.approx(0.0, abs=1e-6)
+    np.testing.assert_allclose(np.abs(ta.signed_tail_angles(P[:1])), 10.0, atol=1e-6)
+
+
+def test_joints_tail_on_a_small_run(small_run):
+    from evo import joint_audit as ja
+
+    result = ja.audit(small_run, gen=1, top=2, sample=2, tail=True, log=None)
+    assert result["identique"] and result["butees_corps"]
+    g = result["groupes"]["meilleures"]["queue"]
+    assert g["n"] == 2 and g["penetration_deg"]["queue"] <= 0.5
+    lines = ja.report_lines(result)
+    assert any("critère de repli" in line for line in lines)
+
+
+def test_fallen_audit_on_a_small_run(small_run):
+    result = ta.fallen_audit(small_run, 0, log=None)
+    _, res, _, _ = ev.load_generation(small_run, 0)
+    assert result["n_tombees"] == int(res["fallen"].sum()) > 0
+    assert result["identique"]
+    for row in result["creatures"]:
+        assert row["cree_J"] >= 0.0 and row["queue_max"] >= 0.0
+    assert ta.fallen_lines(result)[0].startswith("créatures tombées")
+
+
+def test_morphology_factors_stay_within_the_genome_bounds(small_run, tmp_path):
+    table = morphology.factors(small_run, gens=(0, 1, 5))
+    assert sorted(table) == [0, 1]                              # générations absentes ignorées
+    lo, hi = config.LENGTH_FACTOR_RANGE
+    for f in table.values():
+        assert f.shape == (7,) and np.all((f >= lo) & (f <= hi))
+    paths = morphology.export(small_run, compare=small_run, out_dir=str(tmp_path), gens=(0, 1), log=None)
+    assert all(os.path.getsize(p) > 0 for p in paths)
+
+
+def test_planche_puts_images_side_by_side(tmp_path):
+    import pygame
+
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    paths = []
+    for k, size in enumerate(((200, 100), (100, 50))):
+        s = pygame.Surface(size)
+        s.fill((40 * (k + 1), 0, 0))
+        paths.append(str(tmp_path / f"{k}.png"))
+        pygame.image.save(s, paths[-1])
+    sheet = planches.assemble(paths, labels=["avant", "après"])
+    assert sheet.get_size() == (100 + 100 + planches.GAP, 50 + planches.CAPTION_H)   # même hauteur (50 px)
+    out = planches.export(paths, str(tmp_path / "planche.png"), crop=(0.0, 0.0, 0.5, 1.0))
+    assert os.path.getsize(out) > 0

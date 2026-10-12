@@ -27,6 +27,10 @@
     python main.py decor --seed 2 --export out/chantierA/decor   # décor au-dessus de 23 m (image 08, 20 → 50 m)
     python main.py joints --seed 2 --gen 200 [--top 50] [--sample 50] [--export DIR]   # angles contre butées (chantier B)
     python main.py joints --seed 2 --gen 200 --top 50 --sample 50 --crossings   # croisements entre membres (chantier C)
+    python main.py joints --seed 2 --gen 200 --top 50 --sample 50 --tail --run-dir runs/butees_corps/2   # queue (C2)
+    python main.py joints --seed 2 --gen 0 --fallen --run-dir runs/butees_corps/2   # créatures tombées (C2)
+    python main.py morpho --seed 2 --run-dir runs/butees_corps/2 --compare runs/2   # longueurs d'os par génération
+    python main.py planche A.png B.png --labels "B2" "C2" --out planche.png   # images côte à côte
 """
 import argparse
 
@@ -68,6 +72,24 @@ def main(argv=None):
     graphs.add_argument("--out", default=None, help="dossier de sortie (défaut : <run>/graphes)")
     graphs.add_argument("--compare", metavar="RUN_DIR", default=None,
                         help="superpose ce run de référence (pointillés) aux courbes du run (chantier B2)")
+    graphs.add_argument("--labels", nargs=2, metavar=("REF", "RUN"), default=("sans butées", "avec butées"),
+                        help="légendes de --compare : run de référence, puis run (défaut : sans / avec butées)")
+
+    morpho = sub.add_parser("morpho", help="facteur moyen de longueur de chaque os au fil des générations (chantier C2)")
+    morpho.add_argument("--seed", type=int, default=2)
+    morpho.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    morpho.add_argument("--compare", metavar="RUN_DIR", default=None, help="second run superposé (pointillés)")
+    morpho.add_argument("--gens", type=int, nargs="+", default=None,
+                        help="générations (défaut : 0 10 25 50 100 150 200)")
+    morpho.add_argument("--out", default=None, help="dossier de sortie (défaut : <run>/graphes)")
+
+    planche = sub.add_parser("planche", help="assemble des images côte à côte, légendées (chantier C2)")
+    planche.add_argument("images", nargs="+")
+    planche.add_argument("--labels", nargs="+", default=None, help="une légende par image (défaut : nom du fichier)")
+    planche.add_argument("--height", type=int, default=None, help="hauteur commune (défaut : la plus petite)")
+    planche.add_argument("--crop", type=float, nargs=4, metavar=("X0", "Y0", "X1", "Y1"), default=None,
+                         help="recadrage de chaque image, en fractions (0 à 1)")
+    planche.add_argument("--out", required=True)
 
     hist = sub.add_parser("histogram", help="histogramme des hauteurs d'une génération (PNG)")
     hist.add_argument("--seed", type=int, default=42)
@@ -145,6 +167,11 @@ def main(argv=None):
                         help="audit d'énergie de chaque créature en plus : sauts au moment où une butée s'engage")
     joints.add_argument("--crossings", action="store_true",
                         help="croisements entre membres : côté de l'axe du corps, paires de segments, cône de queue (chantier C)")
+    joints.add_argument("--tail", action="store_true",
+                        help="queue et butées du corps à chaque sous-pas, verdict du critère de repli (chantier C2)")
+    joints.add_argument("--fallen", action="store_true",
+                        help="toutes les créatures tombées de la génération : énergie créée hors muscles et queue, "
+                             "contre les seuils d'audit (chantier C2)")
 
     args = parser.parse_args(argv)
     if args.command == "debug-physics":
@@ -183,7 +210,7 @@ def main(argv=None):
         gens = [args.gen] if args.command == "histogram" else None
         style = args.style if args.command == "histogram" else "calibration"
         if args.command == "graphs" and args.compare:
-            print(charts.export_comparison(args.compare, run_dir, args.out))
+            print(charts.export_comparison(args.compare, run_dir, args.out, labels=tuple(args.labels)))
         for path in charts.export_run(run_dir, args.out, gens=gens, curves=args.command == "graphs", style=style):
             print(path)
     elif args.command == "population":
@@ -276,13 +303,38 @@ def main(argv=None):
         import sys
         from evo import evolution, joint_audit
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        if args.fallen:
+            from evo import tail_audit
+            gen = args.gen if args.gen is not None else evolution.saved_generations(run_dir)[-1]
+            result = tail_audit.fallen_audit(run_dir, gen)
+            if args.export:
+                import json
+                import os
+                os.makedirs(args.export, exist_ok=True)
+                path = os.path.join(args.export, f"tombees_{os.path.basename(os.path.normpath(run_dir))}_g{gen}.json")
+                with open(path, "w") as fh:
+                    json.dump(result, fh, indent=1, ensure_ascii=False)
+                print(path)
+            if not result["identique"]:
+                print("ALERTE : une hauteur rejouée diffère de la hauteur stockée")
+                sys.exit(1)
+            return
         result = joint_audit.audit(run_dir, gen=args.gen, top=args.top, sample=args.sample, energy=args.energy,
-                                   crossings=args.crossings)
+                                   crossings=args.crossings, tail=args.tail)
         if args.export:
             print(joint_audit.export(result, args.export))
         if not result["identique"]:
             print("ALERTE : une hauteur rejouée diffère de la hauteur stockée")
             sys.exit(1)
+    elif args.command == "morpho":
+        from evo import evolution, morphology
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        gens = tuple(args.gens) if args.gens else morphology.GENERATIONS
+        for path in morphology.export(run_dir, compare=args.compare, out_dir=args.out, gens=gens):
+            print(path)
+    elif args.command == "planche":
+        from evo import planches
+        print(planches.export(args.images, args.out, labels=args.labels, height=args.height, crop=args.crop))
     elif args.command == "debug-creature":
         from evo import debug_creature
         if args.export:

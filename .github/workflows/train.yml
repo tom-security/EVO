@@ -1,7 +1,7 @@
 # Entraînements et contrôles d'EVO sur les runners GitHub (Linux, 4 vCPU).
 # Lancement depuis le PC (le fichier doit être sur main pour que workflow_dispatch apparaisse) :
 #   gh workflow run train.yml --ref main -f mode=reproductibilite
-#   gh workflow run train.yml --ref <branche> -f mode=pytest
+#   gh workflow run train.yml --ref <branche> -f mode=pytest [-f source_run_id=<id d'un run train>]
 #   gh workflow run train.yml --ref <branche> -f mode=train -f run_name=essai -f generations=5
 #   gh workflow run train.yml --ref <branche> -f mode=analyse -f source_run_id=<id d'un run train> \
 #       -f commandes="joints --seed 2 --gen 200 --crossings --export out/c1 ; replay --seed 2 --gen 200 --export out/r2"
@@ -22,7 +22,11 @@ on:
         options: [train, reproductibilite, pytest, analyse]
         default: train
       source_run_id:
-        description: "analyse : identifiant d'un run train dont on récupère les archives (vide : runs B2 seuls)"
+        description: "analyse, pytest : identifiant d'un run train dont on récupère les archives (vide : runs B2 seuls)"
+        type: string
+        default: ""
+      source_run_id_2:
+        description: "analyse, pytest : second run train (facultatif, ex. runs à 6° et à 30°)"
         type: string
         default: ""
       commandes:
@@ -180,7 +184,36 @@ jobs:
           FIN
           sha256sum -c runs.sha256
           for s in 0 1 2; do tar -xzf "runs_$s.tar.gz"; done
+          rm -f runs_?.tar.gz
+      - name: Récupération des archives du run source
+        if: inputs.source_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: runs_*
+          path: artefacts/1
+          merge-multiple: true
+      - name: Récupération des archives du second run source
+        if: inputs.source_run_id_2 != ''
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.source_run_id_2 }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: runs_*
+          path: artefacts/2
+          merge-multiple: true
+      - name: Vérification et extraction des archives des runs sources
+        if: inputs.source_run_id != '' || inputs.source_run_id_2 != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          for d in artefacts/*/; do
+            (cd "$d" && ls -l && sha256sum -c *.sha256 && for a in *.tar.gz; do tar -xzf "$a" -C ../..; done)
+          done
+          ls runs
       - name: Tests
+        # avec les runs C2 extraits, test_local_runs_replay_with_their_own_flag rejoue aussi runs/butees_corps/S
         run: python -m pytest -q -rs tests/
 
   analyse:
@@ -221,17 +254,26 @@ jobs:
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: runs_*
-          path: artefacts
+          path: artefacts/1
           merge-multiple: true
-      - name: Vérification et extraction des archives du run source
-        if: inputs.source_run_id != ''
+      - name: Récupération des archives du second run source
+        if: inputs.source_run_id_2 != ''
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.source_run_id_2 }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: runs_*
+          path: artefacts/2
+          merge-multiple: true
+      - name: Vérification et extraction des archives des runs sources
+        if: inputs.source_run_id != '' || inputs.source_run_id_2 != ''
         shell: bash
         run: |
           set -euo pipefail
-          cd artefacts
-          ls -l
-          sha256sum -c *.sha256
-          for a in *.tar.gz; do tar -xzf "$a" -C ..; done
+          for d in artefacts/*/; do
+            (cd "$d" && ls -l && sha256sum -c *.sha256 && for a in *.tar.gz; do tar -xzf "$a" -C ../..; done)
+          done
+          ls runs
       - name: "Garde-fou : rejeu au bit près des champions B2"
         shell: bash
         run: |
