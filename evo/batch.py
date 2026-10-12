@@ -64,7 +64,10 @@ def pack(genomes):
     }
     if any(not np.array_equal(c.world.limit_sign, first.world.limit_sign) for c in creatures):
         raise ValueError("toutes les créatures doivent avoir les mêmes sens de butée")
+    if any(not np.array_equal(c.world.limit_joints, first.world.limit_joints) for c in creatures):
+        raise ValueError("toutes les créatures doivent avoir les mêmes triplets de butée")
     arrays["lim_sign"] = first.world.limit_sign.copy()
+    arrays["lim_joints"] = first.world.limit_joints.copy()   # (Q, 3) triplets des butées (C2), séparés des muscles
     assert arrays["pos"].shape[0] == n
     return arrays
 
@@ -88,8 +91,8 @@ def _wrap(x):
 # ajoute par défaut pour lever ZeroDivisionError comme Python). Même arithmétique IEEE.
 @njit(cache=True, error_model="numpy")
 def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets, holds, first, last,
-                    links, joints, joint_signs, lim_sign, lim_lo, lim_hi, lim_margin, limbs, n_body, n_steps, h,
-                    g, n_iter, beta, n_pos_iter, ground_y, friction, margin,
+                    links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs, n_body,
+                    n_steps, h, g, n_iter, beta, n_pos_iter, ground_y, friction, margin,
                     kp, kd, torque_unit, trunk_x, trunk_half, fall_eps, fall_disables_hold,
                     energy_out, fallen_out, vel_out):
     """Créatures first..last-1 simulées en même temps (même suite d'opérations que _simulate_one
@@ -258,7 +261,7 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
                 else:
                     contact[p, b] = False
         for q in range(n_lim):  # butées : même calcul que physics._link_velocities_numba
-            a, pv, bb = joints[q, 0], joints[q, 1], joints[q, 2]
+            a, pv, bb = lim_joints[q, 0], lim_joints[q, 1], lim_joints[q, 2]
             for b in range(nb):
                 c = first + b
                 cq, s, jax, jay, jbx, jby = _limit_geometry(px[a, b], py[a, b], px[pv, b], py[pv, b],
@@ -295,7 +298,7 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
                     vx[j2, b] += lam * wj * nx[k, b]
                     vy[j2, b] += lam * wj * ny[k, b]
             for q in range(n_lim):
-                a, pv, bb = joints[q, 0], joints[q, 1], joints[q, 2]
+                a, pv, bb = lim_joints[q, 0], lim_joints[q, 1], lim_joints[q, 2]
                 for b in range(nb):
                     if not l_on[q, b]:
                         continue
@@ -335,7 +338,7 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
                 py[p, b] += vy[p, b] * h
         # --- projection (même calcul que physics._project_links_numba) ---
         for q in range(n_lim):  # butées candidates : à moins de la marge au début de la projection
-            a, pv, bb = joints[q, 0], joints[q, 1], joints[q, 2]
+            a, pv, bb = lim_joints[q, 0], lim_joints[q, 1], lim_joints[q, 2]
             for b in range(nb):
                 c = first + b
                 l_near[q, b] = _limit_geometry(px[a, b], py[a, b], px[pv, b], py[pv, b], px[bb, b], py[bb, b],
@@ -359,7 +362,7 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
                     px[j2, b] -= wj * cc * dx
                     py[j2, b] -= wj * cc * dy
             for q in range(n_lim):  # butées franchies (même calcul que physics._project_links_numba)
-                a, pv, bb = joints[q, 0], joints[q, 1], joints[q, 2]
+                a, pv, bb = lim_joints[q, 0], lim_joints[q, 1], lim_joints[q, 2]
                 for b in range(nb):
                     if not l_near[q, b]:
                         continue
@@ -414,8 +417,8 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
 
 @njit(parallel=True, cache=True, error_model="numpy")
 def _simulate_population(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets, holds, block,
-                         links, joints, joint_signs, lim_sign, lim_lo, lim_hi, lim_margin, limbs, n_body, n_steps, h,
-                         g, n_iter, beta, n_pos_iter, ground_y, friction, margin,
+                         links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs,
+                         n_body, n_steps, h, g, n_iter, beta, n_pos_iter, ground_y, friction, margin,
                          kp, kd, torque_unit, trunk_x, trunk_half, fall_eps, fall_disables_hold,
                          energy_out, fallen_out):
     n = pos.shape[0]
@@ -425,8 +428,8 @@ def _simulate_population(pos, rest, mass, phi_rest, s_plus, s_minus, period, tar
         first = blk * block
         last = min(first + block, n)
         _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets, holds, first, last,
-                        links, joints, joint_signs, lim_sign, lim_lo, lim_hi, lim_margin, limbs, n_body, n_steps,
-                        h, g, n_iter, beta, n_pos_iter,
+                        links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs,
+                        n_body, n_steps, h, g, n_iter, beta, n_pos_iter,
                         ground_y, friction, margin, kp, kd, torque_unit, trunk_x, trunk_half, fall_eps,
                         fall_disables_hold, energy_out, fallen_out, vel)
     return vel
@@ -452,7 +455,7 @@ def evaluate(genomes, duration=10.0, packed=None):
         pos, arrays["rest"], arrays["mass"], arrays["phi_rest"], arrays["s_plus"], arrays["s_minus"],
         arrays["period"], arrays["targets"], arrays["holds"], int(config.BATCH_BLOCK),
         arrays["links"], arrays["joints"],
-        cr.JOINT_SIGNS, arrays["lim_sign"], arrays["lim_lo"], arrays["lim_hi"],
+        cr.JOINT_SIGNS, arrays["lim_joints"], arrays["lim_sign"], arrays["lim_lo"], arrays["lim_hi"],
         float(math.radians(config.JOINT_LIMIT_MARGIN_DEG)),
         np.array(cr.LIMBS, dtype=np.int64), sk.TAIL_START, int(round(duration / h)), h,
         float(config.G), int(config.N_ITER), float(config.BETA), int(config.N_POS_ITER),
