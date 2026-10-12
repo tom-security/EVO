@@ -329,3 +329,17 @@ de référence du critère.
 - `pytest` sur le runner ;
 - run `butees_corps_30` (200 générations) ;
 - puis les mêmes mesures. S'il se déclenche aussi à 30° : arrêt.
+
+**Runner** : `pytest` du repli, 156 passent (38278049033). Les runs à 6° se rejouent avec leur propre config.
+
+**Outil `trace`** (commit `ee5de93`) : rejeu pas à pas audité. `pytest` 157 passent (38278546718).
+
+**Créature n°541 (C2 à 6°, graine 2, gén. 200)**, rejouée au bit près (38278559147) :
+- 0 J créé ;
+- à t ≈ 8,78 s, en l'air (aucune prise, pas encore tombée : la chute arrive à 9,31 s), un point de queue **alterne
+  d'un sous-pas à l'autre** entre le bord du cône et 3°, 10° puis 32° au-delà, sur 116 sous-pas.
+
+C'est une oscillation numérique contre le cône, chez une créature tirée au hasard et pas chez les grimpeuses. Le
+critère, qui porte sur les meilleures, ne la voyait pas. Elle est à remesurer à 30°.
+
+**Run à 30° lancé** : 38278062446. Diagnostic B2 lancé en parallèle : `trace` de 868, 760 et 447.
