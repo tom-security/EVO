@@ -102,3 +102,58 @@ validé.
 
 **Prochaine étape** : selon la décision. Le code du commit 2 est prêt dans l'arbre de travail ; il reste
 `tests/test_body_limits.py` à écrire.
+
+## Étape 2 bis : décisions de Tom appliquées, nouvel ARRÊT
+
+**Décisions de Tom (appliquées, non commitées)** :
+1. créature couchée : borne de hauteur alignée sur la plage de la vidéo (−9 à −7,8 m), avec le constat en
+   commentaire ;
+2. test batché : seules les 8 butées articulaires sont comptées ;
+3. énergie de la créature inerte : seuil propre à ce cas avec `BODY_LIMITS`, de 6 J, mécanisme en commentaire ;
+   0,23 J partout ailleurs ;
+4. à ajouter au rapport C2 : l'énergie créée sur les créatures tombées des vraies populations ; arrêt si l'une
+   d'elles dépasse 5 cm.
+
+**Fait** :
+- `tests/test_body_limits.py` : 15 tests, tous verts en local, en 16 s. Ils couvrent :
+  - la disposition des 22 butées et le repos ;
+  - le pied libre et le pied tenu lancés vers l'axe ;
+  - la queue lancée contre le cône à 2, 5 et 10 m/s ;
+  - le départ hors bornes, avec retour par le côté court ;
+  - scalaire = batché au bit près, avec le pied et la queue engagés ;
+  - numba = Python avec les 22 butées ;
+  - l'énergie sur deux grimpes ;
+  - le drapeau et `config.json`.
+- `test_local_runs_replay_with_their_own_flag` est étendu à `runs/butees_corps/S`.
+- Mesures de mise au point (sans gravité ni sol, sans muscles) :
+
+  | Cas | Engagée | Pénétration | Énergie |
+  |---|---|---|---|
+  | pied libre à 6 m/s | 213 sous-pas | 0,000° | strictement décroissante |
+  | pied tenu, corps à 4 m/s | 246 sous-pas | 0,000° | strictement décroissante |
+  | queue à 10 m/s | 2 978 sous-pas | 0,000° | strictement décroissante |
+
+  Erreur des os de queue sur la queue lancée à 10 m/s : 1,7e-5.
+- pytest local : 144 passent, 4 échouent : les 3 rejeux Windows connus, et le cas ci-dessous.
+
+**Arrêt : `test_creature.py::test_limp_creature_falls_and_lies_on_ground`, assertion `bench.max_tail < 0.08`.** Elle
+ne s'était pas montrée au premier passage, parce que le test s'arrêtait à l'assertion de hauteur, corrigée depuis.
+
+| Créature inerte (banc du sol), erreur de longueur de la queue | B2 | C2 à 6° | C2 à 30° |
+|---|---|---|---|
+| maximum | 7,05 % (t = 1,02 s, impact) | **9,37 %** (t = 1,69 s) | 7,85 % (t = 1,69 s) |
+| temps au-delà de 1 % | 25 ms | **1 310 ms** | 90 ms |
+| temps au-delà de 5 % | 10 ms | **662 ms** | 58 ms |
+| erreur des os du corps | 0,13 % | 0,13 % | 0,18 % |
+
+- Le mécanisme est le même que pour l'énergie : après la chute, la queue est à la fois en butée de cône et au sol.
+- Ce n'est plus un pic d'impact : la queue reste étirée de plus de 5 % pendant 0,66 s.
+- C'est la grandeur même du critère de repli (erreur de longueur de la queue au-delà de 1 %). Ce critère est
+  défini sur les 50 meilleures grimpeuses de la génération 200, pas sur les créatures tombées.
+
+**Décision attendue de Tom** :
+- accepter avec un seuil propre au cas inerte avec `BODY_LIMITS` (par exemple 10 %), comme pour l'énergie ;
+- ou considérer que le repli à 30° est déjà justifié par ce cas ;
+- ou autre chose.
+
+**Prochaine étape** : selon la décision, puis commit 2, `pytest` sur le runner et la suite de C2.
