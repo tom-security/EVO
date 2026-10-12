@@ -64,13 +64,15 @@ def chart(tables, title, size=(1280, 720)):
     for v in (lo, hi):
         y = panel.y(v)
         pygame.draw.line(surface, ch._c(ch.NEUTRAL), (panel.plot.left, y), (panel.plot.right, y), 1)
+    items = []
     for k, bone in enumerate(cr.BONE_NAMES):
         for run, (label, table) in enumerate(tables.items()):
             gens = list(table)
             values = [table[g][k] for g in gens]
             pts = (panel.line if run == 0 else panel.dashed)(gens, values, BONE_COLORS[k], 2)
             if run == 0:
-                panel.end_label(pts, BONE_LABELS[bone])
+                items.append((pts, BONE_LABELS[bone]))
+    ch._end_labels(panel, items)   # étiquettes écartées, sans chevauchement
     ch._text(surface, fonts["small"], "génération", (w - 40, h - 14), ch.TEXT_DIM, "bottomright")
     return surface
 
