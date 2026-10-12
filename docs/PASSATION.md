@@ -50,7 +50,8 @@ Les autres documents du dépôt restent la référence pour le détail :
 - **Runs de référence :**
   - `runs/<graine>` (graines 0, 1, 2), entraînés avec les butées articulaires du chantier B ;
   - graine 2 par défaut pour les écrans ;
-  - **hors git, seulement dans le conteneur** (voir §3).
+  - **hors git** dans les branches de code, mais sauvegardés en archives sur la branche `sauvegarde-runs` (voir
+    §3.3).
 - **Branches :**
   - `claude/modest-ritchie-mkwjnd` : phases 1 à 6 et chantiers A et B ;
   - `claude/chantier-c-collisions` : la même chose + le chantier C1 + ce document ;
@@ -218,7 +219,21 @@ out/       exports PNG/MP4 par phase   ← hors git
 cache/     couches de décor pré-rendues ← hors git
 ```
 
-### 3.3 Les runs (hors git : à régénérer dans un environnement neuf)
+### 3.3 Les runs (hors git ; les runs par défaut sont sauvegardés sur la branche `sauvegarde-runs`)
+
+**Sauvegarde :** les runs par défaut `runs/0`, `runs/1` et `runs/2` sont copiés sur la branche `sauvegarde-runs`.
+C'est une branche sans code et sans historique commun avec les autres, qui contient une archive `runs_S.tar.gz`
+d'≈ 25 Mo par graine et un README (SHA-256, restauration).
+- Restauration vérifiée : les archives relues depuis GitHub redonnent les dossiers identiques octet par octet, et
+  les trois champions de la génération 200 se rejouent à leur hauteur stockée.
+- Pour restaurer, à la racine du dépôt :
+  ```
+  git fetch origin sauvegarde-runs
+  git show origin/sauvegarde-runs:runs_S.tar.gz > runs_S.tar.gz
+  tar -xzf runs_S.tar.gz
+  ```
+- Les anciens runs (`legacy_no_limits`), les runs de calibration et les exports de `out/` ne sont **pas**
+  sauvegardés : c'est le choix de l'utilisateur. Les exports se refont en quelques minutes à partir des runs.
 
 | Dossier | Contenu | Config |
 |---|---|---|
@@ -249,6 +264,7 @@ cache/     couches de décor pré-rendues ← hors git
 | `claude/modest-ritchie-mkwjnd` | 2a9b55d | phases 1 à 6, chantiers A et B, réorganisation des runs |
 | `claude/chantier-b-limites-articulaires` | 86f7a7f | chantier B (déjà fusionné, un commit derrière) |
 | `claude/chantier-c-collisions` | après b29a010 | modest-ritchie + C1 (outil `joints --crossings`, diagnostic) + ce document |
+| `sauvegarde-runs` | 8ff6ab2 | pas de code : archives des runs par défaut 0, 1 et 2 (§3.3) |
 
 Le chantier C n'est pas encore ramené sur `claude/modest-ritchie-mkwjnd` : l'utilisateur le décidera après C2.
 
