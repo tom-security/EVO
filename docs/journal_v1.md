@@ -343,3 +343,102 @@ C'est une oscillation numérique contre le cône, chez une créature tirée au h
 critère, qui porte sur les meilleures, ne la voyait pas. Elle est à remesurer à 30°.
 
 **Run à 30° lancé** : 38278062446. Diagnostic B2 lancé en parallèle : `trace` de 868, 760 et 447.
+
+## Étape 7 : run C2 à 30°, mesures, écrans ; ARRÊT
+
+**Run `butees_corps_30`** (38278062446) :
+- durée : 43,6 / 44 / 18 min ; SHA-256 OK ; runs dans `runs/butees_corps_30/S` ;
+- champions à la gén. 200 : **+39,46 / +37,10 / +42,78 m** (B2 : 34,24 / 33,45 / 35,32 ; C2 à 6° : 38,89 / 33,85 /
+  48,50) ; moyennes +29,2 / +27,1 / +34,8 m ; au sol 119 / 90 / 84 ;
+- période 0,86 / 1,47 / 0,87 s ; muscle 16,4 / 13,4 / 13,8 ;
+- audits des champions : 0 J créé hors muscles, aucune alerte ; os ≤ 0,74 %, queue ≤ 0,93 %.
+
+**`pytest` avec les runs à 30° et à 6°** (38283350177) : 157 passent. Les deux runs C2 se rejouent au bit près.
+
+**Morphologie à la gén. 200** (facteur moyen ; B2 entre parenthèses) :
+
+| Graine | Colonne | Demi-bassin | Fémur |
+|---|---|---|---|
+| 0 | 0,66 (1,24) | 0,82 (0,62) | — |
+| 1 | 0,76 (0,90) | 0,63 (0,69) | 0,63 (1,29) |
+| 2 | 1,08 (0,62) | 1,37 (1,36) | — |
+
+À 6°, la graine 2 avait la colonne à 1,04 et le demi-bassin à 0,76.
+
+**`--tail --crossings`, 50 meilleures** (38283361347) :
+
+| Graine | Critère de repli | Os de queue, max | Oscillation, max | Pied de l'autre côté | Jambe/queue (B2) | Autre |
+|---|---|---|---|---|---|---|
+| 0 | garder 30° | 0,64 % | 1,2 % | 0 % | 0 % (14,0 %) | **bras G/bras D 89,2 %**, membres/tête 31,1 % |
+| 1 | garder 30° | 0,37 % | 0,6 % | 0,1 % | 6,8 % (72,0 %) | — |
+| 2 | garder 30° | 0,26 % | 0,9 % | 0 % | 7,5 % (50,1 %) | — |
+
+- Pénétration des meilleures ≤ 0,026°.
+- Les bras croisés de la graine 0 sont nouveaux à 30°. Aucune collision n'existe entre les bras ; ce n'était pas dans
+  le périmètre de C2.
+
+**Butée de queue franchie, groupe tiré au hasard** : jusqu'à 144° au-delà du cône (graines 0 et 1 ; 19,6° pour la
+graine 2). Rejeu pas à pas de la n°808 (graine 1, 38285458758) :
+- jamais tombée, en l'air, une patte tenue, 4 à 6 butées de queue actives ;
+- un point de queue sort du cône pendant **un seul sous-pas** (6°, puis 38° au-delà), puis revient, 16 fois en
+  0,12 s ;
+- c'est un saut de position de la projection quand plusieurs butées de queue agissent ensemble (même motif que la
+  n°541 à 6°) ;
+- 0 J créé.
+
+**Créatures tombées, C2 (30°) contre B2** (38283372931 / 38283386346 / 38283398504) :
+
+| Graine, gén. | > 5 cm B2 / C2 | Max B2 / C2 (cm) | Queue > 5 % B2 / C2 | Queue max B2 / C2 |
+|---|---|---|---|---|
+| 0, 0 | 5 / 3 | 85,1 / 50,3 | 6 / 9 | 12,2 / 8,0 % |
+| 0, 200 | 0 / 0 | 3,8 / 0,0 | 0 / **6** | 3,0 / **43,8 %** |
+| 1, 0 | 3 / 4 | 61,3 / 34,9 | 1 / **19** | 6,3 / 12,8 % |
+| 1, 200 | 7 / 0 | 424,5 / 0,0 | 9 / 1 | 9,8 / 5,0 % |
+| 2, 0 | 6 / 3 | 645,3 / 68,1 | 6 / 12 | 11,4 / 11,0 % |
+| 2, 200 | 0 / 0 | 0,0 / 0,1 | 0 / 0 | 2,7 / 2,6 % |
+
+- **Énergie** : la règle relative ne se déclenche pas, et C2 à 30° fait nettement mieux que B2.
+- **Queue > 5 %** (règle de Tom en valeur absolue, non rendue relative) : **dépassée**, et plus souvent qu'en B2 sur
+  la graine 1 en gén. 0 (19 contre 1) et sur la graine 0 en gén. 200 (6 contre 0, jusqu'à 43,8 %).
+- n°677 (graine 0, gén. 200) : 43,8 % à t = 9,53 s, 0,02 s après la chute, avec 8 points de queue au sol et la queue
+  au-delà du cône ; c'est le mécanisme de l'impact.
+- Graine 1, gén. 0, sous-pas au-delà de 5 % : 64 % avec la queue en butée et au sol, 15 % avec la queue en butée
+  seule, 21 % sans butée de queue (n°840).
+- n°840 (graine 1, gén. 0) : 74 J créés **avant** la chute, en tenant le mur (2,3 pattes tenues en moyenne, 3 butées
+  articulaires actives). C'est le même génome qu'en B2 (82,5 J) : un mécanisme B2.
+
+**Écrans et vidéos** (38283422908, 38283435591), rapatriés dans `artefacts/`, avec l'image de référence remplacée
+par un aplat :
+- replay, population 200, cycle 0 → 1, histogrammes 0 / 1 / 200, analyse, comparaison ;
+- analyse B2 / C2 à 6° / C2 à 30° pour l'avant/après ;
+- 6 vidéos (20 Mo).
+
+**Diagnostic B2, chiffré à l'avance** (lecture seule ; options appliquées par substitution de fonctions dans un
+script hors dépôt, sous Windows) :
+- **Mécanisme** (868, 760, 447) :
+  - toute l'énergie est créée **après la chute**, couchée, avec des points au sol et 2 à 3 butées articulaires
+    actives ;
+  - à chaque sous-pas, la gravité ajoute ≈ 1,2 J d'énergie cinétique, le mouvement enfonce les points (−1,2 J
+    d'énergie potentielle), la projection les remonte (+0,8 à +1,1 J), et les vitesses n'en retirent que 0,03 à
+    0,14 J ;
+  - la vitesse vers le bas n'est jamais annulée.
+- **Options** (énergie créée pour 868 / 760 / 447, et effet sur les champions B2) :
+
+  | Option | 868 | 760 | 447 | Champions B2 |
+  |---|---|---|---|---|
+  | moteur actuel | 1 292 J | 824 J | 202 J | — |
+  | v_y ≥ 0 pour les points remontés au sol | 1 289 J | 816 J | 238 J | — |
+  | 60 passes | 1 158 J | 799 J | 211 J | — |
+  | 120 passes | 1 075 J | 763 J | 275 J | — |
+  | correction de projection reportée sur la vitesse (v += Δp/h) | **9,6 J** | **11,8 J** | **8,6 J** | −0,4 à +0,1 m |
+
+  Seule la dernière agit. Elle change la physique, donc demande un drapeau et un réentraînement.
+
+**Décision attendue de Tom** :
+- la queue des créatures tombées dépasse 5 % (règle absolue) : arrêt conforme à la consigne. Faut-il la rendre
+  relative, comme l'énergie, ou traiter le mécanisme ?
+- le saut de position de la queue en l'air (n°541 à 6°, n°808 à 30°) : à accepter, ou à traiter ?
+- les bras croisés de la graine 0 à 30°.
+
+**Non commencé** : rapport `docs/chantier_c_c2.md` et planche contre l'image 11 (les données sont là), nettoyage,
+bilan.
