@@ -196,3 +196,38 @@ sans les butées du corps.
   toujours en contact.
 
 **Prochaine étape** : `pytest` sur le runner, puis l'essai de 5 générations (lancé en parallèle).
+
+**Runner** : `mode=pytest`, 156 passent (run 38266405208). Commit 3 validé.
+
+## Étape 4 : essai de 5 générations (run 38266417518)
+
+**Durée des jobs** : 100 / 197 / 77 s pour les graines 0 / 1 / 2.
+
+**SHA-256** : les 3 archives sont OK. Les runs sont extraits dans `runs/essai/S`.
+
+**`config.json`** : `JOINT_LIMITS: true`, `BODY_LIMITS: true`, `TAIL_CONE_DEG: 6.0`.
+
+| Graine | Éval. gén. 0 (compilation numba comprise) | Éval. des gén. suivantes (médiane) | Gén. 5 : meilleure | Gén. 5 : au sol |
+|---|---|---|---|---|
+| 0 | 41 s | 8,1 s | +3,21 m | 28 |
+| 1 | 85 s | 18,1 s | +2,68 m | 27 |
+| 2 | 31 s | 5,8 s | +3,17 m | 18 |
+
+Pour comparaison, B2 prenait 4,2 à 5,1 s par génération dans l'ancien conteneur.
+
+**Estimation pour 200 générations** : ≈ 27 / 60 / 19 min, sous les 150 min par graine.
+
+**Audits de la génération 0** : 0 J créé hors muscles, sauts max 0 J, 191 à 217 engagements de butées.
+
+## Étape 5 : run complet lancé, mesures de référence B2
+
+Lancés à 15:00 UTC :
+- run complet `butees_corps`, 200 générations : 38266975229 ;
+- `joints --tail` sur B2 (gén. 200, 50 meilleures et 50 au hasard) : 38266985028 ;
+- `joints --fallen` sur B2, gén. 0 et 200 : graine 0 → 38266995055, graine 1 → 38267006193, graine 2 → 38267016651.
+
+**Prochaine étape** :
+- rapatrier et vérifier les runs C2 ;
+- `pytest` avec `source_run_id` (rejeu C2) ;
+- `--tail`, `--crossings`, `--energy` et `--fallen` sur C2 ;
+- critère de repli.
