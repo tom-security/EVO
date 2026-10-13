@@ -1,5 +1,7 @@
-numpy>=1.26
-numba>=0.59
-pygame>=2.5
+# Versions des runs de référence (PASSATION §3.1) : un run ne se rejoue au bit près qu'avec elles, sur Linux
+# (runner GitHub ubuntu-24.04, Python 3.11). Sous Windows, la bibliothèque mathématique diffère (voir README.md).
+numpy==2.4.6
+numba==0.67.0
+pygame==2.6.1
 pytest>=8
 # vidéo (--export-video) : ffmpeg dans le PATH, ou pip install imageio-ffmpeg

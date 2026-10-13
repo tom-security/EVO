@@ -272,7 +272,7 @@ AUDIT_MAX_LIMIT_JUMP = 0.005
 # ---------------------------------------------------------------------------
 DEBUG_BG = "#040414"          # [VU] fond bleu nuit
 DEBUG_GRID = "#5C5C6C"        # [VU] grille fine
-DEBUG_GRID_STEP = 1.0         # [VU ≈] m par carreau
+DEBUG_GRID_STEP = 1.0         # [DÉDUIT] m par carreau (≈ ce qu'on voit sur les images 15 à 17)
 DEBUG_TRUNK = "#0E0E2A"       # [CHOIX] bande du tronc (là où une patte peut tenir)
 DEBUG_GROUND = "#3C3C4C"      # [CHOIX] sol
 DEBUG_BONE = "#FCECD4"        # [VU] os et articulations (crème)
@@ -286,8 +286,8 @@ DEBUG_SCALE = 32.0            # [CHOIX] px par mètre dans la vue debug
 # ---------------------------------------------------------------------------
 # Rendu des schémas pédagogiques (§5.2, images 19–23)
 # ---------------------------------------------------------------------------
-WINDOW_SIZE = (1280, 720)
-FPS = 60
+WINDOW_SIZE = (1280, 720)    # [VU] définition des images de la vidéo (docs/reference/)
+FPS = 60                      # [CHOIX] images par seconde des fenêtres et des exports (1 frame = DT)
 
 SCHEMA_BG = "#F8F8F8"           # [VU] fond des schémas
 SCHEMA_POINT = "#D41424"        # [VU] point
@@ -310,15 +310,17 @@ MASS_SCHEMA_COLORS = [
     ("#CE52C3", "#DB72D1"),   # magenta
 ]
 
-# §5.3 — polices libres (OFL) versionnées dans assets/fonts/ (voir assets/fonts/README.md) ; repli sur
-# FONT_SANS puis sur la police par défaut de pygame si un fichier manque (evo/fonts.py).
+# [CHOIX] §5.3 — polices libres (OFL) versionnées dans assets/fonts/ (voir assets/fonts/README.md), les plus
+# proches de celles de la vidéo ; repli sur FONT_SANS puis sur la police par défaut de pygame si un fichier manque
+# (evo/fonts.py).
 FONT_FILES = {
     "questrial": "assets/fonts/Questrial-Regular.ttf",       # HUD, cartons, repères (≈ Century Gothic)
     "nunito_semibold": "assets/fonts/NunitoSans-SemiBold.ttf",  # titres des slides (≈ Avenir Next Demi Bold)
 }
-# [≈] §5.3 — polices du système (graphes, schémas, repli) : la première disponible, sinon celle de pygame
+# [CHOIX] §5.3 — polices du système (graphes, schémas, repli), proches de celles de la vidéo : la première
+# disponible, sinon celle de pygame
 FONT_SANS = ["avenirnext", "nunitosans", "montserrat", "dejavusans", "freesans"]
-FONT_MONO = ["dejavusansmono", "liberationmono", "freemono"]
+FONT_MONO = ["dejavusansmono", "liberationmono", "freemono"]   # [CHOIX] chiffres alignés des tableaux de debug
 
 # ---------------------------------------------------------------------------
 # Rendu jungle (§5, phase 4), fenêtre WINDOW_SIZE = 1280×720
@@ -439,7 +441,7 @@ LIZARD_DARK = "#4CA40C"       # [VU] §5.2 — moitié droite
 # jonction épaule / torse lisible (§5.4 écrit #5CAC24 à gauche, #4CA40C à droite).
 LIZARD_LIMB_COLORS = ("#4CA40C", "#489C0C")
 LIZARD_FINGER = "#D4FC7C"     # [VU] rayons des doigts
-LIZARD_PAD = "#5C9C3C"        # [VU ≈] disques au bout des doigts
+LIZARD_PAD = "#5C9C3C"        # [VU] disques au bout des doigts (couleur approchée : disques de quelques pixels)
 LIZARD_EYE_COLOR = "#040404"  # [VU]
 LIZARD_SUPERSAMPLE = 2        # [CHOIX] lézard dessiné ×2 puis réduit (puissance de 2 : smoothscale exact ; ×3 perd 2 niveaux de couleur et d'alpha)
 LIZARD_LIMB_WIDTH = 0.154     # [DÉDUIT] image 01 : humérus / fémur ≈ 1/3 de la largeur des hanches (0.11), ×1.4 pour l'allure compacte de la vidéo (× colonne de référence)
@@ -467,7 +469,7 @@ LIZARD_FINGERS = ((-100.0, -50.0, 0.0, 50.0, 100.0), 1.6, 0.4, 0.8, 0.9)
 # HUD de simulation (§6, phase 5a) — positions en px d'une fenêtre 1280×720
 # ---------------------------------------------------------------------------
 # Tailles de police Questrial calées sur la hauteur et la largeur d'encre mesurées (images 03, 09, 39).
-HUD_FONT = "questrial"
+HUD_FONT = "questrial"         # [DÉDUIT] la plus proche de l'encre du HUD de la vidéo (images 03, 09, 39)
 HUD_BADGE_FONT_PX = 22        # [DÉDUIT] images 03/09 : « 1.3 s » 15 × 41 px d'encre (Questrial 22 : 14 × 40)
 HUD_TEXT_FONT_PX = 28         # [DÉDUIT] image 03 : « Génération: 0 » 19 × 173 px (Questrial 28 : 19 × 166)
 HUD_LABEL_FONT_PX = 29        # [DÉDUIT] image 09 : « 23.1 m » 20 × 82 px (Questrial 29 : 20 × 82)

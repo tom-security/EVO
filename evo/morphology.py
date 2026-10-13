@@ -8,8 +8,6 @@ basse, demi-bassin près de la borne haute.
 import csv
 import os
 
-import numpy as np
-
 import config
 from evo import creature as cr
 from evo import evolution as ev
