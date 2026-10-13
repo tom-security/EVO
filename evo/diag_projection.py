@@ -36,7 +36,12 @@ PASSES = 120
 # - courbure<β> : un cône de ±β sur le premier segment seulement (NECK, PELVIS, TAIL_0), puis une butée de courbure
 #   à chaque jonction (TAIL_{k−1}, TAIL_k, TAIL_{k+1}), angle à ±β de l'alignement. Le pivot est toujours à distance
 #   fixe de ses deux voisins : pas de singularité au sommet du cône.
-TAILS = {"cone": None, "courbure5": 5.0, "courbure1": 1.0}
+TAILS = {"cone": None, "courbure5": 5.0, "courbure2.5": 2.5, "courbure1": 1.0}
+# Sens de parcours des butées de queue dans les passes du solveur : « ordre » (celui du moteur) ou « alterne »
+# (racine → bout aux passes paires, bout → racine aux impaires ; evo/diag_alterne.py).
+ORDERS = ("ordre", "alterne")
+# Enfoncement des butées de queue (°, ≥ 0) : histogramme par grimpe, pour un p95 sur tous les sous-pas d'un groupe.
+PEN_EDGES = np.concatenate([np.arange(0.0, 2.0001, 0.05), [3.0, 5.0, 10.0, 20.0, 45.0, 90.0, 180.0]])
 # Dernier sous-pas : report sur la vitesse (énergie cinétique ajoutée, facteur α), et ce que la résolution en vitesse a
 # laissé à la projection (relevé juste avant elle, en lecture seule, y compris avec le moteur tel quel) : marge
 # minimale des butées de queue (rad, < 0 = franchie), étirement maximal des liens, correction de position maximale.
@@ -109,6 +114,22 @@ def tail_limits(kind):
 
 
 @contextlib.contextmanager
+def solver_order(kind):
+    """Substitue les noyaux à sens de parcours alterné (kind="alterne") le temps du bloc."""
+    if kind not in ORDERS:
+        raise ValueError(f"ordre inconnu : {kind} ({', '.join(ORDERS)})")
+    originals = (physics._link_velocities_numba, physics._project_links_numba)
+    try:
+        if kind == "alterne":
+            from evo import diag_alterne
+            physics._link_velocities_numba = diag_alterne.link_velocities_alterne
+            physics._project_links_numba = diag_alterne.project_links_alterne
+        yield
+    finally:
+        physics._link_velocities_numba, physics._project_links_numba = originals
+
+
+@contextlib.contextmanager
 def variant(name, record=False):
     """Substitue la variante `name` le temps du bloc, puis rend le moteur tel quel. record : relève aussi, en lecture
     seule, l'état avant chaque projection (LAST), y compris avec le moteur tel quel."""
@@ -144,19 +165,37 @@ STRETCH_PRE = 0.002    # liens étirés de plus de 0,2 % avant la projection : r
 
 
 def split(name):
-    """« projection[:queue] » → (projection, queue) ; queue par défaut : cone (v1)."""
-    proj, _, tail = name.partition(":")
-    tail = tail or "cone"
-    if proj not in VARIANTS or tail not in TAILS:
-        raise ValueError(f"variante inconnue : {name} (projection : {', '.join(VARIANTS)} ; queue : {', '.join(TAILS)})")
+    """« projection[:queue] » → (projection, queue) ; queue par défaut : cone (v1). Le sens de parcours éventuel
+    (« :alterne ») est lu par split3."""
+    proj, tail, _ = split3(name)
     return proj, tail
+
+
+def split3(name):
+    """« projection[:queue[:ordre]] » → (projection, queue, ordre) ; défauts : cone, ordre (le moteur)."""
+    parts = name.split(":")
+    proj = parts[0]
+    tail = parts[1] if len(parts) > 1 and parts[1] else "cone"
+    order = parts[2] if len(parts) > 2 and parts[2] else "ordre"
+    if proj not in VARIANTS or tail not in TAILS or order not in ORDERS or len(parts) > 3:
+        raise ValueError(f"variante inconnue : {name} (projection : {', '.join(VARIANTS)} ; queue : {', '.join(TAILS)} ; "
+                         f"ordre : {', '.join(ORDERS)})")
+    return proj, tail, order
+
+
+@contextlib.contextmanager
+def configuration(name, record=False):
+    """Toute la variante « projection[:queue[:ordre]] », le temps du bloc. L'ordre des solveurs est substitué en
+    premier, pour que le report sur la vitesse de la projection enveloppe la projection alternée."""
+    proj, tail, order = split3(name)
+    with solver_order(order), tail_limits(tail), variant(proj, record=record):
+        yield
 
 
 def measure(genome, name="tel_quel"):
     """Rejeu audité (evo/audit.py) d'une grimpe avec la variante `name` (« projection[:queue] ») : énergie créée hors
     muscles, queue (étirement, pénétration des butées, sauts d'angle, approche du sommet, posture), convergence."""
-    proj, tail = split(name)
-    with variant(proj, record=True), tail_limits(tail):
+    with configuration(name, record=True):
         c = _new_creature(genome)
         c.tail_links = np.array([n == "tail" for n in c.skel.link_names])
         ledger = {k: 0.0 for stage in audit.STAGES for k in (stage, stage + "+")}
@@ -166,6 +205,7 @@ def measure(genome, name="tel_quel"):
         groups = cr.limit_groups(len(c.world.limit_lo)) if len(c.world.limit_lo) else {}
         over5 = exits = apex = jumps = stretched = 0
         worst_exit = pre_max = 0.0
+        pen = []
         fall = None
         prev = None
         dev, bend = [], []
@@ -175,6 +215,7 @@ def measure(genome, name="tel_quel"):
             over5 += (np.abs(w.link_lengths() - w.rest) / w.rest)[c.tail_links].max() > 0.05
             if "queue" in groups:
                 m = w.limit_violation()[groups["queue"]].min()
+                pen.append(max(0.0, -math.degrees(m)))
                 if m < -math.radians(0.5):
                     exits += 1
                     worst_exit = max(worst_exit, -math.degrees(m))
@@ -196,7 +237,21 @@ def measure(genome, name="tel_quel"):
             "hauteur": c.height(), "tombee_a": fall, "vitesse_max": float(ledger["max_speed"]),
             "sauts_queue": jumps, "sommet_s": apex * H, "avant_proj_lien_max": pre_max,
             "avant_proj_etire_s": stretched * H, "ecart_median_deg": float(np.median(dev)),
-            "ecart_p95_deg": float(np.percentile(dev, 95)), "courbure_mediane_deg": float(np.median(bend))}
+            "ecart_p95_deg": float(np.percentile(dev, 95)), "courbure_mediane_deg": float(np.median(bend)),
+            "enfoncement_p95_deg": float(np.percentile(pen, 95)) if pen else 0.0,
+            "enfoncement_hist": np.histogram(np.clip(pen, 0.0, 179.999), PEN_EDGES)[0].tolist() if pen else []}
+
+
+def pooled_percentile(rows, q=95.0):
+    """Percentile de l'enfoncement des butées de queue sur tous les sous-pas d'un groupe de grimpes, lu dans les
+    histogrammes (borne haute de la classe qui le contient)."""
+    hists = [r["enfoncement_hist"] for r in rows if r.get("enfoncement_hist")]
+    if not hists:
+        return 0.0
+    total = np.sum(hists, axis=0)
+    cum = np.cumsum(total) / total.sum()
+    k = int(np.searchsorted(cum, q / 100.0))
+    return float(PEN_EDGES[min(k + 1, len(PEN_EDGES) - 1)])
 
 
 def compare(run_dir, gen, index, variants=VARIANTS, log=print):
@@ -279,7 +334,8 @@ def summarize(rows):
             "avant_proj_etire_s_moyen": float(np.mean([r.get("avant_proj_etire_s", 0) for r in rows])),
             "ecart_median_deg": float(np.median([r.get("ecart_median_deg", 0) for r in rows])),
             "ecart_p95_deg": float(np.median([r.get("ecart_p95_deg", 0) for r in rows])),
-            "courbure_mediane_deg": float(np.median([r.get("courbure_mediane_deg", 0) for r in rows]))}
+            "courbure_mediane_deg": float(np.median([r.get("courbure_mediane_deg", 0) for r in rows])),
+            "enfoncement_p95_deg": pooled_percentile(rows), "enfoncement_max_deg": float(max(r["sortie_max_deg"] for r in rows))}
 
 
 def population_lines(r):
@@ -298,7 +354,8 @@ def population_lines(r):
         lines.append(f"  {'':22s}   avant projection : liens jusqu'à {100 * s['avant_proj_lien_max']:.2f} %, au-delà de "
                      f"0,2 % en moyenne {1000 * s['avant_proj_etire_s_moyen']:.0f} ms par grimpe ; posture (médianes) : "
                      f"écart à l'axe {s['ecart_median_deg']:.1f}°, p95 {s['ecart_p95_deg']:.1f}°, courbure "
-                     f"{s['courbure_mediane_deg']:.1f}°")
+                     f"{s['courbure_mediane_deg']:.1f}° ; enfoncement des butées de queue : p95 ≤ "
+                     f"{s['enfoncement_p95_deg']:.2f}°, max {s['enfoncement_max_deg']:.1f}°")
     return lines
 
 
@@ -311,11 +368,7 @@ def benchmark(run_dir, gen, n=6, rounds=3, variants=VARIANTS, log=print):
     times = {name: [] for name in variants}
     steps = int(round(config.SIM_DURATION / H))
 
-    @contextlib.contextmanager
-    def both(name):
-        proj, tail = split(name)
-        with variant(proj), tail_limits(tail):
-            yield
+    both = configuration
 
     for name in variants:   # compilation numba hors chronomètre
         with both(name):

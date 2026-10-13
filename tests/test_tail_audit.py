@@ -200,8 +200,37 @@ def test_curvature_tail_limits_replace_the_cone_without_touching_the_engine():
         m = dp.measure(cr.diagonal_gait_genome(), "dissipatif:courbure1")
     assert m["cree_J"] >= 0.0 and m["ecart_p95_deg"] < 15.0     # queue presque droite
     assert dp.split("dissipatif") == ("dissipatif", "cone")
+    assert dp.split3("dissipatif:courbure2.5:alterne") == ("dissipatif", "courbure2.5", "alterne")
     with pytest.raises(ValueError):
         dp.split("dissipatif:spirale")
+
+
+def test_alternating_order_only_changes_the_tail_block():
+    from evo import diag_projection as dp
+    from evo import physics
+
+    originals = (physics._link_velocities_numba, physics._project_links_numba)
+    rng = np.random.default_rng(3)
+    for body in (False, True):            # sans butées du corps : identique au moteur, au bit près
+        config.BODY_LIMITS = body
+        try:
+            with dp.tail_limits("courbure1"):             # queue serrée : toutes ses butées actives ensemble
+                c = cr.Creature(cr.random_genome(rng))
+                pos = c.world.pos + rng.normal(scale=0.2, size=c.world.pos.shape)
+                vel = rng.normal(scale=3.0, size=c.world.pos.shape)
+                worlds = []
+                for order in ("ordre", "alterne"):
+                    w = cr.Creature(c.genome).world
+                    w.pos, w.vel = pos.copy(), vel.copy()
+                    with dp.solver_order(order):
+                        physics.link(w, H)
+                        physics.project_links(w)
+                    worlds.append(w)
+            same = np.array_equal(worlds[0].pos, worlds[1].pos) and np.array_equal(worlds[0].vel, worlds[1].vel)
+            assert same is (not body)                            # avec la queue : le sens de parcours compte
+        finally:
+            config.BODY_LIMITS = True
+    assert (physics._link_velocities_numba, physics._project_links_numba) == originals
 
 
 def test_morphology_factors_stay_within_the_genome_bounds(small_run, tmp_path):
