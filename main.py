@@ -398,8 +398,8 @@ def main(argv=None):
         if args.export:
             os.makedirs(args.export, exist_ok=True)
             path = os.path.join(args.export, f"diag_s{seed}_g{args.gen}_{tag}.json")
-            with open(path, "w") as fh:
-                json.dump(result, fh, indent=1, ensure_ascii=False)
+            with open(path, "w") as fh:     # default : scalaires numpy (compteurs, booléens) en types Python
+                json.dump(result, fh, indent=1, ensure_ascii=False, default=lambda o: o.item())
             print(path)
         if result.get("identique") is False:
             print("ALERTE : la hauteur rejouée (moteur tel quel) diffère de la hauteur stockée")
