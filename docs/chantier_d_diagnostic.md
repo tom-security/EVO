@@ -243,6 +243,80 @@ est presque toujours active.
   il faudra réentraîner.
 - (d) coûte +49 à +59 % en entraînement, en plus du ×2,2 de C2.
 
+## 5 ter. Dernier tour : β = 1° et 2,5°, ordre actuel ou alterné (avec (b)), et décision
+
+**Décisions de l'utilisateur** :
+- (b) est retenu définitivement ;
+- des butées enfoncées jusqu'à 12° ne respectent pas la règle du projet (0,5° depuis B2), d'où un dernier tour de
+  mesure ;
+- il porte sur quatre configurations, toutes avec (b) : β = 1° et β = 2,5° (le second correspond à 30° de virage
+  cumulé), chacun avec l'ordre actuel des butées de queue, puis avec un sens de parcours alterné à chaque passe (racine
+  → bout, puis bout → racine) ;
+- règle de décision, appliquée par moi : voir plus bas.
+
+**Méthode** :
+- même méthode, en lecture seule ;
+- l'alternance utilise des copies des deux noyaux du solveur (`evo/diag_alterne.py` : mêmes signatures, mêmes
+  opérations, seul le sens de parcours du bloc des butées de queue change aux passes impaires), substituées le temps de
+  la mesure. Sans butées du corps, elles redonnent le moteur au bit près (test) ;
+- **enfoncement** : la pénétration de la butée de queue la plus enfoncée, en degrés, à chaque sous-pas après la
+  projection. Son p95 porte sur tous les sous-pas des 150 grimpes (histogrammes à pas de 0,05° jusqu'à 2°, la valeur
+  donnée est la borne haute de la classe).
+
+Runs : 38396961009 à 38397039239 ; `pytest` sur le runner : 162 passent (38396947215). Le moteur tel quel est
+identique au run pour toutes les créatures.
+
+**Les 50 meilleures de la génération 200** (150 grimpes) :
+
+| configuration | posture : écart à l'axe médian ; p95 | enfoncement des butées de queue : p95 ; max | grimpes avec > 0,5° | sauts d'angle ; sommet du cône | énergie créée | queue étirée max | liens > 0,2 % avant projection (ms moyennes) | Δh médiane ; min | tombées |
+|---|---|---|---|---|---|---|---|---|---|
+| tel quel (cône) | 25,4° ; 30,0° | ≤ 0,05° ; 0,0° | 0 | 6 ; 11 | 0 J | 0,6 % | 1 372 | 0 ; 0 | 0 |
+| (b) (cône) | 25,6° ; 30,0° | ≤ 0,05° ; 0,0° | 0 | 9 ; 12 | 0 J | 0,6 % | 1 350 | −0,04 ; −8,81 m | 0 |
+| (b) + β = 1° | 6,9° ; 10,2° | ≤ 1,20° ; 11,7° | 150 | 0 ; 0 | 0 J | 3,9 % | 51 | −2,62 ; −45,61 m | 33 |
+| (b) + β = 1°, alterné | 7,0° ; 10,5° | ≤ 1,90° ; 11,1° | 150 | 0 ; 0 | 0 J | 3,7 % | 58 | −2,59 ; −45,58 m | 35 |
+| **(b) + β = 2,5°** | **8,9° ; 17,5°** | **≤ 1,05° ; 14,6°** | 117 | 0 ; 0 | 0 J | 4,0 % | 26 | −0,39 ; −45,59 m | 17 |
+| (b) + β = 2,5°, alterné | 8,9° ; 17,5° | ≤ 1,60° ; 27,0° | 141 | 0 ; 0 | 0 J | 3,2 % | 32 | −0,35 ; −45,49 m | 15 |
+
+Par graine (écart médian ; enfoncement p95) :
+
+| | graine 0 | graine 1 | graine 2 |
+|---|---|---|---|
+| β = 1° | 5,1° ; 0,70° | 8,1° ; 1,60° | 6,9° ; 1,00° |
+| β = 1° alterné | 5,1° ; 1,10° | 8,2° ; 3,00° | 7,0° ; 1,60° |
+| β = 2,5° | 6,9° ; 0,30° | 14,3° ; 1,65° | 8,7° ; 0,35° |
+| β = 2,5° alterné | 6,9° ; 0,50° | 14,4° ; 3,00° | 8,7° ; 0,55° |
+
+**Les créatures tombées de la génération 200** (293) :
+
+| configuration | posture : écart médian ; p95 | enfoncement p95 ; max | sauts ; sommet | énergie créée | queue étirée max ; > 5 % |
+|---|---|---|---|---|---|
+| tel quel | 29,5° ; 30,0° | ≤ 0,05° ; 150° | 196 ; 206 | 0,1 J | 43,8 % ; 7 |
+| (b) | 29,5° ; 30,0° | ≤ 0,05° ; 150° | 200 ; 211 | 0 J | 6,9 % ; 1 |
+| (b) + β = 1° | 7,0° ; 11,5° | ≤ 1,55° ; 19,3° | 0 ; 0 | 0,1 J | 9,8 % ; 2 |
+| (b) + β = 1°, alterné | 7,1° ; 12,0° | ≤ 3,00° ; 24,1° | 0 ; 0 | 0 J | 9,2 % ; 2 |
+| (b) + β = 2,5° | 13,2° ; 21,7° | ≤ 1,60° ; 22,1° | 0 ; 0 | 2,7 J | 11,2 % ; 10 |
+| (b) + β = 2,5°, alterné | 13,0° ; 22,0° | ≤ 3,00° ; 33,1° | 0 ; 0 | 0,3 J | 9,3 % ; 8 |
+
+**Coût** (runner, en alternance) :
+- moteur scalaire avec (b) : ×1,20 à ×1,21 pour les quatre configurations, ×1,15 pour (b) avec le cône ;
+- évaluateur batché : cône 12,36 s, β = 2,5° 19,35 s (**×1,57**), β = 1° 19,72 s (×1,60) ;
+- l'alternance ne change pas le nombre d'opérations.
+
+**Décision, par la règle de l'utilisateur** :
+1. **Posture des 50 meilleures, écart médian ≤ 10°** : les quatre configurations passent (6,9 / 7,0 / 8,9 / 8,9°).
+2. **Enfoncement le plus faible (p95, puis max), à coût comparable** : **β = 2,5° dans l'ordre actuel** (p95 ≤ 1,05°,
+   max 14,6°), devant β = 1° (≤ 1,20°). L'alternance aggrave l'enfoncement dans les deux cas (≤ 1,60° et ≤ 1,90°),
+   pour le même coût ; elle est écartée.
+3. **p95 ≤ 1,05° : entre 0,5° et 2°**, c'est le cas 4 de la règle. On enchaîne sur l'étape 3 (code derrière drapeaux,
+   tests, `pytest` sur le runner) puis sur l'étape 4 (essai de 5 générations, réentraînement des 3 graines), en
+   documentant la tolérance de la queue dans le rapport.
+
+**Tolérance de la queue, à documenter** :
+- les butées de courbure de la queue tiennent à 1,05° près au p95, mais peuvent s'enfoncer ponctuellement jusqu'à
+  14,6° (les meilleures, ici avec des génomes entraînés sous le cône) ;
+- la chaîne des 11 butées couplées converge moins bien que des butées isolées ;
+- la règle de 0,5° de B2 reste celle des butées articulaires et des pieds.
+
 ## 6. Question pour la v2 (hors chantier D) : le score « hauteur à 10 s »
 
 Le score lit la hauteur à t = 10 s pile. Une créature qui a lâché le mur et tombe est notée **à l'endroit où elle se
