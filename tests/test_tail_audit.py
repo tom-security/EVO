@@ -175,6 +175,10 @@ def test_diag_projection_population_and_trace_variant(small_run, tmp_path):
     t = trace.trace(small_run, 0, i, log=None, out_dir=str(tmp_path), variante="dissipatif")
     assert t["csv"].endswith("_dissipatif.csv")
     assert max(x["variante_ke_vitesse_J"] for x in t["rows"]) <= 1e-9
+    assert min(x["queue_dist_bassin_min_m"] for x in t["rows"]) > 0.0
+    base = trace.trace(small_run, 0, i, log=None)
+    more = trace.trace(small_run, 0, i, log=None, variante="passes120")   # la variante s'applique bien (N_ITER)
+    assert base["identique"] and more["hauteur"] != base["hauteur"]
     b = dp.benchmark(small_run, 0, n=1, rounds=1, variants=("tel_quel", "dissipatif"), log=None)
     assert set(b["secondes"]) == {"tel_quel", "dissipatif"}
 

@@ -26,6 +26,7 @@ def trace(run_dir, gen, index, log=print, out_dir=None, variante="tel_quel"):
     temps du rejeu seulement (le moteur du dépôt n'est pas modifié)."""
     from evo import diag_projection as dp
 
+    ev.use_run_config(run_dir)          # avant la variante : la config du run fixe N_ITER, que passes120 remplace
     with dp.variant(variante, record=True):
         result = _trace(run_dir, gen, index, out_dir, variante)
     if log:
@@ -37,7 +38,6 @@ def trace(run_dir, gen, index, log=print, out_dir=None, variante="tel_quel"):
 def _trace(run_dir, gen, index, out_dir, variante):
     from evo import diag_projection as dp
 
-    ev.use_run_config(run_dir)
     pop, res, _, _ = ev.load_generation(run_dir, gen)
     genome = pop.genome(index)
     h = config.DT / config.SUBSTEPS
@@ -71,6 +71,13 @@ def _trace(run_dir, gen, index, out_dir, variante):
                "variante_ke_vitesse_J": dp.LAST["ke_vitesse"], "variante_alpha": dp.LAST["alpha"],
                "avant_proj_marge_queue_deg": math.degrees(dp.LAST["pre_marge_queue"]),
                "avant_proj_lien_max": dp.LAST["pre_lien"], "projection_dp_max_m": dp.LAST["dp_max"]}
+        # point de queue le plus proche du bassin (hors le premier, relié au bassin) : près du sommet du cône, l'angle
+        # vu du bassin n'est plus défini et la butée de cône devient singulière
+        if len(w.pos) > sk.TAIL_START + 1:
+            d = np.hypot(*(w.pos[sk.TAIL_START + 1:] - w.pos[sk.PELVIS]).T)
+            k = int(d.argmin())
+            row["queue_dist_bassin_min_m"] = float(d[k])
+            row["queue_point_proche"] = k + 1
         for name, idx in groups.items():
             row[f"actives_{name}"] = int(w.limit_active[idx].sum())
             row[f"marge_min_{name}_deg"] = float(math.degrees(margins[idx].min()))
@@ -138,6 +145,10 @@ def summary_lines(r):
         lines.append(f"    t = {x['t']:.4f} s : créé {x['cree_J']:.4f} J | {st}{extra} | tenus {x['tenus']}, au sol corps "
                      f"{x['sol_corps']} queue {x['sol_queue']} | butées actives : {act} | queue écart max "
                      f"{x['queue_ecart_max_deg']:.1f}°, os de queue {100 * x['queue_os_max']:.2f} %")
+    if "queue_dist_bassin_min_m" in rows[0]:
+        near = min(rows, key=lambda x: x["queue_dist_bassin_min_m"])
+        lines.append(f"  queue : point le plus proche du bassin {100 * near['queue_dist_bassin_min_m']:.1f} cm (point "
+                     f"{near['queue_point_proche']}) à t = {near['t']:.4f} s")
     worst_tail = max(rows, key=lambda x: x["queue_ecart_max_deg"])
     lines.append(f"  queue : écart max à l'axe {worst_tail['queue_ecart_max_deg']:.1f}° à t = {worst_tail['t']:.4f} s "
                  f"(au sol : queue {worst_tail['sol_queue']}, corps {worst_tail['sol_corps']}) ; os de queue max "
