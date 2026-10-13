@@ -148,3 +148,5 @@ def test_planche_puts_images_side_by_side(tmp_path):
     assert sheet.get_size() == (100 + 100 + planches.GAP, 50 + planches.CAPTION_H)   # même hauteur (50 px)
     out = planches.export(paths, str(tmp_path / "planche.png"), crop=(0.0, 0.0, 0.5, 1.0))
     assert os.path.getsize(out) > 0
+    bare = planches.assemble(paths[:1], labels=[""], crop=(0.5, 0.0, 1.0, 1.0))   # recadrage seul, sans bandeau
+    assert bare.get_size() == (100, 100)

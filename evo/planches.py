@@ -22,7 +22,7 @@ def assemble(paths, labels=None, height=None, crop=None):
     crop : (x0, y0, x1, y1) en fractions de l'image, appliqué à chaque image avant la mise à l'échelle.
     """
     pygame.font.init()
-    labels = list(labels or [os.path.basename(p) for p in paths])
+    labels = [label.strip() for label in (labels or [os.path.basename(p) for p in paths])]
     if len(labels) != len(paths):
         raise ValueError("une légende par image")
     images = []
@@ -37,14 +37,16 @@ def assemble(paths, labels=None, height=None, crop=None):
     scaled = [pygame.transform.smoothscale(img, (max(1, round(img.get_width() * target / img.get_height())), target))
               for img in images]
     width = sum(s.get_width() for s in scaled) + GAP * (len(scaled) - 1)
-    sheet = pygame.Surface((width, target + CAPTION_H))
+    caption = CAPTION_H if any(labels) else 0   # légendes toutes vides : pas de bandeau (recadrage seul)
+    sheet = pygame.Surface((width, target + caption))
     sheet.fill(BG)
     font = pygame.font.SysFont(None, 26)
     x = 0
     for s, label in zip(scaled, labels):
         sheet.blit(s, (x, 0))
-        text = font.render(label, True, TEXT)
-        sheet.blit(text, text.get_rect(midtop=(x + s.get_width() // 2, target + 8)))
+        if label:
+            text = font.render(label, True, TEXT)
+            sheet.blit(text, text.get_rect(midtop=(x + s.get_width() // 2, target + 8)))
         x += s.get_width() + GAP
     return sheet
 
