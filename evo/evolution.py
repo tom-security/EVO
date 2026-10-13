@@ -231,7 +231,8 @@ def saved_generations(run_dir):
 
 # Valeur d'une clé absente de la config d'un run : celle d'avant son introduction (les runs d'avant les butées
 # articulaires se rejouent sans elles).
-LEGACY_DEFAULTS = {"JOINT_LIMITS": False, "BODY_LIMITS": False}
+LEGACY_DEFAULTS = {"JOINT_LIMITS": False, "BODY_LIMITS": False, "CLEAN_PROJECTION": False,
+                   "TAIL_CURVATURE_LIMITS": False, "HAND_LIMITS": False}
 
 
 def run_config(run_dir):

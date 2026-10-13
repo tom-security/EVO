@@ -24,7 +24,8 @@ from evo import creature as cr
 from evo import physics
 from evo import skeleton as sk
 
-STAGES = ("gravite", "muscles", "hold", "liens_contacts", "hold2", "mouvement", "projection_sol")
+STAGES = ("gravite", "muscles", "hold", "liens_contacts", "hold2", "mouvement", "projection_sol",
+          "report_projection")
 # énergie créée hors muscles d'un sous-pas selon l'état des butées (max et somme, J)
 LIMIT_CLASSES = ("engagement", "contact", "libre")
 LIMIT_KEYS = (("butees_engagements", "butees_sous_pas_engagement", "engagement_liens_ke_max",
@@ -66,7 +67,10 @@ def audited_substep(c, h, ledger):
     links = stage("liens_contacts", lambda: physics.link(w, h), _ke)
     stage("hold2", lambda: physics.hold(w), _ke)
     stage("mouvement", lambda: physics.movement(w, h), _pe)
+    before = w.pos.copy() if w.clean_projection else None
     projection = stage("projection_sol", lambda: physics.project_links(w), _pe)
+    if w.clean_projection:     # chantier D : report dissipatif de la projection sur la vitesse
+        stage("report_projection", lambda: physics.projection_velocity(w, before, h), _ke)
     w.t += h
     # Part purement « schéma de la gravité » : ΔKE(gravité) + ΔPE(Movement) si seule la
     # gravité avait agi = −½·m·g²·h² par point libre (toujours négative).

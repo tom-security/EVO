@@ -24,6 +24,8 @@ needs_numba = pytest.mark.skipif(not physics.HAVE_NUMBA, reason="numba non insta
 @pytest.fixture(autouse=True)
 def limits_on(monkeypatch):
     monkeypatch.setattr(config, "JOINT_LIMITS", True)
+    for flag in ("CLEAN_PROJECTION", "TAIL_CURVATURE_LIMITS", "HAND_LIMITS"):   # moteur de la v1 (chantier D : à part)
+        monkeypatch.setattr(config, flag, False)
 
 
 def _hinge(held_end="A"):
@@ -256,3 +258,4 @@ def test_local_runs_replay_with_their_own_flag(seed, run_config_restored):
         assert r.ok, run_dir                              # hauteur rejouée = hauteur stockée
         assert config.JOINT_LIMITS is joint_flag, run_dir  # butées selon le run, pas selon config.py
         assert config.BODY_LIMITS is body_flag, run_dir
+        assert not (config.CLEAN_PROJECTION or config.TAIL_CURVATURE_LIMITS or config.HAND_LIMITS), run_dir  # d'avant D

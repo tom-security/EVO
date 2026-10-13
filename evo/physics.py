@@ -92,6 +92,9 @@ class World:
         self.ground_y = None  # hauteur du sol (None = pas de sol) ; les bancs de la phase 1 n'en ont pas
         self.ground_friction = config.GROUND_FRICTION
         self.contact_margin = config.CONTACT_MARGIN
+        # Chantier D : report dissipatif de la projection sur la vitesse (projection_velocity). Posé par Creature
+        # (config.CLEAN_PROJECTION) ; les bancs de la phase 1 gardent la projection seule.
+        self.clean_projection = False
 
     def set_joint_limits(self, sign, lo, hi, triplets=None):
         """Butées : limit_sign·θ reste dans [lo, hi] (rad, hi − lo < 2π) pour chaque triplet (A, pivot P, B).
@@ -262,6 +265,17 @@ def project_links(world):
     kernel(world.pos, world.inv_mass, world.links, world.rest, int(world.n_pos_iter),
            ground, float(world.ground_y or 0.0), world.limit_joints, world.limit_sign, world.limit_lo,
            world.limit_hi, float(world.limit_margin))
+
+
+def projection_velocity(world, before, h):
+    """Report dissipatif de la projection sur la vitesse (chantier D, config.CLEAN_PROJECTION) ; renvoie α.
+
+    `before` : positions juste avant project_links. Avec Δv = Δp/h, B = Σ m·v·Δv et A = Σ m·|Δv|² :
+    v += α·Δv, α = min(1, −2B/A) si B < 0, sinon 0. L'énergie cinétique varie de α·B + ½·α²·A ≤ 0 : le report
+    retire la vitesse qui allait contre la correction (point remonté au sol, lien raccourci), sans jamais en ajouter.
+    """
+    kernel = _projection_velocity_numba if world.backend == "numba" else _projection_velocity_python
+    return kernel(world.pos, before, world.vel, world.mass, float(h))
 
 
 # Noyaux du solveur. Les versions numba et Python font exactement les mêmes
@@ -573,6 +587,48 @@ def _project_links_python(pos, inv_mass, links, rest, n_pos_iter, ground, ground
     pos[:, 1] = py
 
 
+@njit(cache=True)
+def _projection_velocity_numba(pos, before, vel, mass, h):
+    # même suite d'opérations dans l'évaluateur batché (evo/batch.py) : sommes dans l'ordre des points
+    n_points = pos.shape[0]
+    bb = 0.0
+    aa = 0.0
+    for p in range(n_points):
+        dvx = (pos[p, 0] - before[p, 0]) / h
+        dvy = (pos[p, 1] - before[p, 1]) / h
+        bb += mass[p] * (vel[p, 0] * dvx + vel[p, 1] * dvy)
+        aa += mass[p] * (dvx * dvx + dvy * dvy)
+    alpha = min(1.0, -2.0 * bb / aa) if (bb < 0.0 and aa > 0.0) else 0.0
+    if alpha > 0.0:
+        for p in range(n_points):
+            vel[p, 0] += alpha * ((pos[p, 0] - before[p, 0]) / h)
+            vel[p, 1] += alpha * ((pos[p, 1] - before[p, 1]) / h)
+    return alpha
+
+
+def _projection_velocity_python(pos, before, vel, mass, h):
+    """Référence Python pure de `_projection_velocity_numba`."""
+    px, py = pos[:, 0].tolist(), pos[:, 1].tolist()
+    bx, by = before[:, 0].tolist(), before[:, 1].tolist()
+    vx, vy = vel[:, 0].tolist(), vel[:, 1].tolist()
+    m = mass.tolist()
+    bb = 0.0
+    aa = 0.0
+    for p in range(len(px)):
+        dvx = (px[p] - bx[p]) / h
+        dvy = (py[p] - by[p]) / h
+        bb += m[p] * (vx[p] * dvx + vy[p] * dvy)
+        aa += m[p] * (dvx * dvx + dvy * dvy)
+    alpha = min(1.0, -2.0 * bb / aa) if (bb < 0.0 and aa > 0.0) else 0.0
+    if alpha > 0.0:
+        for p in range(len(px)):
+            vx[p] += alpha * ((px[p] - bx[p]) / h)
+            vy[p] += alpha * ((py[p] - by[p]) / h)
+        vel[:, 0] = vx
+        vel[:, 1] = vy
+    return alpha
+
+
 def spring_link(world, h, k=None, c=None):
     """Méthode naïve (vidéo « créatures aquatiques ») : un ressort amorti par lien.
 
@@ -615,7 +671,12 @@ def substep(world, h):
         link(world, h)
         hold(world)
         movement(world, h)
-        project_links(world)
+        if world.clean_projection:
+            before = world.pos.copy()
+            project_links(world)
+            projection_velocity(world, before, h)
+        else:
+            project_links(world)
     world.t += h
 
 

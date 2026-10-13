@@ -197,6 +197,28 @@ TAIL_LENGTH_LIMIT = 0.01
 TAIL_CHATTER_MIN_DEG = 0.01
 TAIL_CHATTER_CONTACT_DEG = 2.0
 TAIL_CHATTER_MAX = 0.10
+# Chantier D (« projection propre » ; docs/chantier_d_diagnostic.md). Trois drapeaux, absents de la config d'un run
+# (runs d'avant D) : False, les runs de B2 et C2 se rejouent tels quels.
+# [CHOIX] D, candidat (b) retenu — report dissipatif de la projection sur la vitesse : avec Δv = Δp/h (correction de
+# position de la projection), B = Σ m·v·Δv et A = Σ m·|Δv|², v += α·Δv avec α = min(1, −2B/A) si B < 0, sinon 0. Le
+# report ne peut que retirer de l'énergie cinétique : il supprime l'énergie créée par les créatures couchées (la
+# projection remontait les points sans corriger leur vitesse vers le bas ; B2 n°868 : 1 292,5 J → 0 J).
+CLEAN_PROJECTION = True
+# [CHOIX] D, candidat (d) — queue tenue par sa courbure plutôt que par un cône vu du bassin (singulier quand un point
+# de queue revient sur le bassin) : le premier segment dans un cône de ±TAIL_CURVATURE_DEG autour du prolongement de
+# la colonne, puis à chaque jonction (point précédent, TAIL_k, TAIL_k+1) un angle à ±TAIL_CURVATURE_DEG de
+# l'alignement. Remplace les butées de cône (mêmes indices 10 à 21) si JOINT_LIMITS et BODY_LIMITS.
+TAIL_CURVATURE_LIMITS = True
+# [CHOIX] D — β retenu par la règle de décision de Tom (dernier tour de mesure, 50 meilleures de la gén. 200 des 3
+# graines C2) : écart médian à l'axe 8,9° (≤ 10°), enfoncement des butées de queue le plus faible (p95 ≤ 1,05°,
+# max 14,6°) ; β = 1° : 6,9°, p95 ≤ 1,20°. Tolérance de la queue : la chaîne de butées couplées s'enfonce plus que la
+# règle de 0,5° des butées articulaires et des pieds.
+TAIL_CURVATURE_DEG = 2.5
+# [CHOIX] D (BILAN_V1 §4.3) — chaque main reste de son côté de l'axe bassin–cou, comme les pieds : triplets
+# (NECK, PELVIS, L_HAND / R_HAND), à au moins HAND_AXIS_MARGIN_DEG de l'axe ; posées après la queue (indices 22, 23)
+# si JOINT_LIMITS et BODY_LIMITS. Motivation : C2 à 30°, graine 0, mains de l'autre côté de l'axe 91,4 % du temps.
+HAND_LIMITS = True
+HAND_AXIS_MARGIN_DEG = 0.0  # [CHOIX] D — main jusque sur l'axe, pas au-delà (comme FOOT_AXIS_MARGIN_DEG)
 # [CHOIX] §2.5 — probabilité qu'une patte tienne dans une pose aléatoire. Grille 2 (génération 0,
 # graines 0/1/2, au sol sur 1000) : TS 0.25 → prise 0.5 : 700–737, 0.6 : 530–542, 0.7 : 315–361 ;
 # départ 10.3 m : −5 % seulement. Retenu 0.62 (voir TORQUE_SCALE, grille 3).

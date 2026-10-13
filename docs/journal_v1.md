@@ -531,3 +531,37 @@ inchangé. `pytest` : 158 passent (38360421255).
 - test des runs locaux et workflow mis à jour (`.github/scripts/restaurer_runs.sh` restaure les trois jeux) ;
 - le job `reproductibilite` rejoue les champions C2 et B2 ;
 - docs mises à jour (PASSATION, note de chemins du rapport C2, encadré du bilan).
+
+## Étape 12 : chantier D, diagnostic (branche `claude/chantier-d-diagnostic`)
+
+Détail et chiffres : `docs/chantier_d_diagnostic.md`.
+- (b) `dissipatif` retenu par Tom ; (a) et (c) écartés.
+- Dernier tour de (d), quatre configurations avec (b) (runs 38396947215 à 38397039239) : β = 2,5° dans l'ordre
+  actuel est retenue par la règle de Tom (posture 8,9° ≤ 10°, enfoncement p95 ≤ 1,05°, max 14,6°) ; entre 0,5° et
+  2°, d'où la règle 4 : on enchaîne sur les étapes 3 et 4, en documentant la tolérance de la queue (commit `dc13561`).
+
+## Étape 13 : chantier D, étape 3 (moteur, branche `claude/chantier-d`) ; ARRÊT
+
+**Code** (drapeaux absents de la config d'un run = False, `LEGACY_DEFAULTS`) :
+- `CLEAN_PROJECTION` : report dissipatif dans le noyau scalaire (`physics.projection_velocity`), sa référence Python et
+  l'évaluateur batché ; étape `report_projection` dans l'audit d'énergie ;
+- `TAIL_CURVATURE_LIMITS`, `TAIL_CURVATURE_DEG = 2.5` : courbure de queue, mêmes indices 10 à 21 ;
+- `HAND_LIMITS`, `HAND_AXIS_MARGIN_DEG = 0` : mains de leur côté de l'axe, indices 22 et 23 (`limit_groups` : groupe
+  « mains ») ;
+- `tests/test_chantier_d.py` (21 tests) ; les tests de B2, C2 et des outils de mesure fixent les trois drapeaux à
+  False.
+
+**Vérifications locales** :
+- scalaire et batché identiques au bit près, avec pied, main et queue engagés et le report actif ;
+- numba et Python identiques à 1e-12 près ;
+- aucune énergie créée sur la grimpeuse, la marche et les quatre créatures du diagnostic (868, 760, 808, 677 : 0 J,
+  queue ≤ 0,74 %) ;
+- `pytest` local : 178 passent ; 3 échecs connus (rejeu Windows) et **2 échecs sur la créature inerte**.
+
+**Arrêt (décision validée, PASSATION §10)** : « créature inerte avec butées du corps : hauteur dans la plage de la
+vidéo, seuils propres à ce cas (énergie < 6 J, queue < 10 %) ». Avec le moteur D, elle finit à **−7,74 m** (plage :
+−9 à −7,8 m) et crée **8,16 J** (≈ 3,7 cm, sous le seuil d'audit de 5 cm). Cause : elle tombe sur la pointe de sa
+queue, que les butées de courbure tiennent droite comme une échasse ; la chaîne de 12 butées couplées n'est pas
+résolue en vitesse, et la projection la redresse en soulevant le torse d'environ 2 mm par sous-pas, à vitesse nulle (le
+report n'a rien à retirer). Ce n'est pas un défaut de l'implémentation : l'outil du diagnostic donne 8,154 J.
+Options mesurées : `docs/chantier_d.md`. Le runner n'a pas été lancé ; l'étape 4 attend la décision.

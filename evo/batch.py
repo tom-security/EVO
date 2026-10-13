@@ -5,7 +5,8 @@ repasser par Python. Chaque créature refait exactement les mêmes opérations, 
 ordre, que le moteur scalaire (`Creature.substep` → `physics.substep`) : contrôleur à
 horloge + PD, forces des muscles (même ordre d'accumulation que `np.add.at`), prises sur le
 tronc, liens + butées articulaires + contacts sol (même calcul que `_link_velocities_numba`, mêmes
-fonctions partagées pour les butées), projection, chute, énergie. Dans un bloc, la boucle intérieure passe d'une créature à l'autre : leurs calculs
+fonctions partagées pour les butées), projection (et son report dissipatif sur la vitesse, chantier D), chute,
+énergie. Dans un bloc, la boucle intérieure passe d'une créature à l'autre : leurs calculs
 indépendants s'entrelacent et masquent la latence de Gauss-Seidel (×5 par rapport à une
 créature à la fois). Les tests vérifient l'égalité avec le moteur scalaire à 1e-9 près.
 
@@ -68,6 +69,9 @@ def pack(genomes):
         raise ValueError("toutes les créatures doivent avoir les mêmes triplets de butée")
     arrays["lim_sign"] = first.world.limit_sign.copy()
     arrays["lim_joints"] = first.world.limit_joints.copy()   # (Q, 3) triplets des butées (C2), séparés des muscles
+    if any(c.world.clean_projection != first.world.clean_projection for c in creatures):
+        raise ValueError("toutes les créatures doivent avoir le même report de la projection")
+    arrays["clean_projection"] = bool(first.world.clean_projection)   # chantier D
     assert arrays["pos"].shape[0] == n
     return arrays
 
@@ -92,7 +96,7 @@ def _wrap(x):
 @njit(cache=True, error_model="numpy")
 def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets, holds, first, last,
                     links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs, n_body,
-                    n_steps, h, g, n_iter, beta, n_pos_iter, ground_y, friction, margin,
+                    n_steps, h, g, n_iter, beta, n_pos_iter, clean_projection, ground_y, friction, margin,
                     kp, kd, torque_unit, trunk_x, trunk_half, fall_eps, fall_disables_hold,
                     energy_out, fallen_out, vel_out):
     """Créatures first..last-1 simulées en même temps (même suite d'opérations que _simulate_one
@@ -145,6 +149,11 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
     l_min = np.zeros((n_lim, nb))
     l_lam = np.zeros((n_lim, nb))
     l_near = np.zeros((n_lim, nb), dtype=np.bool_)
+    bx0 = np.zeros((n_points, nb))      # positions avant la projection (report dissipatif, chantier D)
+    by0 = np.zeros((n_points, nb))
+    rep_b = np.zeros(nb)
+    rep_a = np.zeros(nb)
+    rep_alpha = np.zeros(nb)
     pose_index = np.full(nb, -1)
     pose = np.zeros(nb, dtype=np.int64)
     energy = np.zeros(nb)
@@ -337,6 +346,11 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
                 px[p, b] += vx[p, b] * h
                 py[p, b] += vy[p, b] * h
         # --- projection (même calcul que physics._project_links_numba) ---
+        if clean_projection:
+            for p in range(n_points):
+                for b in range(nb):
+                    bx0[p, b] = px[p, b]
+                    by0[p, b] = py[p, b]
         for q in range(n_lim):  # butées candidates : à moins de la marge au début de la projection
             a, pv, bb = lim_joints[q, 0], lim_joints[q, 1], lim_joints[q, 2]
             for b in range(nb):
@@ -389,6 +403,24 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
                 for b in range(nb):
                     if inv[p, b] > 0.0 and py[p, b] < ground_y:
                         py[p, b] = ground_y
+        # --- report dissipatif de la projection (même calcul que physics._projection_velocity_numba) ---
+        if clean_projection:
+            for b in range(nb):
+                rep_b[b] = 0.0
+                rep_a[b] = 0.0
+            for p in range(n_points):
+                for b in range(nb):
+                    dvx = (px[p, b] - bx0[p, b]) / h
+                    dvy = (py[p, b] - by0[p, b]) / h
+                    rep_b[b] += m[p, b] * (vx[p, b] * dvx + vy[p, b] * dvy)
+                    rep_a[b] += m[p, b] * (dvx * dvx + dvy * dvy)
+            for b in range(nb):
+                rep_alpha[b] = min(1.0, -2.0 * rep_b[b] / rep_a[b]) if (rep_b[b] < 0.0 and rep_a[b] > 0.0) else 0.0
+            for p in range(n_points):
+                for b in range(nb):
+                    if rep_alpha[b] > 0.0:
+                        vx[p, b] += rep_alpha[b] * ((px[p, b] - bx0[p, b]) / h)
+                        vy[p, b] += rep_alpha[b] * ((py[p, b] - by0[p, b]) / h)
         # --- énergie, chute ---
         for b in range(nb):
             for j in range(8):
@@ -418,7 +450,7 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
 @njit(parallel=True, cache=True, error_model="numpy")
 def _simulate_population(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets, holds, block,
                          links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs,
-                         n_body, n_steps, h, g, n_iter, beta, n_pos_iter, ground_y, friction, margin,
+                         n_body, n_steps, h, g, n_iter, beta, n_pos_iter, clean_projection, ground_y, friction, margin,
                          kp, kd, torque_unit, trunk_x, trunk_half, fall_eps, fall_disables_hold,
                          energy_out, fallen_out):
     n = pos.shape[0]
@@ -429,7 +461,7 @@ def _simulate_population(pos, rest, mass, phi_rest, s_plus, s_minus, period, tar
         last = min(first + block, n)
         _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets, holds, first, last,
                         links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs,
-                        n_body, n_steps, h, g, n_iter, beta, n_pos_iter,
+                        n_body, n_steps, h, g, n_iter, beta, n_pos_iter, clean_projection,
                         ground_y, friction, margin, kp, kd, torque_unit, trunk_x, trunk_half, fall_eps,
                         fall_disables_hold, energy_out, fallen_out, vel)
     return vel
@@ -459,6 +491,7 @@ def evaluate(genomes, duration=10.0, packed=None):
         float(math.radians(config.JOINT_LIMIT_MARGIN_DEG)),
         np.array(cr.LIMBS, dtype=np.int64), sk.TAIL_START, int(round(duration / h)), h,
         float(config.G), int(config.N_ITER), float(config.BETA), int(config.N_POS_ITER),
+        bool(arrays.get("clean_projection", False)),
         float(config.GROUND_Y), float(config.GROUND_FRICTION), float(config.CONTACT_MARGIN),
         float(config.KP), float(config.KD), float(cr.torque_unit()), float(config.TRUNK_X),
         float(config.TRUNK_WIDTH / 2), float(config.FALL_CONTACT_EPS), bool(config.FALL_DISABLES_HOLD),

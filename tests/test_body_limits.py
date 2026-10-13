@@ -27,6 +27,8 @@ needs_numba = pytest.mark.skipif(not physics.HAVE_NUMBA, reason="numba non insta
 def limits_on(monkeypatch):
     monkeypatch.setattr(config, "JOINT_LIMITS", True)
     monkeypatch.setattr(config, "BODY_LIMITS", True)
+    for flag in ("CLEAN_PROJECTION", "TAIL_CURVATURE_LIMITS", "HAND_LIMITS"):   # butées de C2 (D : test_chantier_d)
+        monkeypatch.setattr(config, flag, False)
 
 
 def _free_creature():

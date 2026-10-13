@@ -22,15 +22,24 @@ T = int(round(config.SIM_DURATION / H)) + 1
 def limits_on(monkeypatch):
     monkeypatch.setattr(config, "JOINT_LIMITS", True)
     monkeypatch.setattr(config, "BODY_LIMITS", True)
+    for flag in D_FLAGS:          # outils de mesure du moteur de la v1 (C2)
+        monkeypatch.setattr(config, flag, False)
+
+
+D_FLAGS = ("CLEAN_PROJECTION", "TAIL_CURVATURE_LIMITS", "HAND_LIMITS")
 
 
 @pytest.fixture(scope="module")
 def small_run(tmp_path_factory):
-    saved = (config.JOINT_LIMITS, config.BODY_LIMITS)
+    names = ("JOINT_LIMITS", "BODY_LIMITS") + D_FLAGS
+    saved = {k: getattr(config, k) for k in names}
     config.JOINT_LIMITS = config.BODY_LIMITS = True
+    for flag in D_FLAGS:
+        setattr(config, flag, False)
     run = str(tmp_path_factory.mktemp("run") / "0")
     ev.train(0, generations=1, pop_size=24, run_dir=run, audit_every=0, log=lambda *_: None)
-    config.JOINT_LIMITS, config.BODY_LIMITS = saved
+    for k, v in saved.items():
+        setattr(config, k, v)
     return run
 
 

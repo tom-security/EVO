@@ -13,6 +13,8 @@ Conventions
   config.JOINT_LIMITS_DEG ; les cibles du génome restent dans la même plage (target_bounds()).
 - Butées du corps (chantier C2, config.BODY_LIMITS) : pieds de leur côté de l'axe bassin–cou, queue dans un cône
   (body_limits()), posées à la suite des 8 articulations ; limit_groups() les range par groupe.
+- Chantier D : queue tenue par sa courbure (config.TAIL_CURVATURE_LIMITS), mains de leur côté de l'axe
+  (config.HAND_LIMITS), report dissipatif de la projection sur la vitesse (config.CLEAN_PROJECTION).
 """
 import math
 from dataclasses import dataclass, replace
@@ -74,30 +76,56 @@ def joint_limits_phi():
 
 
 def body_limits(n_tail=None):
-    """Butées du corps (C2) : (triplets (Q, 3), signes (Q,), bas (Q,), haut (Q,)), en u = signe·θ (rad).
+    """Butées du corps (C2, D) : (triplets (Q, 3), signes (Q,), bas (Q,), haut (Q,)), en u = signe·θ (rad).
 
     Triplets (NECK, PELVIS, X) : θ = angle de X vu du bassin depuis l'axe bassin→cou (physics.World.joint_angles).
     - pieds : le pied gauche (x < 0) est à θ > 0, le droit à θ < 0 ; u ∈ [m, π − m] le garde de son côté de l'axe ;
-    - queue : au repos θ = ±π ; u ∈ [π − τ, π + τ] la garde dans le cône (le repli sur le cercle de
-      physics._limit_geometry gère le passage de +π à −π).
+    - queue, cône (C2) : au repos θ = ±π ; u ∈ [π − τ, π + τ] la garde dans le cône (le repli sur le cercle de
+      physics._limit_geometry gère le passage de +π à −π) ;
+    - queue, courbure (D, config.TAIL_CURVATURE_LIMITS) : (NECK, PELVIS, TAIL_0) dans le cône de ±β, puis
+      (PELVIS ou TAIL_k−1, TAIL_k, TAIL_k+1) à ±β de l'alignement (θ = ±π au repos) ; même nombre de butées ;
+    - mains (D, config.HAND_LIMITS) : comme les pieds, posées après la queue.
     """
     n_tail = config.TAIL_SEGMENTS if n_tail is None else n_tail
     m = math.radians(config.FOOT_AXIS_MARGIN_DEG)
-    tau = math.radians(config.TAIL_CONE_DEG)
     triplets = [(sk.NECK, sk.PELVIS, sk.L_FOOT), (sk.NECK, sk.PELVIS, sk.R_FOOT)]
-    triplets += [(sk.NECK, sk.PELVIS, sk.TAIL_START + k) for k in range(n_tail)]
-    signs = [1.0, -1.0] + [1.0] * n_tail
-    lo = [m, m] + [math.pi - tau] * n_tail
-    hi = [math.pi - m, math.pi - m] + [math.pi + tau] * n_tail
+    signs = [1.0, -1.0]
+    lo = [m, m]
+    hi = [math.pi - m, math.pi - m]
+    if config.TAIL_CURVATURE_LIMITS:
+        tau = math.radians(config.TAIL_CURVATURE_DEG)
+        triplets += [(sk.NECK, sk.PELVIS, sk.TAIL_START)]
+        triplets += [(sk.PELVIS if k == 0 else sk.TAIL_START + k - 1, sk.TAIL_START + k, sk.TAIL_START + k + 1)
+                     for k in range(n_tail - 1)]
+    else:
+        tau = math.radians(config.TAIL_CONE_DEG)
+        triplets += [(sk.NECK, sk.PELVIS, sk.TAIL_START + k) for k in range(n_tail)]
+    signs += [1.0] * n_tail
+    lo += [math.pi - tau] * n_tail
+    hi += [math.pi + tau] * n_tail
+    if config.HAND_LIMITS:
+        mh = math.radians(config.HAND_AXIS_MARGIN_DEG)
+        triplets += [(sk.NECK, sk.PELVIS, sk.L_HAND), (sk.NECK, sk.PELVIS, sk.R_HAND)]
+        signs += [1.0, -1.0]
+        lo += [mh, mh]
+        hi += [math.pi - mh, math.pi - mh]
     return (np.array(triplets, dtype=np.int64), np.array(signs), np.array(lo), np.array(hi))
 
 
-def limit_groups(n_limits):
-    """Indices des butées par groupe, dans l'ordre que pose Creature : articulations, pieds, queue."""
+def limit_groups(n_limits, hands=None):
+    """Indices des butées par groupe, dans l'ordre que pose Creature : articulations, pieds, queue, mains.
+
+    hands : butées des mains posées (défaut : celles de la config courante, JOINT_LIMITS, BODY_LIMITS et HAND_LIMITS,
+    que use_run_config règle sur le run lu)."""
+    if hands is None:
+        hands = bool(config.JOINT_LIMITS and config.BODY_LIMITS and config.HAND_LIMITS)
     groups = {"articulations": np.arange(min(n_limits, len(JOINTS)))}
     if n_limits > len(JOINTS):
+        end = n_limits - 2 if hands else n_limits
         groups["pieds"] = np.arange(len(JOINTS), len(JOINTS) + 2)
-        groups["queue"] = np.arange(len(JOINTS) + 2, n_limits)
+        groups["queue"] = np.arange(len(JOINTS) + 2, end)
+        if hands:
+            groups["mains"] = np.arange(end, n_limits)
     return groups
 
 
@@ -227,11 +255,12 @@ class Creature:
         self.world.ground_y = config.GROUND_Y
         self.world.joints = np.array(JOINTS, dtype=np.int64)
         self.world.torque = np.zeros(len(JOINTS))
+        self.world.clean_projection = bool(config.CLEAN_PROJECTION)    # chantier D
         self.phi_rest = JOINT_SIGNS * self.world.joint_angles()
         if config.JOINT_LIMITS:  # butées en u = signe·θ, l'angle du moteur orienté comme φ : φ = u − φ_repos
             lim = joint_limits_phi()
             sign, lo, hi = JOINT_SIGNS, lim[:, 0] + self.phi_rest, lim[:, 1] + self.phi_rest
-            if config.BODY_LIMITS:  # C2 : pieds et queue, à la suite des 8 articulations
+            if config.BODY_LIMITS:  # C2 : pieds et queue (D : et mains), à la suite des 8 articulations
                 trip, bsign, blo, bhi = body_limits(len(self.world.pos) - sk.TAIL_START)
                 self.world.set_joint_limits(np.concatenate([sign, bsign]), np.concatenate([lo, blo]),
                                             np.concatenate([hi, bhi]),
