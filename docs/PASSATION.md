@@ -4,12 +4,23 @@ Ce document est écrit pour une IA qui rejoint le projet en cours de route. Il r
 dépôt, les échanges avec l'utilisateur et les rapports de chaque phase : le but, les règles de travail, le code,
 chaque décision prise avec sa raison, les chiffres mesurés, les écarts connus et la suite déjà validée.
 
-État au 12 octobre 2026 : phases 1 à 6 terminées et validées, chantiers A et B terminés et fusionnés, chantier C
-phase C1 terminée et validée, **phase C2 validée mais pas commencée** (son plan est au §12).
+État au 13 octobre 2026 : **la v1 est terminée et prête à être gelée.**
+- Phases 1 à 6 terminées et validées ; chantiers A et B terminés et fusionnés.
+- Chantier C terminé (C1 diagnostic, C2 butées du corps), sur la branche `claude/chantier-c2-butees-corps`.
+- Nettoyage sur `claude/nettoyage-v1`.
+- Rien n'est encore fusionné sur `main` : la fusion, les runs par défaut et le tag `v1.0` attendent la décision de
+  l'utilisateur (`docs/BILAN_V1.md`).
+
+**Nouveau cap** : EVO devient le socle d'une vidéo YouTube, la **v2 : duel LLM contre évolution**. La v1 (la
+reproduction de la vidéo de Code BH) doit rester finie, propre et gelée. Un chantier D (« projection propre ») est
+proposé comme préalable à la v2, sans être appliqué (`docs/BILAN_V1.md`).
 
 Les autres documents du dépôt restent la référence pour le détail :
 - `docs/CODEBH_GRIMPE_SPEC.md` : la spec, **à lire avant toute modification** (règle du `CLAUDE.md`) ;
-- `docs/chantier_b_diagnostic.md` (B1), `docs/chantier_b_b2.md` (B2), `docs/chantier_c_diagnostic.md` (C1) ;
+- `docs/chantier_b_diagnostic.md` (B1), `docs/chantier_b_b2.md` (B2), `docs/chantier_c_diagnostic.md` (C1),
+  `docs/chantier_c_c2.md` (C2) ;
+- `docs/BILAN_V1.md` : le bilan de la v1, les écarts restants, les décisions en attente, le chantier D proposé ;
+- `docs/journal_v1.md` : le journal pas à pas de C2, du nettoyage et du gel (runs GitHub, chiffres, décisions) ;
 - `config.py` : chaque paramètre, avec son tag et, souvent, le tableau de mesures qui l'a fixé.
 
 ---
@@ -45,21 +56,29 @@ Les autres documents du dépôt restent la référence pour le détail :
 - **Langue :** tout est en français (code, commentaires, commits, rapports, échanges).
 - **Méthode :** phase par phase. Pour chaque étape, l'utilisateur envoie un prompt détaillé. On propose un plan,
   il le valide ou l'ajuste, on exécute, on rapporte avec des chiffres, **et on s'arrête** jusqu'à sa validation.
-- **Pile :** Python 3.11, numpy, numba, pygame, pytest ; ffmpeg pour les MP4. Tout passe par `python main.py <commande>`.
+- **Pile :** Python 3.11, numpy 2.4.6, numba 0.67.0, pygame 2.6.1 (épinglés), pytest ; ffmpeg pour les MP4. Tout passe
+  par `python main.py <commande>`.
 - **Paramètres :** tout ce qui est [CHOIX] ou [DÉDUIT] va dans `config.py`, avec son tag et sa source.
-- **Runs de référence :**
-  - `runs/<graine>` (graines 0, 1, 2), entraînés avec les butées articulaires du chantier B ;
-  - graine 2 par défaut pour les écrans ;
-  - **hors git** dans les branches de code, mais sauvegardés en archives sur la branche `sauvegarde-runs` (voir
-    §3.3).
-- **Branches (après le ménage du 12 octobre 2026) :**
-  - `main` : tout le code, phases 1 à 6, chantiers A, B et C1, ce document ;
-  - `sauvegarde-runs` : archives des runs par défaut (§3.3).
-  Les anciennes branches `claude/modest-ritchie-mkwjnd`, `claude/chantier-b-limites-articulaires` et
-  `claude/chantier-c-collisions` étaient toutes contenues dans `main` ; elles ont été supprimées.
-- **Prochaine étape :** C2, des butées « du corps » (pied de son côté de l'axe, queue dans un cône de ±6°) avec un
-  critère de repli objectif vers ±30°. Le plan validé est au §12.
-- **Tests :** 133 passent (`pytest -q tests/`) ; les tests vidéo demandent ffmpeg (voir §3).
+- **Où tourne quoi :**
+  - le PC de l'utilisateur (Windows, 2 cœurs) sert au code, aux tests et aux lectures de npz ;
+  - **GitHub Actions** (`.github/workflows/train.yml`, runner ubuntu-24.04) sert aux entraînements, aux rejeux et aux
+    écrans (§3.5) ;
+  - **un run ne se rejoue au bit près que sur le runner Linux** : sous Windows, la bibliothèque mathématique diffère.
+- **Runs** (hors git) :
+  - `runs/<graine>` (graines 0, 1, 2) : runs par défaut actuels, entraînés avec les butées articulaires (B2),
+    sauvegardés sur la branche `sauvegarde-runs` (§3.3) ;
+  - `runs/butees_corps_30/<graine>` : **référence C2** (butées du corps, cône de 30°) ; archives d'artefacts GitHub,
+    gardées 30 jours (§3.3) ;
+  - graine 2 par défaut pour les écrans.
+- **Branches :**
+  - `main` : code jusqu'à C1, plus le workflow ;
+  - `claude/chantier-c2-butees-corps` : C2 complet ;
+  - `claude/nettoyage-v1` : C2, plus le nettoyage et le bilan (la plus récente) ;
+  - `sauvegarde-runs` : archives des runs B2.
+- **Prochaine étape :** décisions de l'utilisateur sur le gel de la v1 (fusion, runs par défaut, tag `v1.0`), puis
+  le chantier D proposé et la v2 (`docs/BILAN_V1.md`).
+- **Tests :** 158 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
+  locaux échouent, et c'est attendu (§3.5).
 
 ---
 
@@ -172,20 +191,21 @@ remplacée en phase 1 par la règle de nommage des images.
 
 ### 2.3 Git
 
-- Commits en français, descriptifs, qui finissent par :
-  ```
-  Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
-  Claude-Session: https://claude.ai/code/session_01T42Gxwy9nB412TRncKsZ7o
-  ```
-- Aucun identifiant de modèle dans le code, les commits ou les docs.
-- Push avec `git push -u origin <branche>`.
+- Commits en français, descriptifs, qui finissent par le pied `Co-Authored-By: Claude Opus 5.5
+  <noreply@anthropic.com>`. Sur le PC de l'utilisateur, git n'a pas d'identité configurée : l'auteur des commits est
+  passé commande par commande (`git -c user.name=Claude -c user.email=noreply@anthropic.com commit …`), sans toucher
+  à la configuration globale.
+- Aucun identifiant de modèle dans le code ou les docs (le pied de commit mis à part).
+- Push avec `git push -u origin <branche>` ; **jamais `--force`**, jamais de réécriture d'historique, aucune
+  suppression de branche ou de run sans accord. Git Credential Manager garde les identifiants une fois que
+  l'utilisateur s'est connecté dans son propre terminal.
 - **Pas de pull request** sauf demande explicite.
-- Branche de référence : `main`. L'utilisateur demande une **nouvelle branche par chantier** (ce fut le cas pour B
-  et C) ; une fois validé, le chantier est ramené par avance rapide sur `main`, sur sa demande. Jusqu'au
-  12 octobre 2026, la branche de référence s'appelait `claude/modest-ritchie-mkwjnd` : les rapports plus anciens
-  la citent encore.
-- Un « stop hook » de l'environnement refuse la fin d'un tour s'il reste des modifications non commitées : commiter
-  et pousser avant de rendre la main.
+- Branche de référence : `main`. L'utilisateur demande une **nouvelle branche par chantier** ; une fois validé, le
+  chantier est ramené par avance rapide sur `main`, sur sa demande. Jusqu'au 12 octobre 2026, la branche de
+  référence s'appelait `claude/modest-ritchie-mkwjnd` : les rapports plus anciens la citent encore. Rien n'est
+  fusionné sur `main` sans décision de l'utilisateur.
+- **Journal** : pendant une mission en autonomie, chaque étape est notée dans `docs/journal_v1.md` (fait, chiffres,
+  runs GitHub, prochaine étape) et commitée, pour pouvoir reprendre si la session s'interrompt.
 
 ---
 
@@ -193,32 +213,43 @@ remplacée en phase 1 par la règle de nommage des images.
 
 ### 3.1 Logiciels
 
-- Python 3.11.15, numpy 2.4.6, numba 0.67.0, pygame 2.6.1 (SDL 2.28.4), pytest.
-- `requirements.txt` : numpy ≥ 1.26, numba ≥ 0.59, pygame ≥ 2.5, pytest ≥ 8, plus un commentaire pour ffmpeg.
-- 4 cœurs dans le conteneur ; numba parallélise l'évaluation batchée.
-- **ffmpeg n'est pas installé dans le conteneur.** Pour les MP4 et les tests vidéo, il a été installé via le paquet
-  `imageio-ffmpeg` dans le scratchpad, hors du dépôt :
+- **Versions de référence** (épinglées dans `requirements.txt`) : Python 3.11, numpy 2.4.6, numba 0.67.0 (llvmlite
+  0.49.0), pygame 2.6.1 (SDL 2.28.4), pytest. Les runs de référence ont été entraînés avec elles. Jusqu'à C1, c'était
+  sur Python 3.11.15, dans un conteneur cloud Linux à 4 cœurs ; depuis C2, sur le runner GitHub ubuntu-24.04
+  (4 vCPU).
+- **PC de l'utilisateur** : Windows 11, portable i3-1115G4 (2 cœurs, 4 threads, 7,7 Go). Environnement :
   ```
-  PYTHONPATH=/tmp/claude-0/-home-user-EVO/5213f90f-b1c4-589b-a32e-bbea0fe5e8d3/scratchpad/pylib python -m pytest -q tests/
+  python -m venv .venv
+  .venv\Scripts\python.exe -m pip install -r requirements.txt imageio-ffmpeg
+  .venv\Scripts\python.exe -m pytest -q tests/
   ```
-  Sans ce `PYTHONPATH`, 2 tests vidéo sont sautés. Le scratchpad est éphémère : dans un nouvel environnement,
-  `pip install imageio-ffmpeg` (ou ffmpeg dans le PATH) suffit. `evo/video.py` cherche ffmpeg dans le PATH, puis
-  via `imageio-ffmpeg`, puis écrit une séquence PNG et affiche la commande ffmpeg.
-- fontTools (dans le même `pylib`) n'a servi qu'une fois, pour extraire l'instance SemiBold de Nunito Sans. La police
-  produite est versionnée : on n'en a plus besoin.
+  - Python 3.11.9 (dernier installeur Windows de la 3.11) ;
+  - la suite complète prend ≈ 3 à 4 min sur ce PC ;
+  - git et la CLI GitHub (`gh`) sont installés ; `gh` est connecté au compte de l'utilisateur ;
+  - les nouvelles sessions doivent recharger le PATH (`git`, `gh`) si le terminal a été ouvert avant leur
+    installation.
+- numba parallélise l'évaluation batchée (blocs de `BATCH_BLOCK` = 64 créatures, 8 blocs au plus pour 500 enfants).
+- **ffmpeg** : `pip install imageio-ffmpeg` (ou ffmpeg dans le PATH). `evo/video.py` cherche ffmpeg dans le PATH,
+  puis via `imageio-ffmpeg`, sinon il écrit une séquence PNG et affiche la commande ffmpeg. Sans lui, 2 tests vidéo
+  sont sautés.
+- fontTools n'a servi qu'une fois, pour extraire l'instance SemiBold de Nunito Sans. La police produite est
+  versionnée : on n'en a plus besoin.
 - Sans écran : `SDL_VIDEODRIVER=dummy` (les exports le posent eux-mêmes).
 
 ### 3.2 Arborescence
 
 ```
-CLAUDE.md, config.py, main.py, requirements.txt, pytest.ini (pythonpath = ., testpaths = tests)
-docs/      spec, rapports des chantiers B et C, ce document, images de référence, courbes de B2
+README.md, CLAUDE.md, config.py, main.py, requirements.txt, pytest.ini (pythonpath = ., testpaths = tests)
+.github/workflows/train.yml   entraînements, rejeux, tests et écrans sur GitHub Actions (§3.5)
+docs/      spec, rapports des chantiers B et C, bilan, journal, ce document, images de référence, figures
 assets/fonts/   Questrial-Regular.ttf, NunitoSans-SemiBold.ttf, leurs licences OFL, README (sources, SHA-256)
 evo/       le code (§4)
-tests/     12 fichiers, 133 tests (§14)
+tests/     14 fichiers, 158 tests (§14)
 runs/      runs d'évolution            ← hors git (.gitignore)
 out/       exports PNG/MP4 par phase   ← hors git
 cache/     couches de décor pré-rendues ← hors git
+artefacts/ archives et sorties rapatriées du runner GitHub ← hors git
+.venv/     environnement Python du PC   ← hors git
 ```
 
 ### 3.3 Les runs (hors git ; les runs par défaut sont sauvegardés sur la branche `sauvegarde-runs`)
@@ -239,36 +270,90 @@ d'≈ 25 Mo par graine et un README (SHA-256, restauration).
 
 | Dossier | Contenu | Config |
 |---|---|---|
-| `runs/0`, `runs/1`, `runs/2` | **runs par défaut**, 200 générations × 1000, avec butées articulaires (B2) | `JOINT_LIMITS = True` |
-| `runs/legacy_no_limits/0..2` | anciens runs de la phase 3b, sans butées | pas de clé `JOINT_LIMITS`, donc False |
+| `runs/0`, `runs/1`, `runs/2` | **runs par défaut** actuels, 200 générations × 1000, avec butées articulaires (B2) | `JOINT_LIMITS = True`, pas de clé `BODY_LIMITS`, donc False |
+| `runs/butees_corps_30/0..2` | **référence C2** : butées articulaires et du corps, cône de queue de 30° | `BODY_LIMITS = True`, `TAIL_CONE_DEG = 30` |
+| `runs/butees_corps/0..2` | C2 avec un cône de 6°, gardé pour le rapport C2 | `BODY_LIMITS = True`, `TAIL_CONE_DEG = 6` |
+| `runs/essai/0..2` | essai de 5 générations de C2 (durées sur le runner) | comme `butees_corps` |
+| `runs/legacy_no_limits/0..2` | anciens runs de la phase 3b, sans butées (absents du PC actuel) | pas de clé `JOINT_LIMITS`, donc False |
 | `runs/calib/*` | 6 runs de 30 générations (calibration de TORQUE_SCALE et de la prise, phase 3b, étape 1) | cités dans `config.py` |
 | `runs/fit/*` | runs de 40 générations (grilles de fitness, phase 3b, étape 2) | cités dans `config.py` |
 | `runs/train_s{0,1,2}.log` | journaux d'entraînement des runs par défaut | |
 
 - Chaque run contient : `gen_0000.npz` à `gen_0200.npz`, `stats.csv`, `config.json` (instantané complet de la
   config au lancement, `--set` compris) et `audit.csv`.
-- **Durée :** ≈ 15 à 18 min d'évaluation par graine avec les butées (867 / 990 / 1071 s pour les graines 0 / 1 / 2) ;
-  ≈ 8,5 min sans butées.
-- **Régénérer les runs par défaut :**
-  ```
-  python main.py train --seed S --generations 200 --pop 1000 --set AUDIT_EVERY=10
-  ```
-  pour S = 0, 1, 2. Le run est déterministe : même graine, même code, même config donnent les mêmes générations.
+- **Durée** :
+  - B2 : ≈ 15 à 18 min d'évaluation par graine (867 / 990 / 1071 s pour les graines 0 / 1 / 2) ; ≈ 8,5 min sans
+    butées ;
+  - C2 à 30° : 18 à 44 min par graine sur le runner. Les 14 butées du corps coûtent ×2,2 en évaluation.
+- **Runs C2** : ils viennent des artefacts GitHub, gardés 30 jours :
+  - `runs_butees_corps_30_S.tar.gz` du run 38278062446 ;
+  - `runs_butees_corps_S.tar.gz` du run 38266975229.
+
+  Ils ne sont pas sur `sauvegarde-runs` : leur sauvegarde durable fait partie des propositions du bilan.
+- **Régénérer des runs** : sur le runner, `gh workflow run train.yml --ref <branche> -f mode=train -f run_name=<nom>`
+  (§3.5) ; ou en local, `python main.py train --seed S --generations 200 --pop 1000 --run-dir runs/<nom>/S --set
+  AUDIT_EVERY=10`. Le run est déterministe sur une même machine : même graine, même code, même config donnent les
+  mêmes générations. Entre Linux et Windows, ce n'est pas vrai (§3.5).
 - **Régénérer les anciens runs :** les relancer avec `--set JOINT_LIMITS=False` dans
   `--run-dir runs/legacy_no_limits/S`. Attention : le code a changé depuis, et l'identité au bit près avec les
   runs d'origine n'est garantie que pour le rejeu, pas pour un ré-entraînement.
 
 ### 3.4 Arbre des branches
 
-| Branche | Dernier commit | Contenu |
-|---|---|---|
-| `main` | ce commit | tout : phases 1 à 6, chantiers A, B et C1, ce document |
-| `sauvegarde-runs` | 8ff6ab2 | pas de code : archives des runs par défaut 0, 1 et 2 (§3.3) |
+| Branche | Contenu |
+|---|---|
+| `main` | phases 1 à 6, chantiers A, B et C1, et le workflow GitHub Actions (`d9317eb`) |
+| `claude/chantier-c2-butees-corps` | `main` + C2 : moteur, butées du corps, outils de mesure, repli à 30°, rapport C2 |
+| `claude/nettoyage-v1` | la branche C2 + le nettoyage (aucun changement de comportement), ce document à jour, README, bilan |
+| `sauvegarde-runs` | pas de code : archives des runs par défaut 0, 1 et 2 de B2 (`8ff6ab2`, §3.3) |
+
+Chacune contient la précédente : `main` ⊂ C2 ⊂ nettoyage. Le gel proposé est d'avancer `main` jusqu'à
+`claude/nettoyage-v1` (`docs/BILAN_V1.md`).
 
 Ménage du 12 octobre 2026, validé par l'utilisateur : `main` (qui ne contenait que le commit initial) a été avancée
-jusqu'au dernier commit de `claude/chantier-c-collisions`, puis `claude/modest-ritchie-mkwjnd`,
-`claude/chantier-b-limites-articulaires` et `claude/chantier-c-collisions` ont été supprimées : chacune était
+jusqu'au dernier commit de `claude/chantier-c-collisions`. Les branches `claude/modest-ritchie-mkwjnd`,
+`claude/chantier-b-limites-articulaires` et `claude/chantier-c-collisions` ont ensuite été supprimées : chacune était
 entièrement contenue dans `main`, rien n'a été perdu.
+
+### 3.5 GitHub Actions et reproductibilité
+
+**Pourquoi.** Le PC de l'utilisateur est lent (2 cœurs), et surtout **il ne rejoue pas les runs au bit près**. Mesuré
+sur les champions B2 de la génération 200, entraînés sous Linux, avec les mêmes versions de numpy et numba :
+
+| Graine | Hauteur stockée | Rejouée sous Windows | Écart |
+|---|---|---|---|
+| 0 | +34,241587941 m | +34,240889724 m | −0,7 mm |
+| 1 | +33,447863030 m | +33,207706444 m | −24,0 cm |
+| 2 | +35,323759508 m | +35,293234546 m | −3,05 cm |
+
+C'est la bibliothèque mathématique (§5.3, §13) : la dynamique est chaotique, et un bit d'écart suffit. Le runner
+GitHub ubuntu-24.04, lui, rejoue les 3 champions à l'identique (run 38255551159). **Tout ce qui rejoue ou mesure un
+run entraîné passe donc par le runner.** Le PC reste utile pour le code, les tests (hors rejeu des runs), les lectures
+de npz (`morpho`, `graphs`) et les planches.
+
+**Le workflow** `.github/workflows/train.yml` est lancé à la main (`workflow_dispatch`). Il utilise la version du
+fichier de la branche passée en `--ref`. Son environnement est figé : ubuntu-24.04, Python 3.11, numpy 2.4.6,
+numba 0.67.0, pygame 2.6.1. Entrée `mode` :
+
+| Mode | Ce qu'il fait |
+|---|---|
+| `train` | matrice sur `seeds` (3 graines en parallèle) ; `train --pop 1000 --set AUDIT_EVERY=10 <extra_set>` dans `runs/<run_name>/S` ; archive `runs_<run_name>_S.tar.gz` + SHA-256 + `pip_freeze.txt`, en artefact gardé 30 jours |
+| `reproductibilite` | restaure les runs B2 depuis `sauvegarde-runs` (SHA-256 vérifiés), rejoue les champions de la génération 200, échoue sur tout écart |
+| `pytest` | la suite complète, avec les runs B2 restaurés et, en option, les archives de un ou deux runs `train` (`source_run_id`, `source_run_id_2`) : le test des runs locaux les rejoue alors aussi |
+| `analyse` | runs B2 et archives des runs sources ; garde-fou (rejeu des champions B2) ; captures de la vidéo remplacées par des aplats (les artefacts sont publics) ; cache du décor ; `commandes` = sous-commandes de `main.py` séparées par « ; » (liste blanche, sans shell, sans guillemets ni espaces dans les valeurs) ; `out/` et les journaux en artefact |
+
+```
+gh workflow run train.yml --ref <branche> -f mode=pytest -f source_run_id=38278062446
+gh workflow run train.yml --ref <branche> -f mode=train -f run_name=essai -f generations=5
+gh workflow run train.yml --ref <branche> -f mode=analyse -f source_run_id=38278062446 -f "commandes=joints --seed 2 --gen 200 --top 50 --tail --run-dir runs/butees_corps_30/2 --export out/tail ; replay --gen 200 --run-dir runs/butees_corps_30/2 --export out/replay"
+gh run watch <id>
+gh run download <id> -D artefacts/<id>
+```
+
+- `gh run download` crée un sous-dossier par artefact.
+- Vérifier les SHA-256 avant d'extraire (`Get-FileHash … -Algorithm SHA256`), puis `tar -xzf` à la racine du dépôt.
+- Les images de `docs/reference/` ne sortent jamais dans les artefacts. Les planches avec les captures de la vidéo se
+  font sur le PC (`planche`), à partir des rendus rapatriés.
 
 ---
 
@@ -278,9 +363,9 @@ entièrement contenue dans `main`, rien n'a été perdu.
 
 | Module | Rôle |
 |---|---|
-| `physics.py` | `World` (points, liens, masses, prises, articulations, butées), les 5 fonctions de la vidéo (`movement`, `gravity`, `hold`, `link`, `contract`), la projection de position, `substep`/`step`, les noyaux numba et leur référence Python, `spring_link` (méthode naïve du banc 4) |
+| `physics.py` | `World` (points, liens, masses, prises, articulations, butées sur leurs propres triplets `limit_joints`), les 5 fonctions de la vidéo (`movement`, `gravity`, `hold`, `link`, `contract`), la projection de position, `substep`/`step`, les noyaux numba et leur référence Python, `spring_link` (méthode naïve du banc 4) |
 | `skeleton.py` | topologie : indices des points (NECK=0 … R_FOOT=13, HEAD=14, queue à partir de 15), 13 os, `BRACES` (liens invisibles de rigidité des ceintures), `build_skeleton()` |
-| `creature.py` | `Genome`, `random_genome`, `diagonal_gait_genome` (marche écrite à la main), `limp_genome`, `Creature` (contrôleur PD à horloge, prises, chute, énergie, hauteur), `JOINTS`, `JOINT_SIGNS`, `joint_limits_phi`, `target_bounds`, `torque_unit`, `fitness` |
+| `creature.py` | `Genome`, `random_genome`, `diagonal_gait_genome` (marche écrite à la main), `limp_genome`, `Creature` (contrôleur PD à horloge, prises, chute, énergie, hauteur), `JOINTS`, `JOINT_SIGNS`, `joint_limits_phi`, `body_limits` et `limit_groups` (C2), `target_bounds`, `torque_unit`, `fitness` |
 | `batch.py` | évaluateur batché : toute la simulation de 10 s de toute la population dans un noyau numba, **identique au bit près** au moteur scalaire ; `pack`, `evaluate`, `benchmark` |
 | `evolution.py` | `Population`, mutations, sélection, `train` (avec reprise), sauvegardes npz/csv/json, `run_config` + `LEGACY_DEFAULTS`, `apply_config`, `audit_champion` |
 | `audit.py` | audit d'énergie étape par étape : qui ajoute ou retire de l'énergie ; classement par état des butées (engagement, contact, libre) |
@@ -298,6 +383,11 @@ entièrement contenue dans `main`, rien n'a été perdu.
 | `compare.py` | comparaison de générations : fantômes |
 | `video.py` | export MP4 via ffmpeg |
 | `decor_check.py` | commande `decor` : contrôle du décor au-dessus de 23 m |
+| `tail_audit.py` | C2 : `joints --tail` (queue à chaque sous-pas : longueur des os, oscillation contre le cône, posture, pénétration des butées par groupe, verdict du critère de repli) et `joints --fallen` (toutes les créatures tombées d'une génération, énergie et queue contre les seuils d'audit) |
+| `morphology.py` | C2 : commande `morpho`, facteur moyen de longueur de chaque os par génération, deux runs superposés (npz seuls) |
+| `planches.py` | C2 : commande `planche`, images côte à côte légendées (planches avec les captures de la vidéo, sur le PC) |
+| `trace.py` | C2 : commande `trace`, rejeu pas à pas d'une créature avec l'audit d'énergie à chaque sous-pas (diagnostic) |
+| `diag_projection.py` | C2 : commande `diag-projection`, moteur tel quel contre la variante « vitesse_proj » du chantier D proposé, substituée le temps de la commande (lecture seule) |
 
 ### 4.2 Commandes (`main.py`)
 
@@ -306,7 +396,7 @@ python main.py debug-physics [--bench N] [--export DIR] [--calibrate]
 python main.py debug-creature [--mode diagonale|...] [--seed S] [--export DIR]
 python main.py benchmark --pop 1000 [--seed S]
 python main.py train --seed S --generations 200 --pop 1000 [--run-dir DIR] [--set CLE=VALEUR …] [--no-audit]
-python main.py graphs --seed S [--run-dir DIR] [--out DIR] [--compare AUTRE_RUN]
+python main.py graphs --seed S [--run-dir DIR] [--out DIR] [--compare AUTRE_RUN] [--labels REF RUN]
 python main.py histogram --seed S --gen G [--style calibration|video]
 python main.py population --seed 2 --gen 200 [--export DIR] [--export-video MP4] [--cycle]
 python main.py replay --seed 2 --gen 200 --rank 1 [--creature I] [--speed X] [--slow] [--title-card "…"]
@@ -314,7 +404,12 @@ python main.py replay --seed 2 --gen 200 --rank 1 [--creature I] [--speed X] [--
 python main.py analyze --seed 2 --gen 200 --rank 1 [--speed X] [--slow] [--export DIR] [--export-video MP4]
 python main.py compare --seed 2 --gens 0 23 100 200 [--speed X] [--slow] [--export DIR] [--export-video MP4]
 python main.py decor --seed 2 --export DIR [--no-cache]
-python main.py joints --seed S --gen G [--top N] [--sample N] [--energy] [--crossings] [--export DIR]
+python main.py joints --seed S --gen G [--top N] [--sample N] [--energy] [--crossings] [--tail] [--export DIR]
+python main.py joints --seed S --gen G --fallen [--run-dir DIR] [--export DIR]
+python main.py morpho --seed S [--run-dir DIR] [--compare AUTRE_RUN] [--gens G …] [--out DIR]
+python main.py trace --seed S --gen G --creature I [--run-dir DIR] [--export DIR]
+python main.py diag-projection --seed S --gen G --creature I [--run-dir DIR]
+python main.py planche IMAGE … --out PNG [--labels …] [--height H] [--crop X0 Y0 X1 Y1]
 ```
 
 - `--seed` vaut 2 par défaut pour les écrans, 42 pour `train` et `graphs`.
@@ -422,10 +517,29 @@ project_links  passes de projection de position : liens, puis butées proches, p
 - **Ordre dans chaque passe :** liens, butées, sol. Il a été conservé après un cas limite (voir §9, B2).
 - **Code partagé :** trois fonctions numba (`_limit_geometry`, `_limit_mass`, `_limit_rate`) servent au noyau
   scalaire, à la référence Python et à l'évaluateur batché, pour garantir les mêmes opérations dans le même ordre.
-- **API :** `World.set_joint_limits(sign, lo, hi)`, `World.limit_violation()`, `World.limit_active` (butées entrées
-  dans le solveur au dernier sous-pas). Aujourd'hui, les butées portent sur les **premiers triplets de
-  `world.joints`** (les 8 articulations musclées). C2 prévoit de les séparer (§12).
+- **API :** `World.set_joint_limits(sign, lo, hi, triplets=None)`, `World.limit_violation()`, `World.limit_active`
+  (butées entrées dans le solveur au dernier sous-pas). Depuis C2, les butées portent sur leurs propres triplets,
+  `World.limit_joints` (Q, 3), séparés des muscles (`world.joints`). Sans `triplets`, ce sont les 8 articulations,
+  comme en B2, et les opérations restent identiques au bit près.
 - **Drapeau `JOINT_LIMITS`** (True). Absent d'une config de run, il vaut False.
+
+**Butées du corps (chantier C2, drapeau `BODY_LIMITS`, True ; absent d'une config de run : False).** Même primitive,
+14 butées posées après les 8 articulations, sur des triplets (NECK, PELVIS, X), l'angle étant celui de X vu du bassin
+depuis l'axe bassin → cou :
+- **pieds** (2) : (NECK, PELVIS, L_FOOT), signe +1, et (…, R_FOOT), signe −1. u ∈ [m, 180° − m] garde chaque pied de
+  son côté de l'axe (m = `FOOT_AXIS_MARGIN_DEG` = 0) ;
+- **queue** (12) : (NECK, PELVIS, TAIL_k), u ∈ [180° − τ, 180° + τ], τ = `TAIL_CONE_DEG` = **30** [CHOIX], repli
+  depuis 6° [DÉDUIT] (§9, C2). Au repos, la queue est dans l'axe (θ = ±180°), au centre du cône ;
+- `creature.body_limits()` construit ces butées et `limit_groups()` les range par groupe (articulations, pieds,
+  queue) ;
+- seulement si `JOINT_LIMITS` ;
+- coût : ×2,2 sur l'évaluation, la queue étant presque toujours en contact ;
+- **limites connues** (`docs/chantier_c_c2.md` §6) :
+  - la queue d'une créature tombée peut s'étirer à l'impact quand elle est à la fois en butée et posée au sol
+    (jusqu'à 43,8 %) ;
+  - en l'air, quand plusieurs butées de queue agissent ensemble, la projection peut sortir un point du cône pendant
+    un seul sous-pas (jusqu'à 144°), sans énergie créée ;
+  - les grimpeuses ne sont pas touchées.
 
 ### 5.3 Déterminisme et identité au bit près
 
@@ -994,8 +1108,50 @@ temps.
   - queue dessinée, que le rendu peut lisser ;
   - grimpe verticale, où la gravité aligne une queue passive.
   Repli à 30° [CHOIX].
-- **C2 :** l'utilisateur valide C1 et lance C2, avec un critère de repli objectif. Le plan a été validé, puis
-  l'utilisateur a demandé ce document **avant toute exécution** : C2 n'est pas commencé.
+- **C2 :** l'utilisateur valide C1 et lance C2, avec un critère de repli objectif (§12).
+
+**Passage sur le PC de l'utilisateur et GitHub Actions (12 octobre 2026).**
+- Dépôt reconstruit à partir d'un bundle, puis ménage des branches (§3.4).
+- Python 3.11 installé sur le PC.
+- Les rejeux divergent sous Windows (§3.5) : l'utilisateur fait passer tous les rejeux, entraînements, mesures et
+  écrans par le workflow GitHub Actions, avec ses modes `reproductibilite`, `pytest` et `analyse`.
+- Vérifications :
+  - le runner rejoue les champions B2 au bit près ;
+  - le mode `analyse` redonne les chiffres de C1 à l'identique.
+
+**C2 (exécution, mission en autonomie du 12 au 13 octobre 2026)** — détail dans `docs/chantier_c_c2.md` et
+`docs/journal_v1.md`.
+- **Moteur** : `limit_joints`, puis les 14 butées du corps derrière `BODY_LIMITS`. B2 se rejoue au bit près.
+- **Tests existants adaptés sur décision de l'utilisateur** (moteur inchangé), pour la créature inerte avec les
+  butées du corps :
+  - elle finit couchée à −7,95 m : la borne de hauteur est alignée sur la plage de la vidéo (−9 à −7,8 m) ;
+  - elle crée 4,39 J hors muscles à 6° : seuil propre à ce cas, 6 J ;
+  - sa queue s'étire de 9,37 % : seuil propre à ce cas, 10 % ;
+  - mécanisme : après la chute, la queue est en butée de cône et posée au sol.
+- **Run à 6°** : champions à 38,9 / 33,9 / 48,5 m ; critère de repli « garder 6° » sur les grimpeuses.
+- **Repli à 30°**, par la règle de l'utilisateur (repli direct si une troisième mesure tombe à cause du même
+  mécanisme). La troisième mesure : 77 à 82 créatures tombées par graine en gén. 0 avec un os de queue au-delà de 5 %
+  (B2 : 1 à 6) ; 100 % de ces sous-pas ont la queue en butée et au sol.
+- **Run à 30°** (référence C2) :
+  - champions à **39,5 / 37,1 / 42,8 m** ;
+  - 0 J créé hors muscles chez les champions et les 10 meilleures de 5 générations ;
+  - pieds de l'autre côté de l'axe : 0 à 0,1 % (graine 1 en B2 : 84 %) ;
+  - jambe/queue : 0 / 6,8 / 7,5 % (B2 : 14 / 72 / 50 %) ;
+  - critère « garder 30° ».
+- **Constats et décisions de l'utilisateur** :
+  - la queue des créatures tombées étirée à l'impact, et la sortie de cône d'un sous-pas en l'air, deviennent des
+    **limites connues** ;
+  - les bras croisés de la graine 0 rejoignent les écarts connus ;
+  - l'énergie créée par les créatures couchées existait déjà en B2 (jusqu'à 6,45 m d'équivalent), jamais mesurée
+    jusque-là. Règle relative : C2 fait mieux que B2 (68 cm au plus). Diagnostic et correctif proposé : chantier D
+    (bilan).
+
+**Nettoyage (13 octobre 2026, sans changement de comportement).**
+- Tags de `config.py`, avec `config_snapshot()` identique.
+- Un import inutilisé retiré.
+- Versions épinglées dans `requirements.txt`, `.gitignore` complété.
+- Docs périmées corrigées, ce document mis à jour, `CLAUDE.md` complété, `README.md` public.
+- Chaque commit de code est validé par `pytest` sur le runner, rejeux B2 et C2 compris.
 
 ---
 
@@ -1018,35 +1174,50 @@ temps.
 | Écran de fin volcan | exclu (identité d'un vrai créateur) |
 | Pas de 4b | les défauts restants sont notés, pas corrigés |
 | Butées articulaires | valeurs du §3 de B1 ; cibles du génome dans la plage ; drapeau absent = False ; ordre de projection liens, butées, sol conservé malgré le cas à 1,97 % |
-| Runs | `runs/<graine>` = avec butées ; `runs/legacy_no_limits/` = sans |
-| Chantier C | pied de son côté de l'axe + queue dans un cône ; pas de collision générale ; pas de séparation complète ; résidu de la graine 2 tranché après C2 |
-| Cône de queue | 6° [DÉDUIT] comme point de départ, repli à 30° [CHOIX] selon un critère objectif (§12) |
+| Runs | `runs/<graine>` = avec butées articulaires (défaut actuel) ; `runs/legacy_no_limits/` = sans ; `runs/butees_corps_30/<graine>` = **référence C2** |
+| Chantier C | pied de son côté de l'axe + queue dans un cône ; pas de collision générale ; pas de séparation complète ; résidu jambe–queue tranché au bilan |
+| Cône de queue | 6° [DÉDUIT] au départ, **30° [CHOIX] appliqué** (repli direct par la règle « troisième mesure tombée à cause de la queue en butée et au sol ») ; le critère de repli reste le seul juge sur les grimpeuses |
+| Reproductibilité | le runner GitHub ubuntu-24.04 fait foi pour tout rejeu, test de rejeu, mesure de run et écran ; versions épinglées ; les captures de la vidéo ne sortent jamais dans les artefacts publics |
+| Créature inerte avec butées du corps | effet accepté, moteur inchangé : hauteur dans la plage de la vidéo, seuils propres à ce cas (énergie < 6 J, queue < 10 %) ; 0,23 J et 8 % partout ailleurs |
+| Créatures tombées | énergie créée jugée **relativement à B2** (arrêt seulement si C2 fait plus du double) ; queue étirée à l'impact et sortie de cône d'un sous-pas en l'air : limites connues, documentées |
+| Chantier D (projection propre) | proposé, **non appliqué** : préalable possible à la v2 (`docs/BILAN_V1.md`) |
+| Cap du projet | la v1 est gelée ; la v2 (duel LLM contre évolution) partira d'elle |
 
 ---
 
 ## 11. Écarts connus avec la vidéo
 
-État après B2 (runs avec butées, graine 2 sauf mention). Ils sont gardés en liste volontairement, sans y toucher
-sans accord.
+État après C2 (référence : `runs/butees_corps_30`, graine 2 sauf mention ; valeurs de B2 entre parenthèses). Ils
+sont gardés en liste volontairement, sans y toucher sans accord.
 
 **Calibration et évolution**
 - **Génération 0 trop bonne :** la meilleure monte (+3,0 m), alors que celle de la vidéo ne grimpe pas (−0,1 m). La
   piste « baisser la qualité des grimpeuses de génération 0 » (prise, KP/KD) n'a jamais été testée.
-- **Flemme :** elle est revenue avec les butées (période à 4,0 et 4,8 s pour les graines 0 et 2), mais la chute
-  brutale arrive aux générations 35 à 40 au lieu de 80 à 85.
-- **Créatures au sol** à la génération 200 : 61 / 121 / 51 pour les graines 0 / 1 / 2, contre ≈ 30.
-- **Masse musculaire** des graines 0 et 1 trop haute : 14,6 et 16,7, contre 10,5. La graine 2 est conforme : 10,0.
-- **Énergie du champion :** 8,8, contre 32,5. Écart lié à la définition de E, inchangé depuis la phase 3.
-- **Forces du champion :** plus au plafond, mais réparties autrement que dans la vidéo (deltoïde et fléchisseurs de
-  hanche à 0 %, quadriceps à 100 %).
-- **Démarche diagonale :** partielle, une pose sur quatre.
-- **Période finale :** résolue avec les butées (0,60 s, comme la vidéo). Sans butées, elle restait à 1 à 2 s.
+- **Flemme :** présente (période max 3,4 / 3,7 / 4,2 s, muscle min 8,6 / 6,9 / 9,2 sur les gén. 1 à 20). Mais la
+  chute de période arrive tôt (sous 1,5 s dès les gén. 31 / 184 / 30) au lieu des générations 80 à 85 puis 140
+  à 150.
+- **Créatures au sol** à la génération 200 : 119 / 90 / 84 (B2 : 61 / 121 / 51), contre ≈ 30.
+- **Hauteurs au-dessus de la vidéo :** champions à 39,5 / 37,1 / 42,8 m (vidéo 36 m) ; médianes à 38,4 / 34,9 /
+  41,7 m. La majorité n'est plus « entre 30 et 35 m » (16 / 270 / 15 créatures), elle est au-dessus. B2 était
+  conforme sur ce point (720 / 718 / 623).
+- **Masse musculaire** trop haute : 16,4 / 13,5 / 13,8 (B2 : 14,6 / 16,7 / 10,0), contre 10,5.
+- **Période finale :** 0,86 / 1,47 / 0,87 s (B2 : 1,54 / 0,88 / 0,60), contre 0,6 s.
+- **Énergie du champion :** 13 à 16 (B2 : 8,8), contre 32,5. Écart lié à la définition de E, inchangé depuis la
+  phase 3.
+- **Forces du champion** réparties autrement que dans la vidéo (en B2 : deltoïde et fléchisseurs de hanche à 0 %,
+  quadriceps à 100 %).
+- **Démarche diagonale :** partielle (B2 : une pose sur quatre).
 
 **Morphologie**
-- **Lézard trapu :** colonne à la borne basse (0,62), fémur à la borne basse, demi-bassin presque à la borne haute.
-  La vidéo montre un lézard allongé.
+- **Lézard trapu, en partie corrigé par C2 :** graine 2, colonne à 1,08 (B2 : 0,62), mais demi-bassin toujours large
+  (1,37) ; les autres graines changent sans tendance commune (`docs/chantier_c_c2.md` §7).
 - **Queue physique courte** (1,2 × la colonne), prolongée au dessin à 1,9 ×.
-- **Pieds sous le bassin et la queue :** c'est l'objet de C2.
+- **Queue dessinée courbée à 30° :** la queue de C2 s'écarte de 24 à 28° de l'axe (médiane), contre 1,7 à 5,7° sur
+  les images 11, 12 et 40. À 6°, elle était droite comme dans la vidéo. Le jugement visuel est laissé à
+  l'utilisateur.
+- **Résidu jambe–queue :** 0 / 6,8 / 7,5 % du temps (B2 : 14 / 72 / 50 %), permis par le cône de 30°.
+- **Bras croisés (graine 0) :** chez les 50 meilleures, les bras gauche et droit se croisent 89 % du temps et
+  passent devant la tête 31 % du temps. Aucune contrainte n'existe entre les bras ; c'est apparu avec C2 (≈ 0 en B2).
 
 **Rendu**
 - Canopées de l'arbre latéral plates.
@@ -1056,12 +1227,24 @@ sans accord.
 - Cadrage pendant le carton : la vidéo cadre plus haut à t = 0,5 s (image 39) ; non modifié.
 - Créature 1 de la génération 0 différente de celle de la vidéo : ce n'est pas le même run, rien à corriger.
 
-**Limite du moteur :** erreur de longueur des os jusqu'à 1,97 % dans une posture sur-contrainte rare, sans énergie
-créée ; l'alerte d'audit reste active.
+**Limites du moteur**
+- Erreur de longueur des os jusqu'à 1,97 % dans une posture sur-contrainte rare, sans énergie créée ; l'alerte
+  d'audit reste active.
+- **Énergie créée par les créatures couchées** (existait en B2, mesurée en C2) : la projection les remonte au-dessus
+  du sol sans annuler leur vitesse vers le bas. B2 : jusqu'à 6,45 m d'équivalent ; C2 à 30° : 68 cm au plus. Sans
+  effet sur les grimpeuses (0 J). Correctif proposé : chantier D.
+- **Queue des créatures tombées étirée à l'impact** (jusqu'à 43,8 %) et **sortie de cône d'un seul sous-pas en
+  l'air** (jusqu'à 144°, 0 J) : limites connues de C2 (`docs/chantier_c_c2.md` §6).
 
 ---
 
-## 12. Suite : la phase C2, déjà validée
+## 12. La phase C2 (faite) et la suite
+
+> **C2 est faite** (`docs/chantier_c_c2.md`). Le plan ci-dessous a été suivi, avec deux changements :
+> - l'entraînement et les mesures sont passés sur GitHub Actions (§3.5) ;
+> - le cône est passé à 30° par une règle ajoutée par l'utilisateur (§9).
+>
+> La suite après C2 est au §12.3.
 
 ### 12.1 Consigne de l'utilisateur (texte exact)
 
@@ -1173,13 +1356,24 @@ meilleures et 50 créatures au hasard de la génération 200 :
 6. Rapport `docs/chantier_c_c2.md`, organisé comme `chantier_b_b2.md`, avec les courbes dans `docs/chantier_c_c2/`.
    Commit, push, **arrêt pour validation** (pas de réorganisation de `runs/`).
 
-### 12.3 Après C2 (à décider par l'utilisateur)
+### 12.3 Après C2 (à décider par l'utilisateur ; détail dans `docs/BILAN_V1.md`)
 
-- Ramener la branche de C2 sur `main`, et faire des runs C2 les runs par défaut, comme après B.
-- Le résidu jambe–queue de la graine 2 : collision ciblée ou non.
+- **Gel de la v1, proposé, rien n'est appliqué** :
+  - avancer `main` jusqu'à `claude/nettoyage-v1` ;
+  - faire des runs C2 à 30° les runs par défaut, comme après B ;
+  - sauvegarder ces runs sur `sauvegarde-runs` ;
+  - poser le tag `v1.0`.
+- Le résidu jambe–queue des graines 1 et 2 (6,8 et 7,5 %) : collision ciblée ou non.
+- Le jugement visuel de la queue à 30° (courbée, contre une queue droite dans la vidéo).
+- **Chantier D proposé, « projection propre »** :
+  - reporter sur la vitesse les corrections de position de la projection (énergie des créatures couchées, queue
+    étirée à l'impact, sortie de cône d'un sous-pas) ;
+  - ajouter une butée « mains de leur côté de l'axe » sur le modèle des pieds ;
+  - préalable possible à la v2.
 - Les écarts de calibration (§11) : génération 0 trop bonne, chute de période trop précoce, créatures au sol,
-  morphologie trapue.
+  hauteurs au-dessus de la vidéo, masse musculaire.
 - Les courbes au style vidéo du §7.3, seule mise en forme manquante de la spec.
+- La v2 : duel LLM contre évolution, à partir de la v1 gelée.
 
 ---
 
@@ -1221,18 +1415,34 @@ meilleures et 50 créatures au hasard de la génération 200 :
   session.
 - **Notifications parasites :** une phrase d'interface (« Cette session n'est pas en cours d'exécution… ») est un
   jour apparue au milieu d'un prompt collé. Elle était sans conséquence.
+- **Windows ne rejoue pas les runs Linux au bit près** (§3.5). Ne jamais conclure d'un rejeu sous Windows ; une
+  créature de génération 0 se rejoue parfois à l'identique, les grimpes plus longues divergent.
+- **Une mesure de queue, c'est par point et par sous-pas.** Le minimum d'une marge sur toute la chaîne saute d'un point
+  à l'autre. Pour un test de choc, suivre le point qui touche, et prendre comme contact une marge de 1e-8 rad (le
+  terme spéculatif pose le point pile sur la borne ; un point qui l'effleure seulement reste à 1e-4).
+- **Ne pas juger le repli sur les seules grimpeuses :** les créatures tombées et tirées au hasard ont montré à 6° ce
+  que les 50 meilleures ne montraient pas (queue en butée et au sol, sorties de cône d'un sous-pas).
+- **PowerShell 5.1** supprime les arguments vides (`""`) passés à un exécutable : une légende vide se passe sous la
+  forme `" "`. `&&` n'existe pas : enchaîner avec `;` et `if ($?)`.
+- **git dans une session non interactive** : il ne peut pas demander d'identifiants. Le premier push se fait depuis
+  le terminal de l'utilisateur (Git Credential Manager garde ensuite l'accès).
+- **`workflow_dispatch`** n'apparaît que si le fichier est sur la branche par défaut. Lancé avec `--ref <branche>`,
+  il exécute la version du workflow de cette branche. Les entrées de type texte ne gardent pas les guillemets :
+  `commandes` est découpée sans shell.
 
 ---
 
 ## 14. Tests
 
-`pytest -q tests/` : 133 tests, ≈ 4 min. Avec le `PYTHONPATH` du §3.1 pour les tests vidéo, sinon 2 sont sautés.
+`pytest -q tests/` : 158 tests, cas paramétrés compris ; ≈ 3 à 4 min. Avec ffmpeg (ou `imageio-ffmpeg`) pour les
+tests vidéo, sinon 2 sont sautés. Sur le runner (`mode=pytest`), tout passe. Sous Windows, les 3 cas de
+`test_local_runs_replay_with_their_own_flag` échouent, et c'est attendu (§3.5).
 
 | Fichier | Tests | Ce qui est vérifié |
 |---|---|---|
-| `test_physics.py` | 21 | mouvement, gravité (erreur d'ordre 1), prise, liens rigides contre ressort, quantité de mouvement, pendule simple, convergence des itérations, Contract (3ᵉ loi de Newton, travail → énergie cinétique), masses de l'image 20, topologie, numba = Python, stabilisation sans énergie injectée, pendule humain |
-| `test_creature.py` | 17 | sol (sans pénétration ni rebond, distance de Coulomb), prises sur la bande du tronc, chute, créature inerte (−9 ≤ h ≤ −7,8), muscles et leurs actions, contrôleur PD et horloge, énergie, génome, fitness, marche écrite à la main, audit d'énergie, replay |
-| `test_batch.py` | 1 | batché = scalaire au bit près |
+| `test_physics.py` | 22 | mouvement, gravité (erreur d'ordre 1), prise, liens rigides contre ressort, quantité de mouvement, pendule simple, convergence des itérations, Contract (3ᵉ loi de Newton, travail → énergie cinétique), masses de l'image 20, topologie, numba = Python, stabilisation sans énergie injectée, pendule humain |
+| `test_creature.py` | 28 | sol (sans pénétration ni rebond, distance de Coulomb), prises sur la bande du tronc, chute, créature inerte (−9 ≤ h ≤ −7,8 ; seuils propres au cas inerte avec `BODY_LIMITS`), muscles et leurs actions, contrôleur PD et horloge, énergie, génome, fitness, marche écrite à la main, audit d'énergie, replay |
+| `test_batch.py` | 4 | batché = scalaire au bit près |
 | `test_evolution.py` | 7 | mutations (bornes, symétrie, taux, grosses mutations, mode log), sélection sans réévaluation, run déterministe, reprise et rejeu, audit du champion, cadence d'audit passée en `--set` |
 | `test_render.py` | 9 | décor, couches, canopée qui masque le lézard, repères transitoires, canopées irrégulières, queue dessinée au-dessus du sol, caméra, cache du décor, lézard |
 | `test_hud.py` | 7 | polices versionnées et repli, formats et durée du carton, disposition, énergie rejouée = énergie du run, étiquette visible sous une canopée, repères seulement sans HUD, polices après `pygame.quit` |
@@ -1241,9 +1451,11 @@ meilleures et 50 créatures au hasard de la génération 200 :
 | `test_video.py` | 4 | avancement identique à la fenêtre, repli PNG sans ffmpeg, toutes les images dans le MP4, échec de ffmpeg signalé |
 | `test_decor.py` | 3 | répétition, repères, canopée |
 | `test_joint_audit.py` | 13 | conventions d'angle, miroir, tours, croisements, axe, cône de queue, audit d'un petit run |
-| `test_joint_limits.py` | 11 | butées : arrêt pile, sans rebond ni énergie, batché = scalaire, départ hors bornes, drapeau, runs locaux |
+| `test_joint_limits.py` | 19 | butées : arrêt pile, sans rebond ni énergie, batché = scalaire, départ hors bornes, drapeau, runs locaux (C2 à 30° et à 6°, B2, legacy, chacun avec ses drapeaux) |
+| `test_body_limits.py` | 15 | butées du corps (C2) : disposition et repos, pied libre ou tenu arrêté sur l'axe, queue lancée contre le cône (2, 5, 10 m/s) sans rebond ni énergie, départ hors bornes, batché = scalaire et numba = Python avec les 22 butées, énergie sur deux grimpes, drapeau et `config.json` ; verts à 6° comme à 30° |
+| `test_tail_audit.py` | 10 | outils de C2 sur signaux construits et petit run : oscillation, étirement, pénétration et posture de la queue, verdict de repli, `--tail`, `--fallen`, `trace`, `diag-projection` (moteur rendu intact), `morpho`, `planche` |
 
-`test_local_runs_replay_with_their_own_flag` est sauté si les runs locaux manquent, par exemple dans un clone neuf.
+`test_local_runs_replay_with_their_own_flag` saute les runs locaux absents (clone neuf, ou runs C2 non extraits).
 
 ---
 

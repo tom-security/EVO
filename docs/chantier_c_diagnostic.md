@@ -4,6 +4,10 @@ Le moteur n'a aucune collision entre segments. Les butées d'angle du chantier B
 articulation seule, pas les effets combinés : un pied peut passer sous la queue, une jambe peut en croiser une autre.
 C1 mesure l'ampleur du problème sur les populations réelles et propose une solution. **Le moteur n'est pas touché.**
 
+> **Suite : C2 est faite** (`docs/chantier_c_c2.md`). L'esquisse du §4 a été codée telle quelle. Le cône de queue est
+> passé de 6° [DÉDUIT] au repli de 30° [CHOIX], à cause de la queue des créatures tombées (en butée et posée au
+> sol). Les runs de référence C2 sont `runs/butees_corps_30/S`. Le coût mesuré est ×2,2 (estimé ici à +40 à +60 %).
+
 Reproduire les mesures : `python main.py joints --seed S --gen 200 --top 50 --sample 50 --crossings [--export DIR]`
 (`evo/joint_audit.py`). Runs `runs/<graine>` (entraînés avec butées, chantier B), génération 200, 50 meilleures et
 50 créatures au hasard par graine, soit 300 grimpes, une mesure par sous-pas (4 800 par grimpe). Hauteurs

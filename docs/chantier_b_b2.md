@@ -28,8 +28,9 @@ réentraîne les graines 0, 1 et 2, et compare avant de refaire le moindre écra
 
 ## 2. Réentraînement : hauteurs et scores
 
-`train --seed S --generations 200 --pop 1000 --run-dir runs/butees/S --set AUDIT_EVERY=10`. Les runs sont dans
-`runs/butees/` (ignoré par git, comme les runs actuels).
+`train --seed S --generations 200 --pop 1000 --run-dir runs/S --set AUDIT_EVERY=10`. Les runs sont dans `runs/S`,
+ignoré par git (chemins actuels, voir la note du §7 ; les anciens runs sans butées sont dans
+`runs/legacy_no_limits/S`).
 
 | Champion gén. 200 | sans butées | avec butées | vidéo (§9) |
 |---|---|---|---|
@@ -63,7 +64,7 @@ Avec butées, la phase flemmarde réapparaît nettement pour les graines 0 et 2 
 15 à 25 générations), puis une chute brutale, plus tôt que dans la vidéo (génération 35–40 contre 80–85). La
 graine 2 finit comme la vidéo : période 0,60 s, masse musculaire ≈ 9 puis 10,0.
 
-Courbes superposées (`graphs --run-dir runs/butees/S --compare runs/S`), pointillés gris = sans butées :
+Courbes superposées (`graphs --run-dir runs/S --compare runs/legacy_no_limits/S`), pointillés gris = sans butées :
 
 ![graine 0](chantier_b_b2/courbes_graine0.png)
 ![graine 1](chantier_b_b2/courbes_graine1.png)
@@ -166,15 +167,14 @@ conséquence énergétique ; 24 passes ne suffisent pas non plus (1,27 %) et co�
 - `joints` compte « au-delà » à plus de 1e-6° : sans cette tolérance, une cible posée sur la butée par une mutation
   (−60,000000000000014°) comptait comme hors bornes.
 
-## 7. Écrans refaits sur runs/butees/2
+## 7. Écrans refaits sur runs/2
 
-> **Note : les chemins cités dans ce rapport ont depuis été réorganisés.** Après la validation de B2, les runs avec
-> butées sont devenus les runs par défaut, cohérents avec `JOINT_LIMITS = True` : `runs/butees/<graine>` est devenu
-> `runs/<graine>`, et les anciens runs sans butées ont été déplacés de `runs/<graine>` vers
-> `runs/legacy_no_limits/<graine>`. Dans tout le rapport, lire `runs/butees/S` comme `runs/S`, et `runs/S` (sans
-> butées) comme `runs/legacy_no_limits/S`. Les dossiers `out/…` ne changent pas.
+> **Note : chemins réorganisés après B2.** Les runs avec butées, entraînés dans `runs/butees/<graine>`, sont devenus
+> les runs par défaut (`runs/<graine>`, cohérents avec `JOINT_LIMITS = True`) ; les anciens runs sans butées ont été
+> déplacés de `runs/<graine>` vers `runs/legacy_no_limits/<graine>`. Ce rapport cite les chemins actuels. Les
+> dossiers `out/…` ne changent pas.
 
-Mêmes commandes et mêmes jeux d'images que les phases 4 à 6 et le chantier A, avec `--run-dir runs/butees/2`
+Mêmes commandes et mêmes jeux d'images que les phases 4 à 6 et le chantier A, avec `--run-dir runs/2`
 (sorties dans `out/chantierB/ecrans/`, hors git) : `replay --gen 200 --export`, `population --gen 200 --export`,
 `population --gen 0 --cycle --export`, `histogram --gen 0 / 1 / 200 --style video`, `analyze --gen 200 --export`,
 `compare --export`, et les 6 vidéos (replay, créature 1 de la génération 0 ×4 avec carton, analyse au ralenti,
@@ -195,7 +195,7 @@ Aucun réglage d'écran n'a été modifié.
   seul, qui ne dépend pas de la créature. Mesure en mémoire, ancien et nouveau champion en alternance, deux passes
   (ms par image · part au-delà de 16,7 ms) :
 
-  | écran | ancien champion (runs/2) | nouveau champion (runs/butees/2) |
+  | écran | ancien champion (runs/legacy_no_limits/2) | nouveau champion (runs/2) |
   |---|---|---|
   | replay | 6,48 / 6,78 · 0,0 / 0,7 % | 6,49 / 6,55 · 0 / 0 % |
   | analyse | 14,82 / 14,64 · 15,5 / 9,0 % | 13,28 / 12,52 · 8,8 / 2,5 % |
@@ -244,9 +244,7 @@ Aucun réglage d'écran n'a été modifié.
 
 ## 8. Pour la suite
 
-- *(Fait : chantier B ramené sur `claude/modest-ritchie-mkwjnd`, runs réorganisés, voir la note du §7.)*
-  Ramener le chantier B sur `claude/modest-ritchie-mkwjnd`, et choisir alors le run de référence par défaut : les
-  commandes lisent `runs/<graine>`, c'est-à-dire les anciens runs sans butées ; les nouveaux sont dans
-  `runs/butees/<graine>` (hors git, dans ce conteneur).
+- *(Fait.)* Le chantier B a été ramené sur la branche de référence de l'époque (aujourd'hui `main`), et les runs
+  avec butées sont devenus les runs par défaut (voir la note du §7).
 - Points à discuter : la morphologie trapue (longueurs collées aux bornes de `LENGTH_FACTOR_RANGE`), les pieds qui
   croisent l'axe (§3), l'excès de créatures au sol, la masse musculaire des graines 0 et 1.
