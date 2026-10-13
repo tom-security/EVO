@@ -117,7 +117,8 @@ jobs:
 
   reproductibilite:
     # Prouve que le runner rejoue les runs de référence restaurés depuis sauvegarde-runs (graines 0, 1, 2, génération
-    # 200, champion) à la hauteur stockée : C2 à 30° (runs/S, défaut depuis la v1) et B2 (runs/butees_articulaires/S).
+    # 200, champion) à la hauteur stockée : chantier D (runs/S, défaut depuis la v1.1), C2 à 30°
+    # (runs/butees_corps_30/S) et B2 (runs/butees_articulaires/S).
     if: inputs.mode == 'reproductibilite'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -139,7 +140,8 @@ jobs:
           echo "| run | résultat |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           status=0
-          for d in runs/0 runs/1 runs/2 runs/butees_articulaires/0 runs/butees_articulaires/1 runs/butees_articulaires/2; do
+          for d in runs/0 runs/1 runs/2 runs/butees_corps_30/0 runs/butees_corps_30/1 runs/butees_corps_30/2 \
+                   runs/butees_articulaires/0 runs/butees_articulaires/1 runs/butees_articulaires/2; do
             tag=${d//\//_}
             python main.py replay --run-dir "$d" --gen 200 --rank 1 --export "out/repro_$tag" 2>&1 | tee "repro_$tag.log"
             code=${PIPESTATUS[0]}
@@ -192,8 +194,8 @@ jobs:
           done
           ls runs
       - name: Tests
-        # test_local_runs_replay_with_their_own_flag rejoue runs/S (C2 à 30°), runs/butees_corps/S (6°) et
-        # runs/butees_articulaires/S (B2), restaurés depuis sauvegarde-runs
+        # test_local_runs_replay_with_their_own_flag rejoue runs/S (chantier D), runs/butees_corps_30/S (C2 à 30°),
+        # runs/butees_corps/S (6°) et runs/butees_articulaires/S (B2), restaurés depuis sauvegarde-runs
         run: python -m pytest -q -rs tests/
 
   analyse:
@@ -242,15 +244,15 @@ jobs:
             (cd "$d" && ls -l && sha256sum -c *.sha256 && for a in *.tar.gz; do tar -xzf "$a" -C ../..; done)
           done
           ls runs
-      - name: "Garde-fou : rejeu au bit près des champions de référence (C2 et B2)"
+      - name: "Garde-fou : rejeu au bit près des champions de référence (D, C2 et B2)"
         shell: bash
         run: |
           python - <<'FIN'
           import sys
           from evo import replay as rp
           ok = True
-          for d in ("runs/0", "runs/1", "runs/2",
-                    "runs/butees_articulaires/0", "runs/butees_articulaires/1", "runs/butees_articulaires/2"):
+          for d in ("runs/0", "runs/1", "runs/2", "runs/butees_corps_30/0", "runs/butees_corps_30/1",
+                    "runs/butees_corps_30/2", "runs/butees_articulaires/0", "runs/butees_articulaires/1", "runs/butees_articulaires/2"):
               r = rp.Replay(d, rank=1)
               ok &= bool(r.ok)
           sys.exit(0 if ok else 1)

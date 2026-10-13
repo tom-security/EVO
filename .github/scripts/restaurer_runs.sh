@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# Restaure les runs de référence depuis la branche sauvegarde-runs (dispositions de la v1), SHA-256 vérifiés :
-#   runs/S                      C2, cône de 30° (runs par défaut depuis la v1)
+# Restaure les runs de référence depuis la branche sauvegarde-runs (dispositions de la v1.1), SHA-256 vérifiés :
+#   runs/S                      chantier D : report dissipatif, mains, cône de 15° (runs par défaut depuis la v1.1)
+#   runs/butees_corps_30/S      C2, cône de 30° (défaut de la v1.0)
 #   runs/butees_articulaires/S  B2 (butées articulaires seules)
 #   runs/butees_corps/S         C2, cône de 6° (rapport C2)
 set -euo pipefail
 git fetch --depth=1 origin sauvegarde-runs
 archives=()
-for s in 0 1 2; do archives+=("runs_butees_corps_30_$s" "runs_butees_corps_$s" "runs_$s"); done
+for s in 0 1 2; do archives+=("runs_chantier_d_$s" "runs_butees_corps_30_$s" "runs_butees_corps_$s" "runs_$s"); done
 for a in "${archives[@]}"; do git show "FETCH_HEAD:$a.tar.gz" > "$a.tar.gz"; done
 cat > runs.sha256 <<'FIN'
+77159428c7b698ff81af0e4a94662d875d09d185aa8e17890d329b5e6cc6a1be  runs_chantier_d_0.tar.gz
+30cb901482ed91475d7f236e7aebb2ce71bb728814b6e5ca662f1d2bb5192118  runs_chantier_d_1.tar.gz
+12cfa917c89dbc02b7c8d5e40a5da9146dcbe8c686b8d73190f31a262efce7fa  runs_chantier_d_2.tar.gz
 76ff29a110fc84350ea6480059e92a0b0c0fbba0205a4db080fda3d9334df21e  runs_butees_corps_30_0.tar.gz
 626983d2845b66f18956c8e21e42955c0d7e9b720c270bb3385aae1e241edf59  runs_butees_corps_30_1.tar.gz
 56ffbf7e52f692c0d3b3b87253cfa517e2dee1c9f4f5ff39feffc19aef444fe9  runs_butees_corps_30_2.tar.gz
@@ -22,8 +26,9 @@ FIN
 sha256sum -c runs.sha256
 mkdir -p runs/butees_articulaires
 for s in 0 1 2; do tar -xzf "runs_$s.tar.gz" && mv "runs/$s" "runs/butees_articulaires/$s"; done
-for s in 0 1 2; do tar -xzf "runs_butees_corps_30_$s.tar.gz" && mv "runs/butees_corps_30/$s" "runs/$s"; done
-rmdir runs/butees_corps_30
+for s in 0 1 2; do tar -xzf "runs_chantier_d_$s.tar.gz" && mv "runs/chantier_d/$s" "runs/$s"; done
+rmdir runs/chantier_d
+for s in 0 1 2; do tar -xzf "runs_butees_corps_30_$s.tar.gz"; done
 for s in 0 1 2; do tar -xzf "runs_butees_corps_$s.tar.gz"; done
 rm -f runs_*.tar.gz runs.sha256
 ls runs

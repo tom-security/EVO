@@ -283,8 +283,8 @@ def test_no_energy_created_by_the_report_and_the_hands(name):
 RUN_CASES = [  # créatures du diagnostic (docs/chantier_d_diagnostic.md) : génomes des runs de la v1, moteur D
     ("B2 n°868, couchée", ("butees_articulaires", "2"), 0, 868),
     ("B2 n°760, couchée", ("butees_articulaires", "1"), 200, 760),
-    ("C2 n°808, sorties de cône", ("1",), 200, 808),
-    ("C2 n°677, queue étirée", ("0",), 200, 677),
+    ("C2 n°808, sorties de cône", ("butees_corps_30", "1"), 200, 808),
+    ("C2 n°677, queue étirée", ("butees_corps_30", "0"), 200, 677),
 ]
 
 
