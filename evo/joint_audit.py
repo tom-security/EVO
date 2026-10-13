@@ -208,6 +208,26 @@ def segment_crossings(pos):
     return out
 
 
+def leg_tail_crossings(pos, held):
+    """(instants croisés, dont pied tenu) : pour chaque côté, les instants où la jambe (fémur ou tibia) croise un
+    segment de la queue, et parmi eux ceux où le pied de cette jambe est tenu ; les deux côtés additionnés. En vue de
+    dessus, une jambe qui croise la queue passe au-dessus d'elle (profondeur) : pied tenu, la jambe est posée sur le mur
+    par-dessus la queue ; pied levé, elle passe par-dessus en l'air."""
+    P, _ = _series(pos)
+    held = np.asarray(held)
+    limbs, body = _segment_groups(P.shape[1])
+    crossed = held_count = 0
+    for side, (s, SH, EL, HA, HI, KN, FO) in zip("GD", _SIDES):
+        hit = np.zeros(len(P), bool)
+        for _, a in limbs[side + "jambe"]:
+            for b in body["queue"]:
+                if not {*a} & {*b}:
+                    hit |= _segments_cross(P[:, a[0]], P[:, a[1]], P[:, b[0]], P[:, b[1]])
+        crossed += int(hit.sum())
+        held_count += int((hit & held[:, FO]).sum())
+    return crossed, held_count
+
+
 def crossing_measures(pos, held, lengths):
     """(ligne, brut) d'une grimpe : côté de l'axe de chaque extrémité (part du temps de l'autre côté, profondeur,
     zone, patte tenue), croisements par paire, cône de queue. `held` : (T, P) prises ; `lengths` : os du génome."""
@@ -218,6 +238,9 @@ def crossing_measures(pos, held, lengths):
     raw = {"axe": {}, "croisements": segment_crossings(pos), "queue": tail_cone_angles(pos).max(axis=1)}
     row = {"axe": {}, "croisements": {k: float(v.mean()) for k, v in raw["croisements"].items()},
            "queue_hors_cone": {f"{t:g}": float(np.mean(raw["queue"] > t)) for t in TAIL_CONE_REFS_DEG}}
+    crossed, held_count = leg_tail_crossings(pos, held)
+    raw["jambe_queue"] = (crossed, held_count, len(_series(pos)[0]))
+    row["jambe_queue_pied_tenu"] = held_count / crossed if crossed else None
     for j, name in enumerate(LIMB_POINTS):
         x = lat[:, :, j]
         crossed = x < 0
@@ -253,6 +276,12 @@ def crossing_group(raws):
         v = np.array([r["croisements"][kind].mean() for r in raws])
         out["croisements"][kind] = {"moyenne": float(v.mean()), "mediane": float(np.median(v)), "max": float(v.max()),
                                     "grimpes_plus_5": float(np.mean(v > 0.05))}
+    crossed = sum(r["jambe_queue"][0] for r in raws)
+    held_count = sum(r["jambe_queue"][1] for r in raws)
+    steps = sum(r["jambe_queue"][2] for r in raws)
+    out["jambe_queue_pied"] = {"instants_jambe_croisee": crossed / steps / 2,     # par jambe (deux côtés)
+                               "pied_tenu": held_count / crossed if crossed else 0.0,
+                               "pied_leve": (crossed - held_count) / crossed if crossed else 0.0}
     tail = np.concatenate([r["queue"] for r in raws])
     out["queue_angle"] = {"mediane": float(np.median(tail)), "p95": float(np.percentile(tail, 95)), "max": float(tail.max())}
     for t in TAIL_CONE_REFS_DEG:
@@ -492,6 +521,10 @@ def crossing_lines(c):
     cells = [f"{k} {d['moyenne']:.1%} (max {d['max']:.1%}, > 5 % : {d['grimpes_plus_5']:.0%})"
              for k, d in c["croisements"].items() if d["max"] > 0]
     lines.append("    segments croisés (part du temps) : " + (" | ".join(cells) if cells else "aucun"))
+    j = c.get("jambe_queue_pied")
+    if j and j["instants_jambe_croisee"] > 0:
+        lines.append(f"    jambe sur la queue (vue de dessus : la jambe passe au-dessus) : pied tenu {j['pied_tenu']:.1%} "
+                     f"de ces instants, pied levé {j['pied_leve']:.1%}")
     q = c["queue_angle"]
     lines.append(f"    queue vue du bassin : angle max médian {q['mediane']:.0f}°, p95 {q['p95']:.0f}°, max {q['max']:.0f}° ; "
                  + ", ".join(f"hors de ±{k}° {v:.0%}" for k, v in c["queue_hors_cone"].items()))

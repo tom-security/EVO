@@ -180,6 +180,14 @@ def test_crossing_measures_and_group():
     assert group["croisements"]["tibia/queue"]["grimpes_plus_5"] == 1.0
     assert group["queue_hors_cone"]["6"] == 0.0
     assert any("segments croisés" in line for line in ja.crossing_lines(group))
+    # jambe sur la queue : un instant croisé, pied gauche tenu ; puis le même avec le pied levé
+    assert row["jambe_queue_pied_tenu"] == 1.0
+    lifted = np.zeros((2, len(rest)), bool)
+    _, raw_lifted = ja.crossing_measures(P, lifted, lengths)
+    j = ja.crossing_group([raw, raw_lifted])["jambe_queue_pied"]
+    assert j["pied_tenu"] == pytest.approx(0.5) and j["pied_leve"] == pytest.approx(0.5)
+    assert j["instants_jambe_croisee"] == pytest.approx(0.25)     # 2 instants croisés sur 4, une jambe sur 2
+    assert any("jambe sur la queue" in line for line in ja.crossing_lines(ja.crossing_group([raw])))
 
 
 def test_audit_measures_crossings_on_a_run(small_run):
