@@ -116,7 +116,8 @@ jobs:
           compression-level: 0
 
   reproductibilite:
-    # Prouve que le runner rejoue les runs de B2 (graines 0, 1, 2, génération 200, champion) à la hauteur stockée.
+    # Prouve que le runner rejoue les runs de référence restaurés depuis sauvegarde-runs (graines 0, 1, 2, génération
+    # 200, champion) à la hauteur stockée : C2 à 30° (runs/S, défaut depuis la v1) et B2 (runs/butees_articulaires/S).
     if: inputs.mode == 'reproductibilite'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -129,31 +130,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install $PIP_DEPS
-      - name: Restauration des runs B2 (branche sauvegarde-runs)
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --depth=1 origin sauvegarde-runs
-          for s in 0 1 2; do git show "FETCH_HEAD:runs_$s.tar.gz" > "runs_$s.tar.gz"; done
-          cat > runs.sha256 <<'FIN'
-          4cfee42c86d3b1f510bb61f5a6cbf99df0a955e3d1e2c9a5279e662f82422e23  runs_0.tar.gz
-          93f89aca6b9668bbd7db65ceb7e31a5ef283277d900dc6f4a128eafd913ffb3e  runs_1.tar.gz
-          e4a321392f7af91e92d89e05f51157663f299a0a4a3a707e736517ac0107080b  runs_2.tar.gz
-          FIN
-          sha256sum -c runs.sha256
-          for s in 0 1 2; do tar -xzf "runs_$s.tar.gz"; done
+      - name: Restauration des runs de référence (branche sauvegarde-runs)
+        run: bash .github/scripts/restaurer_runs.sh
       - name: Rejeu des champions de la génération 200
         shell: bash
         run: |
           set -uo pipefail
-          echo "| graine | résultat |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| run | résultat |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           status=0
-          for s in 0 1 2; do
-            python main.py replay --seed "$s" --gen 200 --rank 1 --export "out/repro_$s" 2>&1 | tee "repro_$s.log"
+          for d in runs/0 runs/1 runs/2 runs/butees_articulaires/0 runs/butees_articulaires/1 runs/butees_articulaires/2; do
+            tag=${d//\//_}
+            python main.py replay --run-dir "$d" --gen 200 --rank 1 --export "out/repro_$tag" 2>&1 | tee "repro_$tag.log"
             code=${PIPESTATUS[0]}
-            line=$(grep "^replay graine" "repro_$s.log" || echo "pas de ligne de rejeu")
-            echo "| $s | ${line//|//} (code $code) |" >> "$GITHUB_STEP_SUMMARY"
+            line=$(grep "^replay graine" "repro_$tag.log" | head -n 1 || echo "pas de ligne de rejeu")
+            echo "| $d | ${line//|//} (code $code) |" >> "$GITHUB_STEP_SUMMARY"
             [ "$code" -eq 0 ] || status=1
           done
           exit $status
@@ -171,20 +162,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install $PIP_DEPS pytest imageio-ffmpeg
-      - name: Restauration des runs B2 (branche sauvegarde-runs)
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --depth=1 origin sauvegarde-runs
-          for s in 0 1 2; do git show "FETCH_HEAD:runs_$s.tar.gz" > "runs_$s.tar.gz"; done
-          cat > runs.sha256 <<'FIN'
-          4cfee42c86d3b1f510bb61f5a6cbf99df0a955e3d1e2c9a5279e662f82422e23  runs_0.tar.gz
-          93f89aca6b9668bbd7db65ceb7e31a5ef283277d900dc6f4a128eafd913ffb3e  runs_1.tar.gz
-          e4a321392f7af91e92d89e05f51157663f299a0a4a3a707e736517ac0107080b  runs_2.tar.gz
-          FIN
-          sha256sum -c runs.sha256
-          for s in 0 1 2; do tar -xzf "runs_$s.tar.gz"; done
-          rm -f runs_?.tar.gz
+      - name: Restauration des runs de référence (branche sauvegarde-runs)
+        run: bash .github/scripts/restaurer_runs.sh
       - name: Récupération des archives du run source
         if: inputs.source_run_id != ''
         uses: actions/download-artifact@v4
@@ -213,7 +192,8 @@ jobs:
           done
           ls runs
       - name: Tests
-        # avec les runs C2 extraits, test_local_runs_replay_with_their_own_flag rejoue aussi runs/butees_corps/S
+        # test_local_runs_replay_with_their_own_flag rejoue runs/S (C2 à 30°), runs/butees_corps/S (6°) et
+        # runs/butees_articulaires/S (B2), restaurés depuis sauvegarde-runs
         run: python -m pytest -q -rs tests/
 
   analyse:
@@ -233,20 +213,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install $PIP_DEPS imageio-ffmpeg
-      - name: Restauration des runs B2 (branche sauvegarde-runs)
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --depth=1 origin sauvegarde-runs
-          for s in 0 1 2; do git show "FETCH_HEAD:runs_$s.tar.gz" > "runs_$s.tar.gz"; done
-          cat > runs.sha256 <<'FIN'
-          4cfee42c86d3b1f510bb61f5a6cbf99df0a955e3d1e2c9a5279e662f82422e23  runs_0.tar.gz
-          93f89aca6b9668bbd7db65ceb7e31a5ef283277d900dc6f4a128eafd913ffb3e  runs_1.tar.gz
-          e4a321392f7af91e92d89e05f51157663f299a0a4a3a707e736517ac0107080b  runs_2.tar.gz
-          FIN
-          sha256sum -c runs.sha256
-          for s in 0 1 2; do tar -xzf "runs_$s.tar.gz"; done
-          rm -f runs_?.tar.gz
+      - name: Restauration des runs de référence (branche sauvegarde-runs)
+        run: bash .github/scripts/restaurer_runs.sh
       - name: Récupération des archives du run source
         if: inputs.source_run_id != ''
         uses: actions/download-artifact@v4
@@ -274,15 +242,16 @@ jobs:
             (cd "$d" && ls -l && sha256sum -c *.sha256 && for a in *.tar.gz; do tar -xzf "$a" -C ../..; done)
           done
           ls runs
-      - name: "Garde-fou : rejeu au bit près des champions B2"
+      - name: "Garde-fou : rejeu au bit près des champions de référence (C2 et B2)"
         shell: bash
         run: |
           python - <<'FIN'
           import sys
           from evo import replay as rp
           ok = True
-          for s in (0, 1, 2):
-              r = rp.Replay(f"runs/{s}", rank=1)
+          for d in ("runs/0", "runs/1", "runs/2",
+                    "runs/butees_articulaires/0", "runs/butees_articulaires/1", "runs/butees_articulaires/2"):
+              r = rp.Replay(d, rank=1)
               ok &= bool(r.ok)
           sys.exit(0 if ok else 1)
           FIN

@@ -4,12 +4,10 @@ Ce document est écrit pour une IA qui rejoint le projet en cours de route. Il r
 dépôt, les échanges avec l'utilisateur et les rapports de chaque phase : le but, les règles de travail, le code,
 chaque décision prise avec sa raison, les chiffres mesurés, les écarts connus et la suite déjà validée.
 
-État au 13 octobre 2026 : **la v1 est terminée et prête à être gelée.**
-- Phases 1 à 6 terminées et validées ; chantiers A et B terminés et fusionnés.
-- Chantier C terminé (C1 diagnostic, C2 butées du corps), sur la branche `claude/chantier-c2-butees-corps`.
-- Nettoyage sur `claude/nettoyage-v1`.
-- Rien n'est encore fusionné sur `main` : la fusion, les runs par défaut et le tag `v1.0` attendent la décision de
-  l'utilisateur (`docs/BILAN_V1.md`).
+État au 13 octobre 2026 : **la v1 est terminée et gelée**, tag `v1.0` sur `main`.
+- Phases 1 à 6, chantiers A, B et C (C1 diagnostic, C2 butées du corps), nettoyage et bilan, tout est sur `main`.
+- Les runs par défaut sont ceux de C2 à 30° (`runs/S`).
+- Le gel a été validé par l'utilisateur ; détail dans `docs/BILAN_V1.md` §6 et `docs/journal_v1.md`.
 
 **Nouveau cap** : EVO devient le socle d'une vidéo YouTube, la **v2 : duel LLM contre évolution**. La v1 (la
 reproduction de la vidéo de Code BH) doit rester finie, propre et gelée. Un chantier D (« projection propre ») est
@@ -64,19 +62,17 @@ Les autres documents du dépôt restent la référence pour le détail :
   - **GitHub Actions** (`.github/workflows/train.yml`, runner ubuntu-24.04) sert aux entraînements, aux rejeux et aux
     écrans (§3.5) ;
   - **un run ne se rejoue au bit près que sur le runner Linux** : sous Windows, la bibliothèque mathématique diffère.
-- **Runs** (hors git) :
-  - `runs/<graine>` (graines 0, 1, 2) : runs par défaut actuels, entraînés avec les butées articulaires (B2),
-    sauvegardés sur la branche `sauvegarde-runs` (§3.3) ;
-  - `runs/butees_corps_30/<graine>` : **référence C2** (butées du corps, cône de 30°) ; archives d'artefacts GitHub,
-    gardées 30 jours (§3.3) ;
+- **Runs** (hors git, tous sauvegardés sur la branche `sauvegarde-runs`, §3.3) :
+  - `runs/<graine>` (graines 0, 1, 2) : **runs par défaut depuis la v1**, C2 (butées articulaires et du corps, cône
+    de queue de 30°) ;
+  - `runs/butees_articulaires/<graine>` : B2 (butées articulaires seules), les runs par défaut jusqu'à la v1 ;
+  - `runs/butees_corps/<graine>` : C2 avec un cône de 6° (rapport C2) ;
   - graine 2 par défaut pour les écrans.
 - **Branches :**
-  - `main` : code jusqu'à C1, plus le workflow ;
-  - `claude/chantier-c2-butees-corps` : C2 complet ;
-  - `claude/nettoyage-v1` : C2, plus le nettoyage et le bilan (la plus récente) ;
-  - `sauvegarde-runs` : archives des runs B2.
-- **Prochaine étape :** décisions de l'utilisateur sur le gel de la v1 (fusion, runs par défaut, tag `v1.0`), puis
-  le chantier D proposé et la v2 (`docs/BILAN_V1.md`).
+  - `main` : la v1 gelée, tag `v1.0` (phases 1 à 6, chantiers A, B et C, nettoyage, bilan) ;
+  - `claude/chantier-c2-butees-corps` et `claude/nettoyage-v1` : leurs commits sont dans `main` ;
+  - `sauvegarde-runs` : archives des runs de référence (C2 à 30°, C2 à 6°, B2).
+- **Prochaine étape :** le chantier D proposé (plan seulement, à valider), puis la v2 (`docs/BILAN_V1.md`).
 - **Tests :** 158 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
   locaux échouent, et c'est attendu (§3.5).
 
@@ -252,32 +248,36 @@ artefacts/ archives et sorties rapatriées du runner GitHub ← hors git
 .venv/     environnement Python du PC   ← hors git
 ```
 
-### 3.3 Les runs (hors git ; les runs par défaut sont sauvegardés sur la branche `sauvegarde-runs`)
+### 3.3 Les runs (hors git ; ceux de référence sont sauvegardés sur la branche `sauvegarde-runs`)
 
-**Sauvegarde :** les runs par défaut `runs/0`, `runs/1` et `runs/2` sont copiés sur la branche `sauvegarde-runs`.
-C'est une branche sans code et sans historique commun avec les autres, qui contient une archive `runs_S.tar.gz`
-d'≈ 25 Mo par graine et un README (SHA-256, restauration).
-- Restauration vérifiée : les archives relues depuis GitHub redonnent les dossiers identiques octet par octet, et
-  les trois champions de la génération 200 se rejouent à leur hauteur stockée.
-- Pour restaurer, à la racine du dépôt :
-  ```
-  git fetch origin sauvegarde-runs
-  git show origin/sauvegarde-runs:runs_S.tar.gz > runs_S.tar.gz
-  tar -xzf runs_S.tar.gz
-  ```
-- Les anciens runs (`legacy_no_limits`), les runs de calibration et les exports de `out/` ne sont **pas**
-  sauvegardés : c'est le choix de l'utilisateur. Les exports se refont en quelques minutes à partir des runs.
+**Sauvegarde :** la branche `sauvegarde-runs` n'a pas de code et pas d'historique commun avec les autres. Elle
+contient 9 archives d'≈ 25 Mo et un README avec les SHA-256 et la restauration :
+- C2 à 30° (`runs_butees_corps_30_S.tar.gz`) ;
+- C2 à 6° (`runs_butees_corps_S.tar.gz`) ;
+- B2 (`runs_S.tar.gz`).
+
+Les archives de C2 sont celles des artefacts GitHub ; elles y ont été ajoutées au gel, par un commit ordinaire.
+
+**Restauration vérifiée** :
+- les archives clonées depuis GitHub redonnent les dossiers identiques octet par octet (1 851 fichiers) ;
+- le job `reproductibilite`, qui restaure depuis `sauvegarde-runs`, rejoue les champions de la génération 200 à
+  leur hauteur stockée ;
+- pour restaurer : `.github/scripts/restaurer_runs.sh` (bash, à la racine du dépôt) recrée les dispositions de la
+  v1, avec les SHA-256 vérifiés.
+
+**Non sauvegardés** : les anciens runs (`legacy_no_limits`), les runs de calibration, l'essai de 5 générations et les
+exports de `out/`. C'est le choix de l'utilisateur ; les exports se refont en quelques minutes à partir des runs.
 
 | Dossier | Contenu | Config |
 |---|---|---|
-| `runs/0`, `runs/1`, `runs/2` | **runs par défaut** actuels, 200 générations × 1000, avec butées articulaires (B2) | `JOINT_LIMITS = True`, pas de clé `BODY_LIMITS`, donc False |
-| `runs/butees_corps_30/0..2` | **référence C2** : butées articulaires et du corps, cône de queue de 30° | `BODY_LIMITS = True`, `TAIL_CONE_DEG = 30` |
-| `runs/butees_corps/0..2` | C2 avec un cône de 6°, gardé pour le rapport C2 | `BODY_LIMITS = True`, `TAIL_CONE_DEG = 6` |
+| `runs/0`, `runs/1`, `runs/2` | **runs par défaut depuis la v1** : C2, butées articulaires et du corps, cône de queue de 30° (run GitHub 38278062446) | `BODY_LIMITS = True`, `TAIL_CONE_DEG = 30` |
+| `runs/butees_articulaires/0..2` | B2, butées articulaires seules ; runs par défaut jusqu'à la v1 | `JOINT_LIMITS = True`, pas de clé `BODY_LIMITS`, donc False |
+| `runs/butees_corps/0..2` | C2 avec un cône de 6°, gardé pour le rapport C2 (run GitHub 38266975229) | `BODY_LIMITS = True`, `TAIL_CONE_DEG = 6` |
 | `runs/essai/0..2` | essai de 5 générations de C2 (durées sur le runner) | comme `butees_corps` |
 | `runs/legacy_no_limits/0..2` | anciens runs de la phase 3b, sans butées (absents du PC actuel) | pas de clé `JOINT_LIMITS`, donc False |
 | `runs/calib/*` | 6 runs de 30 générations (calibration de TORQUE_SCALE et de la prise, phase 3b, étape 1) | cités dans `config.py` |
 | `runs/fit/*` | runs de 40 générations (grilles de fitness, phase 3b, étape 2) | cités dans `config.py` |
-| `runs/train_s{0,1,2}.log` | journaux d'entraînement des runs par défaut | |
+| `runs/train_*.log` | journaux d'entraînement (`train_sS.log` : B2 ; `train_butees_corps_30_sS.log` : runs par défaut ; `train_butees_corps_sS.log` : 6°) | |
 
 - Chaque run contient : `gen_0000.npz` à `gen_0200.npz`, `stats.csv`, `config.json` (instantané complet de la
   config au lancement, `--set` compris) et `audit.csv`.
@@ -285,11 +285,9 @@ d'≈ 25 Mo par graine et un README (SHA-256, restauration).
   - B2 : ≈ 15 à 18 min d'évaluation par graine (867 / 990 / 1071 s pour les graines 0 / 1 / 2) ; ≈ 8,5 min sans
     butées ;
   - C2 à 30° : 18 à 44 min par graine sur le runner. Les 14 butées du corps coûtent ×2,2 en évaluation.
-- **Runs C2** : ils viennent des artefacts GitHub, gardés 30 jours :
-  - `runs_butees_corps_30_S.tar.gz` du run 38278062446 ;
-  - `runs_butees_corps_S.tar.gz` du run 38266975229.
-
-  Ils ne sont pas sur `sauvegarde-runs` : leur sauvegarde durable fait partie des propositions du bilan.
+- **Disposition** : jusqu'à la v1, les runs de C2 s'appelaient `runs/butees_corps_30/S`, et ceux de B2 `runs/S`. Les
+  rapports écrits avant le gel (`chantier_c_c2.md`, le journal) citent ces anciens chemins ; voir la note en tête du
+  rapport C2.
 - **Régénérer des runs** : sur le runner, `gh workflow run train.yml --ref <branche> -f mode=train -f run_name=<nom>`
   (§3.5) ; ou en local, `python main.py train --seed S --generations 200 --pop 1000 --run-dir runs/<nom>/S --set
   AUDIT_EVERY=10`. Le run est déterministe sur une même machine : même graine, même code, même config donnent les
@@ -338,9 +336,9 @@ numba 0.67.0, pygame 2.6.1. Entrée `mode` :
 | Mode | Ce qu'il fait |
 |---|---|
 | `train` | matrice sur `seeds` (3 graines en parallèle) ; `train --pop 1000 --set AUDIT_EVERY=10 <extra_set>` dans `runs/<run_name>/S` ; archive `runs_<run_name>_S.tar.gz` + SHA-256 + `pip_freeze.txt`, en artefact gardé 30 jours |
-| `reproductibilite` | restaure les runs B2 depuis `sauvegarde-runs` (SHA-256 vérifiés), rejoue les champions de la génération 200, échoue sur tout écart |
-| `pytest` | la suite complète, avec les runs B2 restaurés et, en option, les archives de un ou deux runs `train` (`source_run_id`, `source_run_id_2`) : le test des runs locaux les rejoue alors aussi |
-| `analyse` | runs B2 et archives des runs sources ; garde-fou (rejeu des champions B2) ; captures de la vidéo remplacées par des aplats (les artefacts sont publics) ; cache du décor ; `commandes` = sous-commandes de `main.py` séparées par « ; » (liste blanche, sans shell, sans guillemets ni espaces dans les valeurs) ; `out/` et les journaux en artefact |
+| `reproductibilite` | restaure les runs de référence depuis `sauvegarde-runs` (`.github/scripts/restaurer_runs.sh`, SHA-256 vérifiés), rejoue les champions de la génération 200 de C2 (`runs/S`) et de B2 (`runs/butees_articulaires/S`), échoue sur tout écart |
+| `pytest` | la suite complète, avec les runs de référence restaurés (le test des runs locaux les rejoue) et, en option, les archives de un ou deux runs `train` (`source_run_id`, `source_run_id_2`) |
+| `analyse` | runs de référence et archives des runs sources ; garde-fou (rejeu des champions C2 et B2) ; captures de la vidéo remplacées par des aplats (les artefacts sont publics) ; cache du décor ; `commandes` = sous-commandes de `main.py` séparées par « ; » (liste blanche, sans shell, sans guillemets ni espaces dans les valeurs) ; `out/` et les journaux en artefact |
 
 ```
 gh workflow run train.yml --ref <branche> -f mode=pytest -f source_run_id=38278062446
@@ -1174,7 +1172,9 @@ temps.
 | Écran de fin volcan | exclu (identité d'un vrai créateur) |
 | Pas de 4b | les défauts restants sont notés, pas corrigés |
 | Butées articulaires | valeurs du §3 de B1 ; cibles du génome dans la plage ; drapeau absent = False ; ordre de projection liens, butées, sol conservé malgré le cas à 1,97 % |
-| Runs | `runs/<graine>` = avec butées articulaires (défaut actuel) ; `runs/legacy_no_limits/` = sans ; `runs/butees_corps_30/<graine>` = **référence C2** |
+| Runs | depuis la v1 : `runs/<graine>` = **C2 à 30°** (défaut) ; `runs/butees_articulaires/<graine>` = B2 ; `runs/butees_corps/<graine>` = C2 à 6° ; `runs/legacy_no_limits/` = sans butées ; tous sauf legacy sauvegardés sur `sauvegarde-runs` |
+| Queue courbée à 30° | acceptée pour la v1, notée dans les écarts connus |
+| `docs/reference/` | laissé tel quel pour l'instant |
 | Chantier C | pied de son côté de l'axe + queue dans un cône ; pas de collision générale ; pas de séparation complète ; résidu jambe–queue tranché au bilan |
 | Cône de queue | 6° [DÉDUIT] au départ, **30° [CHOIX] appliqué** (repli direct par la règle « troisième mesure tombée à cause de la queue en butée et au sol ») ; le critère de repli reste le seul juge sur les grimpeuses |
 | Reproductibilité | le runner GitHub ubuntu-24.04 fait foi pour tout rejeu, test de rejeu, mesure de run et écran ; versions épinglées ; les captures de la vidéo ne sortent jamais dans les artefacts publics |
@@ -1213,8 +1213,8 @@ sont gardés en liste volontairement, sans y toucher sans accord.
   (1,37) ; les autres graines changent sans tendance commune (`docs/chantier_c_c2.md` §7).
 - **Queue physique courte** (1,2 × la colonne), prolongée au dessin à 1,9 ×.
 - **Queue dessinée courbée à 30° :** la queue de C2 s'écarte de 24 à 28° de l'axe (médiane), contre 1,7 à 5,7° sur
-  les images 11, 12 et 40. À 6°, elle était droite comme dans la vidéo. Le jugement visuel est laissé à
-  l'utilisateur.
+  les images 11, 12 et 40. À 6°, elle était droite comme dans la vidéo. **Acceptée pour la v1** (décision de
+  l'utilisateur au gel).
 - **Résidu jambe–queue :** 0 / 6,8 / 7,5 % du temps (B2 : 14 / 72 / 50 %), permis par le cône de 30°.
 - **Bras croisés (graine 0) :** chez les 50 meilleures, les bras gauche et droit se croisent 89 % du temps et
   passent devant la tête 31 % du temps. Aucune contrainte n'existe entre les bras ; c'est apparu avec C2 (≈ 0 en B2).
@@ -1356,16 +1356,16 @@ meilleures et 50 créatures au hasard de la génération 200 :
 6. Rapport `docs/chantier_c_c2.md`, organisé comme `chantier_b_b2.md`, avec les courbes dans `docs/chantier_c_c2/`.
    Commit, push, **arrêt pour validation** (pas de réorganisation de `runs/`).
 
-### 12.3 Après C2 (à décider par l'utilisateur ; détail dans `docs/BILAN_V1.md`)
+### 12.3 Après C2 (détail dans `docs/BILAN_V1.md`)
 
-- **Gel de la v1, proposé, rien n'est appliqué** :
-  - avancer `main` jusqu'à `claude/nettoyage-v1` ;
-  - faire des runs C2 à 30° les runs par défaut, comme après B ;
-  - sauvegarder ces runs sur `sauvegarde-runs` ;
-  - poser le tag `v1.0`.
+- **Gel de la v1, fait le 13 octobre 2026**, validé par l'utilisateur :
+  - runs C2 à 30° devenus les runs par défaut ;
+  - runs C2 sauvegardés sur `sauvegarde-runs` ;
+  - `main` avancée en avance rapide ;
+  - tag `v1.0` posé après un `pytest` vert sur le runner.
+- Décidé au gel : queue courbée à 30° acceptée pour la v1 (écart connu) ; `docs/reference/` laissé tel quel.
 - Le résidu jambe–queue des graines 1 et 2 (6,8 et 7,5 %) : collision ciblée ou non.
-- Le jugement visuel de la queue à 30° (courbée, contre une queue droite dans la vidéo).
-- **Chantier D proposé, « projection propre »** :
+- **Chantier D proposé, « projection propre »**, d'abord un plan à valider, sans code :
   - reporter sur la vitesse les corrections de position de la projection (énergie des créatures couchées, queue
     étirée à l'impact, sortie de cône d'un sous-pas) ;
   - ajouter une butée « mains de leur côté de l'axe » sur le modèle des pieds ;

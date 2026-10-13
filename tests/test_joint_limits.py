@@ -239,14 +239,14 @@ def run_config_restored():
 @pytest.mark.parametrize("seed", [0, 1, 2])
 def test_local_runs_replay_with_their_own_flag(seed, run_config_restored):
     """Runs locaux (hors git, test ignoré s'ils manquent), chacun rejoué au bit près avec sa propre config :
-    runs/butees_corps_30/<graine> et runs/butees_corps/<graine> (C2, butées articulaires et du corps, cône de 30° et
-    de 6°) ; runs/<graine>, le défaut, entraîné avec les
-    butées articulaires (B2) ; runs/legacy_no_limits/<graine>, d'avant B2, sans butées."""
+    runs/<graine>, le défaut depuis la v1 (C2 : butées articulaires et du corps, cône de 30°) ;
+    runs/butees_corps/<graine> (C2, cône de 6°) ; runs/butees_articulaires/<graine> (B2, butées articulaires seules) ;
+    runs/legacy_no_limits/<graine>, d'avant B2, sans butées."""
     from evo import replay as rp
 
-    cases = [(os.path.join(config.RUNS_DIR, "butees_corps_30", str(seed)), True, True),   # C2, cône de 30° (repli)
-             (os.path.join(config.RUNS_DIR, "butees_corps", str(seed)), True, True),      # C2, cône de 6°
-             (ev.run_dir_for(seed), True, False),
+    cases = [(ev.run_dir_for(seed), True, True),                                              # C2, cône de 30°
+             (os.path.join(config.RUNS_DIR, "butees_corps", str(seed)), True, True),           # C2, cône de 6°
+             (os.path.join(config.RUNS_DIR, "butees_articulaires", str(seed)), True, False),   # B2
              (os.path.join(config.RUNS_DIR, "legacy_no_limits", str(seed)), False, False)]
     present = [case for case in cases if os.path.exists(os.path.join(case[0], "config.json"))]
     if not present:

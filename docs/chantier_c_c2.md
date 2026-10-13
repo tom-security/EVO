@@ -20,6 +20,11 @@ C2 les met dans le moteur, réentraîne les trois graines et mesure le résultat
 - `runs/butees_corps/S` : cône de 6°, gardé pour le rapport ;
 - B2 reste dans `runs/S`.
 
+> **Note : chemins réorganisés au gel de la v1.** Les runs C2 à 30° sont devenus les runs par défaut :
+> `runs/butees_corps_30/S` est devenu `runs/S`, et B2 est passé de `runs/S` à `runs/butees_articulaires/S`.
+> `runs/butees_corps/S` (6°) ne change pas. Dans ce rapport, lire `runs/butees_corps_30/S` comme `runs/S`, et `runs/S`
+> (B2) comme `runs/butees_articulaires/S`. Les trois jeux sont sauvegardés sur la branche `sauvegarde-runs`.
+
 Toutes les mesures sur des runs ont été faites sur le runner, hauteurs rejouées identiques au run.
 
 ## 1. Ce qui a changé dans le moteur

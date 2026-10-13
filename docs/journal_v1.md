@@ -508,3 +508,26 @@ inchangé. `pytest` : 158 passent (38360421255).
 - les archives des runs C2 expirent le 11 novembre 2026.
 
 **Fin de la mission** : rien n'est fusionné sur `main` ; arrêt pour validation.
+
+## Étape 11 : gel de la v1
+
+**Décisions de Tom** :
+- gel en autonomie : avance rapide de `main`, runs C2 à 30° par défaut, tag `v1.0` après un `pytest` vert sur le
+  runner ;
+- sauvegarde des runs C2 sur `sauvegarde-runs`, sans réécrire son historique ;
+- `docs/reference/` laissé tel quel ;
+- queue courbée à 30° acceptée (écart connu) ;
+- chantier D : un plan seulement.
+
+**Sauvegarde** :
+- `sauvegarde-runs` passe de `8ff6ab2` à `7f53c9c` en avance rapide : 6 archives C2 (30° et 6°), identiques aux
+  artefacts, et README avec les SHA-256 et la nouvelle disposition ;
+- restauration vérifiée sur un clone neuf depuis GitHub : les 9 SHA-256 sont conformes, et les 1 851 fichiers
+  extraits sont identiques octet par octet aux runs locaux.
+
+**Runs par défaut** :
+- déplacements locaux : `runs/S` (B2) devient `runs/butees_articulaires/S`, et `runs/butees_corps_30/S` devient
+  `runs/S` ;
+- test des runs locaux et workflow mis à jour (`.github/scripts/restaurer_runs.sh` restaure les trois jeux) ;
+- le job `reproductibilite` rejoue les champions C2 et B2 ;
+- docs mises à jour (PASSATION, note de chemins du rapport C2, encadré du bilan).

@@ -6,7 +6,18 @@ maison, lézards qui grimpent, sélection naturelle, rendu jungle, HUD et écran
 et elle attend son gel. Ce document dit ce qui est fait, comment elle se compare à la vidéo, ce qui reste en écart,
 et quelles décisions attendent l'utilisateur, avec des propositions qui ne sont pas appliquées.
 
-**État au 13 octobre 2026** :
+> **Gel fait le 13 octobre 2026** (décisions de l'utilisateur, détail dans `docs/journal_v1.md`) :
+> - les runs C2 à 30° sont les runs par défaut (`runs/S`), B2 est dans `runs/butees_articulaires/S` ;
+> - les runs C2 à 30° et à 6° sont sauvegardés sur `sauvegarde-runs` (point 7 du §5 réglé), avec une restauration
+>   vérifiée ;
+> - `main` a été avancée en avance rapide, puis le tag `v1.0` posé après un `pytest` vert sur le runner ;
+> - la queue courbée à 30° est acceptée pour la v1, comme écart connu (point 2 du §5 réglé) ;
+> - `docs/reference/` est laissé tel quel (point 6 du §5) ;
+> - le chantier D : un plan seulement, sans code, à valider.
+>
+> Le reste de ce document est l'état d'avant le gel.
+
+**État au 13 octobre 2026, avant le gel** :
 
 | Branche | Commit | Contenu |
 |---|---|---|
