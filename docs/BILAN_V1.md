@@ -120,7 +120,8 @@ qui ont la même cause : **la projection corrige les positions sans corriger les
      - B2 : jusqu'à 1 292 J (6,45 m d'équivalent hauteur), 3 à 7 créatures par génération au-delà de 5 cm ;
      - C2 à 30° : 68 cm au plus.
    - Effet sur la sélection : marginal. Les créatures en cause finissent couchées à une hauteur normale ; une seule
-     sur 27 était au rang 499, juste sous la limite des survivantes.
+     des 21 créatures de B2 au-delà de 5 cm (générations 0 et 200, 3 graines) était au rang 499, juste sous la
+     limite des survivantes.
 2. **Queue étirée à l'impact (C2).** La queue en butée de cône et posée au sol est étirée par la projection.
    - C2 à 30° : jusqu'à 43,8 % (n°677) ; 0 à 19 créatures par génération au-delà de 5 % (B2 : 0 à 9).
 3. **Sortie de cône d'un seul sous-pas (C2).** En l'air, quand plusieurs butées de queue agissent ensemble, la
