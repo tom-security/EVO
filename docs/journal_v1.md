@@ -470,3 +470,41 @@ inchangé. `pytest` : 158 passent (38360421255).
 | C2 n°0 (graine 1, gén. 200) | 0 J / 0,4 % / 0 | 0 J / 0,2 % / 0 | +37,10 → +37,21 m |
 
 **Prochaine étape** : partie 2, nettoyage, sur la branche `claude/nettoyage-v1`.
+
+## Étape 9 : nettoyage (branche `claude/nettoyage-v1`, partie de `30b1a61`)
+
+**Constats** :
+- aucune constante de `config.py` n'est inutilisée ;
+- supprimer ou renommer une constante changerait le rejeu des runs : rien n'est supprimé ;
+- il n'y a aucun TODO ;
+- 4 fonctions ne servent qu'aux tests : elles restent.
+
+**Commit `66398e6`** (code et config) :
+- tags de `config.py` (commentaires seuls), avec `config_snapshot()` identique avant et après (246 clés) ;
+- 1 import inutilisé retiré (`morphology.py`). Celui de `replay.py` est volontaire (`noqa`) ;
+- `requirements.txt` épinglé (numpy 2.4.6, numba 0.67.0, pygame 2.6.1) ;
+- `.gitignore` : `.venv/`, `artefacts/` ;
+- pytest local : 155 passent, plus les 3 rejeux Windows connus ;
+- **runner : 158 passent**, rejeux B2 et C2 compris (38361370313).
+
+**Commit `71f1281`** (documents seuls, couverts par le run précédent sur un code identique) :
+- `PASSATION.md` à jour ;
+- `CLAUDE.md` complété ;
+- `README.md` public ;
+- chemins et branches de `chantier_b_b2.md` à jour, renvoi à C2 dans `chantier_c_diagnostic.md`.
+
+## Étape 10 : bilan
+
+**`docs/BILAN_V1.md`** :
+- ce qui est fait ;
+- les chiffres clés contre la vidéo ;
+- les écarts restants ;
+- le chantier D proposé (`vitesse_proj` mesuré au bit près, butée des mains motivée par les 91 % de la graine 0) ;
+- 8 décisions en attente ;
+- les propositions de gel : fusion en avance rapide vérifiée, runs C2 par défaut, tag `v1.0`.
+
+**Vérifications** :
+- `main` (`d9317eb`) et `claude/chantier-c2-butees-corps` (`30b1a61`) sont ancêtres de `claude/nettoyage-v1` ;
+- les archives des runs C2 expirent le 11 novembre 2026.
+
+**Fin de la mission** : rien n'est fusionné sur `main` ; arrêt pour validation.
