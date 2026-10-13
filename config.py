@@ -182,7 +182,13 @@ FOOT_AXIS_MARGIN_DEG = 0.0  # [CHOIX] C2 — pied jusque sur l'axe, pas au-delà
 # - créatures tombées des vraies populations, gén. 0 : 77 à 82 par graine avec un os de queue au-delà de 5 % (B2 :
 #   1 à 6), jusqu'à 26 % ; 100 % de ces sous-pas avec la queue en butée de cône ET au sol.
 # Avec 30°, créature inerte : 0.30 J, queue > 5 % pendant 58 ms. Les runs à 6° sont gardés pour le rapport.
-TAIL_CONE_DEG = 30.0
+# [CHOIX] Chantier D — 15°, par la règle de Tom : l'angle le plus serré (10°, 15°, 30° mesurés) qui respecte, avec le
+# moteur D (report dissipatif, mains), tous les seuils actuels de la créature inerte, sans en changer aucun (plage de
+# la vidéo −9 à −7,8 m, énergie < 6 J, queue < 10 %, et ceux du banc tests/test_creature.py). Mesuré sur le runner
+# (run 38408327494) : 10° → −8,32 m, 1,03 J, queue 5,4 % ; 15° → −8,37 m, 0,39 J ; 30° → −8,53 m, 0,12 J. Mais à
+# 10°, un point posé au sol glisse de 5,97 cm pendant les 3 dernières secondes (seuil du banc : 5 cm ; 15° : 0,45 cm,
+# 30° : 0,15 cm ; mesure du PC). Runs de C2 : 30° (leur config.json).
+TAIL_CONE_DEG = 15.0
 # [CHOIX] C2 — critère de repli du cône de queue (commande `joints --tail`, sur les 50 meilleures de la gén. 200) :
 # - longueur : « systématique » si, pour au moins une graine, plus de TAIL_FALLBACK_SHARE des grimpes ont un os de
 #   queue au-delà de TAIL_LENGTH_LIMIT d'erreur pendant plus de TAIL_FALLBACK_TIME de leur durée ;

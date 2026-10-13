@@ -1,7 +1,9 @@
-"""Chantier D : report dissipatif de la projection (CLEAN_PROJECTION), queue tenue par sa courbure
-(TAIL_CURVATURE_LIMITS), mains de leur côté de l'axe (HAND_LIMITS).
+"""Chantier D : report dissipatif de la projection (CLEAN_PROJECTION) et mains de leur côté de l'axe (HAND_LIMITS),
+avec le cône de queue de C2 (TAIL_CONE_DEG).
 
-Sur le modèle de tests/test_body_limits.py (C2), avec les trois drapeaux du chantier D.
+Sur le modèle de tests/test_body_limits.py (C2). La queue tenue par sa courbure (TAIL_CURVATURE_LIMITS, candidat (d))
+a été explorée puis écartée (docs/chantier_d.md) : son code reste derrière son drapeau (False), et ses tests de
+disposition et d'égalité au bit près sont gardés en fin de fichier.
 """
 import json
 import math
@@ -19,11 +21,8 @@ from evo import physics
 from evo import skeleton as sk
 
 H = config.DT / config.SUBSTEPS
-TOL = math.radians(0.5)                              # pénétration tolérée (critère B2) : articulations, pieds, mains
-# Queue : chaîne de 12 butées couplées, moins bien résolue que des butées isolées (docs/chantier_d_diagnostic.md,
-# 50 meilleures de la gén. 200 : enfoncement p95 ≤ 1,05°, max 14,6°). Tolérance de ces tests : 1°.
-TAIL_TOL = math.radians(1.0)
-JOINTS_FEET = slice(0, 10)
+TOL = math.radians(0.5)                              # pénétration tolérée (critère B2)
+FEET = slice(8, 10)
 TAIL = slice(10, 22)
 HANDS = slice(22, 24)
 D_FLAGS = ("CLEAN_PROJECTION", "TAIL_CURVATURE_LIMITS", "HAND_LIMITS")
@@ -32,8 +31,10 @@ needs_numba = pytest.mark.skipif(not physics.HAVE_NUMBA, reason="numba non insta
 
 @pytest.fixture(autouse=True)
 def d_on(monkeypatch):
-    for flag in ("JOINT_LIMITS", "BODY_LIMITS") + D_FLAGS:
+    """Moteur du chantier D : butées articulaires et du corps, report dissipatif, mains ; pas de courbure."""
+    for flag in ("JOINT_LIMITS", "BODY_LIMITS", "CLEAN_PROJECTION", "HAND_LIMITS"):
         monkeypatch.setattr(config, flag, True)
+    monkeypatch.setattr(config, "TAIL_CURVATURE_LIMITS", False)
 
 
 def _free_creature():
@@ -84,16 +85,14 @@ def test_layout_and_rest_pose():
     assert list(groups["mains"]) == [22, 23]
     assert "mains" not in cr.limit_groups(22, hands=False)
     np.testing.assert_array_equal(w.limit_joints[:8], w.joints)
-    t = sk.TAIL_START
-    # queue : cône du premier segment, puis courbure à chaque jonction (point précédent, pivot, suivant)
-    np.testing.assert_array_equal(w.limit_joints[10], (sk.NECK, sk.PELVIS, t))
-    np.testing.assert_array_equal(w.limit_joints[11], (sk.PELVIS, t, t + 1))
-    np.testing.assert_array_equal(w.limit_joints[21], (t + 9, t + 10, t + 11))
-    np.testing.assert_array_equal(w.limit_joints[22:], [(sk.NECK, sk.PELVIS, sk.L_HAND), (sk.NECK, sk.PELVIS, sk.R_HAND)])
-    np.testing.assert_array_equal(w.limit_sign[22:], [1.0, -1.0])
+    # pieds, queue (cône de C2) et mains : triplets (NECK, PELVIS, X)
+    np.testing.assert_array_equal(w.limit_joints[8:, :2], [[sk.NECK, sk.PELVIS]] * 16)
+    np.testing.assert_array_equal(w.limit_joints[TAIL, 2], np.arange(sk.TAIL_START, sk.TAIL_START + 12))
+    np.testing.assert_array_equal(w.limit_joints[HANDS, 2], [sk.L_HAND, sk.R_HAND])
+    np.testing.assert_array_equal(w.limit_sign[HANDS], [1.0, -1.0])
     assert _theta(w.pos, sk.L_HAND) > 0 > _theta(w.pos, sk.R_HAND)               # main gauche à θ > 0
-    # au repos, la queue est droite, au centre de chaque butée ; les mains loin de l'axe
-    np.testing.assert_allclose(w.limit_violation()[TAIL], math.radians(config.TAIL_CURVATURE_DEG), atol=1e-9)
+    # au repos, la queue est dans l'axe, au centre du cône ; les mains loin de l'axe
+    np.testing.assert_allclose(w.limit_violation()[TAIL], math.radians(config.TAIL_CONE_DEG), atol=1e-9)
     assert np.all(w.limit_violation()[HANDS] > math.radians(10.0))
 
 
@@ -172,11 +171,10 @@ def _engaging_genomes():
     return others + [climber, cr.diagonal_gait_genome()]
 
 
-@needs_numba
-def test_batch_matches_scalar_bit_for_bit_with_the_chantier_d_engine(monkeypatch):
+def _batch_matches_scalar(monkeypatch, n_limits):
     genomes = _engaging_genomes()
     arrays = batch.pack(genomes)
-    assert arrays["lim_joints"].shape == (24, 3) and arrays["clean_projection"] is True
+    assert arrays["lim_joints"].shape == (n_limits, 3) and arrays["clean_projection"] is True
     for k in (0, 2):                                           # pied gauche au-delà de l'axe au départ
         _cross_left_foot(arrays["pos"][k])
     for k in (1, 3):                                           # main gauche au-delà de l'axe au départ
@@ -184,7 +182,7 @@ def test_batch_matches_scalar_bit_for_bit_with_the_chantier_d_engine(monkeypatch
     reports = []
     original = physics.projection_velocity
     monkeypatch.setattr(physics, "projection_velocity", lambda *a: reports.append(original(*a)) or reports[-1])
-    engaged = np.zeros(24, dtype=int)
+    engaged = np.zeros(n_limits, dtype=int)
     scalar = []
     for k, g in enumerate(genomes):
         c = cr.Creature(g)
@@ -193,7 +191,6 @@ def test_batch_matches_scalar_bit_for_bit_with_the_chantier_d_engine(monkeypatch
             c.substep(H)
             engaged += c.world.limit_active
         scalar.append(c)
-    assert engaged[8] > 0 and engaged[22] > 0 and np.all(engaged[TAIL] > 100)   # pied, main, queue engagés
     assert sum(a > 0.0 for a in reports) > 100                                    # le report a agi
     res = batch.evaluate(genomes, packed=arrays)
     for k, c in enumerate(scalar):
@@ -201,6 +198,13 @@ def test_batch_matches_scalar_bit_for_bit_with_the_chantier_d_engine(monkeypatch
         np.testing.assert_array_equal(res["vel"][k], c.world.vel)
         assert res["energy"][k] == c.energy and res["height"][k] == c.height()
         assert bool(res["fallen"][k]) == c.fallen
+    return engaged
+
+
+@needs_numba
+def test_batch_matches_scalar_bit_for_bit_with_the_chantier_d_engine(monkeypatch):
+    engaged = _batch_matches_scalar(monkeypatch, 24)
+    assert engaged[8] > 0 and engaged[22] > 0 and np.any(engaged[TAIL] > 0)     # pied, main, queue engagés
 
 
 def _run(world, seconds, limits):
@@ -224,44 +228,38 @@ def test_free_hand_thrown_at_the_axis_stops_on_it(speed):
 
 
 @pytest.mark.parametrize("speed", [2.0, 5.0, 10.0])
-def test_tail_thrown_sideways_stays_straight_without_energy_gain(speed):
+def test_tail_thrown_against_the_cone_stops_without_energy_gain(speed):
     c = _free_creature()
     w = c.world
     w.vel[sk.TAIL_START:] = (speed, 0.0)
     energies, margins = _run(w, 1.0, TAIL)
-    assert margins.min() >= -TAIL_TOL                          # courbure tenue à 1° près à chaque jonction
-    assert np.any(margins < math.radians(0.01))                # les butées de courbure ont servi
+    assert margins.min() >= -TOL                               # aucun point de queue hors du cône de plus de 0.5°
+    assert np.any(margins < math.radians(0.01))                # le cône a servi
     assert np.all(np.diff(energies) <= 1e-9)
     tail = np.array([name == "tail" for name in c.skel.link_names])
     err = np.abs(w.link_lengths() - w.rest) / w.rest
     assert err[tail].max() < 0.01                              # os de la queue < 1 %
 
 
-def test_start_beyond_the_limits_recovers():
+def test_start_beyond_the_limits_recovers_by_the_short_side():
     c = cr.Creature(cr.diagonal_gait_genome())
     P = c.world.pos
-    _rotate(P, list(range(sk.TAIL_START + 3, len(P))), P[sk.TAIL_START + 2].copy(), 40.0)   # queue pliée de 40°
+    bent = config.TAIL_CONE_DEG + 34.0                         # queue pliée 34° au-delà du cône
+    _rotate(P, list(range(sk.TAIL_START, len(P))), P[sk.PELVIS].copy(), bent)
     _cross_left_foot(P)
     _cross_left_hand(P)
     v = c.world.limit_violation()
     assert v[TAIL].min() < -math.radians(30.0) and v[8] < 0 and v[22] < 0
-    tail = []
     for k in range(int(round(2.0 / H))):
         c.substep(H)
         assert np.all(np.isfinite(c.world.pos)) and np.all(np.isfinite(c.world.vel))
-        v = c.world.limit_violation()
-        tail.append(v[TAIL].min())
-        if k >= 60:                                                                # 1/8 s plus tard : pied et main revenus
-            assert v[8:10].min() >= -TOL and v[HANDS].min() >= -TOL
-    # la queue revient peu à peu (la projection redresse la chaîne ; mesuré : sous 1° en 0,55 s, 0 à 1 s), sans repartir
-    tail = np.array(tail)
-    assert tail[int(round(0.75 / H)):].min() >= -TAIL_TOL
-    assert np.all(np.diff(tail[:int(round(0.75 / H))]) > -math.radians(0.5))
+        if k >= 60:                                                                # 1/8 s plus tard : revenu
+            assert c.world.limit_violation()[8:].min() >= -TOL
     assert np.hypot(*c.world.vel[c.body_points].T).max() < config.AUDIT_MAX_SPEED
 
 
 @pytest.mark.parametrize("name", ["grimpeuse aléatoire", "marche écrite à la main", "inerte"])
-def test_no_energy_created_and_limits_held(name):
+def test_no_energy_created_by_the_report_and_the_hands(name):
     genome = {"grimpeuse aléatoire": lambda: _engaging_genomes()[4], "marche écrite à la main": cr.diagonal_gait_genome,
               "inerte": cr.limp_genome}[name]()
     c, ledger = audit.audit(genome)
@@ -269,23 +267,17 @@ def test_no_energy_created_and_limits_held(name):
     assert ledger["liens_contacts+"] < 1e-9                    # liens + butées + sol : dissipatifs
     assert ledger["report_projection+"] < 1e-9                 # le report ne fait que retirer (arrondis : 1e-12)
     assert ledger["saut_engagement_max"] / weight < config.AUDIT_MAX_LIMIT_JUMP
-    limit = 1e-4 * weight * config.START_HEIGHT                # 0,23 J, comme tests/test_creature.py
-    if name == "inerte":
-        # Effet de la queue tenue par sa courbure (docs/chantier_d.md) : la créature inerte tombe sur la pointe de sa
-        # queue, tenue droite comme une échasse ; la résolution en vitesse (N_ITER passes) ne fait pas converger la
-        # chaîne de 12 butées couplées, la queue fléchit d'un rien à chaque sous-pas et la projection la redresse en
-        # soulevant le torse (≈ 2 mm par sous-pas, à vitesse nulle : le report n'a rien à retirer). Mesuré : 8,16 J
-        # (≈ 3,7 cm ; C2 à 30° : 0,30 J ; courbure sans le report : 6,56 J). Seuil propre à ce cas : 10 J (≈ 4,5 cm),
-        # sous le seuil d'audit (5 cm).
-        limit = 10.0
+    # seuils de tests/test_creature.py, inchangés (PASSATION §10) : 0,23 J ; créature inerte avec les butées du
+    # corps : 6 J
+    limit = 6.0 if name == "inerte" else 1e-4 * weight * config.START_HEIGHT
     assert ledger["hors_muscles+"] < limit
-    c = cr.Creature(genome)
-    worst = np.full(24, np.inf)
-    for _ in range(int(round(10.0 / H))):
-        c.substep(H)
-        worst = np.minimum(worst, c.world.limit_violation())
-    assert worst[JOINTS_FEET].min() >= -TOL and worst[HANDS].min() >= -TOL
-    assert worst[TAIL].min() >= -TAIL_TOL
+    if name != "inerte":
+        c = cr.Creature(genome)
+        worst = np.inf
+        for _ in range(int(round(10.0 / H))):
+            c.substep(H)
+            worst = min(worst, c.world.limit_violation().min())
+        assert worst >= -TOL                                   # les 24 butées tenues à 0.5° près tout du long
 
 
 RUN_CASES = [  # créatures du diagnostic (docs/chantier_d_diagnostic.md) : génomes des runs de la v1, moteur D
@@ -298,9 +290,9 @@ RUN_CASES = [  # créatures du diagnostic (docs/chantier_d_diagnostic.md) : gén
 
 @pytest.mark.parametrize("name, run, gen, index", RUN_CASES, ids=[c[0] for c in RUN_CASES])
 def test_energy_non_regression_on_the_diagnostic_creatures(name, run, gen, index):
-    """Runs locaux (hors git, test ignoré s'ils manquent). Moteur tel quel : 1 292,5 J et 825,2 J créés (couchées),
-    queue étirée à 43,8 % (n°677), 16 sorties de cône (n°808). Le génome est rejoué avec le moteur du chantier D (la
-    config du run n'est pas appliquée)."""
+    """Runs locaux (hors git, test ignoré s'ils manquent). Moteur de la v1 : 1 292,5 J et 825,2 J créés (couchées),
+    queue étirée à 43,8 % (n°677), 16 sorties de cône (n°808), 0 J pour ces deux-là. Le génome est rejoué avec le moteur
+    du chantier D (la config du run n'est pas appliquée)."""
     run_dir = os.path.join(config.RUNS_DIR, *run)
     if not os.path.exists(os.path.join(run_dir, "config.json")):
         pytest.skip("pas de runs locaux")
@@ -308,7 +300,7 @@ def test_energy_non_regression_on_the_diagnostic_creatures(name, run, gen, index
     c, ledger = audit.audit(pop.genome(index))
     weight = c.world.mass.sum() * config.G
     assert ledger["hors_muscles+"] < 1e-4 * weight * config.START_HEIGHT       # 0,23 J
-    assert ledger["max_tail_error"] < 0.01                                      # os de la queue < 1 %
+    assert ledger["max_tail_error"] < config.AUDIT_MAX_TAIL_ERROR                # queue < 5 %
     assert ledger["liens_contacts+"] < 1e-9 and ledger["report_projection+"] < 1e-9
 
 
@@ -320,7 +312,7 @@ def test_flags_off_give_the_c2_engine(monkeypatch):
     np.testing.assert_array_equal(c.world.limit_joints[10:, :2], [[sk.NECK, sk.PELVIS]] * 12)   # cône de C2
     arrays = batch.pack([cr.diagonal_gait_genome()])
     assert arrays["clean_projection"] is False and arrays["lim_joints"].shape == (22, 3)
-    monkeypatch.setattr(config, "BODY_LIMITS", False)          # sans butées du corps, ni courbure ni mains
+    monkeypatch.setattr(config, "BODY_LIMITS", False)          # sans butées du corps, ni mains ni courbure
     monkeypatch.setattr(config, "TAIL_CURVATURE_LIMITS", True)
     monkeypatch.setattr(config, "HAND_LIMITS", True)
     assert len(cr.Creature(cr.diagonal_gait_genome()).world.limit_lo) == 8
@@ -338,5 +330,27 @@ def test_new_run_records_the_chantier_d_flags(tmp_path):
     ev.train(0, generations=1, pop_size=12, run_dir=run, audit_every=0, log=lambda *_: None)
     with open(f"{run}/config.json") as fh:
         saved = json.load(fh)
-    assert saved["CLEAN_PROJECTION"] is True and saved["TAIL_CURVATURE_LIMITS"] is True and saved["HAND_LIMITS"] is True
-    assert saved["TAIL_CURVATURE_DEG"] == config.TAIL_CURVATURE_DEG
+    assert saved["CLEAN_PROJECTION"] is True and saved["HAND_LIMITS"] is True
+    assert saved["TAIL_CURVATURE_LIMITS"] is False and saved["TAIL_CONE_DEG"] == config.TAIL_CONE_DEG
+
+
+# --- Candidat (d), queue tenue par sa courbure : exploré puis écarté, code gardé derrière son drapeau ---------------
+
+@pytest.fixture
+def curvature_on(monkeypatch):
+    monkeypatch.setattr(config, "TAIL_CURVATURE_LIMITS", True)
+
+
+def test_curvature_layout(curvature_on):
+    w = cr.Creature(cr.diagonal_gait_genome()).world
+    t = sk.TAIL_START
+    np.testing.assert_array_equal(w.limit_joints[10], (sk.NECK, sk.PELVIS, t))   # cône du premier segment
+    np.testing.assert_array_equal(w.limit_joints[11], (sk.PELVIS, t, t + 1))     # puis courbure à chaque jonction
+    np.testing.assert_array_equal(w.limit_joints[21], (t + 9, t + 10, t + 11))
+    np.testing.assert_allclose(w.limit_violation()[TAIL], math.radians(config.TAIL_CURVATURE_DEG), atol=1e-9)
+
+
+@needs_numba
+def test_curvature_batch_matches_scalar_bit_for_bit(curvature_on, monkeypatch):
+    engaged = _batch_matches_scalar(monkeypatch, 24)
+    assert np.all(engaged[TAIL] > 100)
