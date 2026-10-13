@@ -565,3 +565,28 @@ queue, que les butées de courbure tiennent droite comme une échasse ; la chaî
 résolue en vitesse, et la projection la redresse en soulevant le torse d'environ 2 mm par sous-pas, à vitesse nulle (le
 report n'a rien à retirer). Ce n'est pas un défaut de l'implémentation : l'outil du diagnostic donne 8,154 J.
 Options mesurées : `docs/chantier_d.md`. Le runner n'a pas été lancé ; l'étape 4 attend la décision.
+
+## Étape 14 : chantier D, (d) écarté, cône de 15°, réentraînement
+
+**Décision de Tom** : option 3. On renonce à (d) (code gardé, drapeau False), on garde (b) et les mains, et l'angle du
+cône est choisi par la mesure, sans nouveau seuil.
+
+**Mesure de 10°, 15° et 30°** (runs 38408822669 à 38408880542) : créature inerte, 4 cas du diagnostic, 50 meilleures
+et tombées des générations 0 et 200, avec les génomes de la v1.
+- Les 3 angles respectent les 3 seuils nommés de la créature inerte.
+- À 10°, un point posé au sol glisse de 5,97 cm (seuil du banc : 5 cm) → **15° retenu** (`TAIL_CONE_DEG`, commit
+  `370676b`).
+- La singularité du cône ne crée pas d'énergie avec le moteur D.
+
+**Vérifications** :
+- `pytest` sur le runner : 185 passent (38410626549), puis 185 avec les runs D rejoués au bit près (38419142447) ;
+- essai de 5 générations (38411261724) : 47 à 74 min estimées.
+
+**Réentraînement** (38411711297) :
+- champions 30,9 / 40,9 / 43,6 m (C2 : 39,5 / 37,1 / 42,8) ;
+- 0 J créé dans les 63 audits ; tombées : 0 au-delà de 5 cm (C2 : 10), 5,5 J en tout sur la gén. 0 (C2 : 606 J) ;
+- mains de la graine 0 : 0 % de l'autre côté de l'axe (91,4 %) ; queue à 15° de l'axe (25 à 28°) ;
+- jambe–queue de la graine 2 : 23,4 % (7,5 %).
+
+Mesures sur les nouveaux runs : 38419154828 à 38419216213. Rapport : `docs/chantier_d.md`. Rien n'est fusionné ; arrêt
+pour validation.
