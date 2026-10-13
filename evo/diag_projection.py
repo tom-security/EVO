@@ -24,6 +24,7 @@ import config
 from evo import audit
 from evo import creature as cr
 from evo import evolution as ev
+from evo import joint_audit as ja
 from evo import physics
 from evo import skeleton as sk
 from evo import tail_audit as ta
@@ -183,10 +184,46 @@ def split3(name):
     return proj, tail, order
 
 
+D_KEYS = ("JOINT_LIMITS", "BODY_LIMITS", "CLEAN_PROJECTION", "HAND_LIMITS", "TAIL_CURVATURE_LIMITS", "TAIL_CONE_DEG")
+
+
+def engine_angle(name):
+    """« D<angle> » (ex. D10, D15, D30) → angle du cône de queue (°) ; None pour une variante de diagnostic."""
+    if name.startswith("D"):
+        try:
+            return float(name[1:])
+        except ValueError:
+            pass
+    return None
+
+
+@contextlib.contextmanager
+def engine_d(angle):
+    """Moteur du chantier D (décision de Tom), posé par-dessus la config du run le temps du bloc : report dissipatif
+    (CLEAN_PROJECTION), butées des mains (HAND_LIMITS), cône de queue de ±angle (TAIL_CONE_DEG), courbure écartée ;
+    butées articulaires et du corps. C'est le moteur du dépôt, pas une substitution."""
+    saved = {k: getattr(config, k) for k in D_KEYS}
+    try:
+        config.JOINT_LIMITS = config.BODY_LIMITS = True
+        config.CLEAN_PROJECTION = config.HAND_LIMITS = True
+        config.TAIL_CURVATURE_LIMITS = False
+        config.TAIL_CONE_DEG = float(angle)
+        yield
+    finally:
+        for k, v in saved.items():
+            setattr(config, k, v)
+
+
 @contextlib.contextmanager
 def configuration(name, record=False):
     """Toute la variante « projection[:queue[:ordre]] », le temps du bloc. L'ordre des solveurs est substitué en
-    premier, pour que le report sur la vitesse de la projection enveloppe la projection alternée."""
+    premier, pour que le report sur la vitesse de la projection enveloppe la projection alternée. « D<angle> » : le
+    moteur du chantier D avec un cône de ±angle (engine_d)."""
+    angle = engine_angle(name)
+    if angle is not None:
+        with engine_d(angle), variant("tel_quel", record=record):
+            yield
+        return
     proj, tail, order = split3(name)
     with solver_order(order), tail_limits(tail), variant(proj, record=record):
         yield
@@ -203,35 +240,62 @@ def measure(genome, name="tel_quel"):
                        "max_torso_speed": 0.0, "max_length_error": 0.0, "max_tail_error": 0.0, "max_height": -np.inf})
         ledger.update({k: 0.0 for k in audit.LIMIT_KEYS})
         groups = cr.limit_groups(len(c.world.limit_lo)) if len(c.world.limit_lo) else {}
-        over5 = exits = apex = jumps = stretched = 0
-        worst_exit = pre_max = 0.0
+        over5 = exits = apex = jumps = stretched = singular = 0
+        worst_exit = pre_max = created_singular = 0.0
         pen = []
+        pen_hands = []
+        pen_max = {name: 0.0 for name in groups}
         fall = None
         prev = None
         dev, bend = [], []
+        P = [c.world.pos.copy()]
         for n in range(int(round(config.SIM_DURATION / H))):
+            created_before = ledger["hors_muscles+"]
             audit.audited_substep(c, H, ledger)
+            created = ledger["hors_muscles+"] - created_before
             w = c.world
+            P.append(w.pos.copy())
             over5 += (np.abs(w.link_lengths() - w.rest) / w.rest)[c.tail_links].max() > 0.05
+            margins = w.limit_violation() if groups else np.zeros(0)
+            for name, idx in groups.items():
+                pen_max[name] = max(pen_max[name], -math.degrees(margins[idx].min()))
+            exit_now = False
             if "queue" in groups:
-                m = w.limit_violation()[groups["queue"]].min()
+                m = margins[groups["queue"]].min()
                 pen.append(max(0.0, -math.degrees(m)))
                 if m < -math.radians(0.5):
                     exits += 1
+                    exit_now = True
                     worst_exit = max(worst_exit, -math.degrees(m))
+            if "mains" in groups:
+                pen_hands.append(max(0.0, -math.degrees(margins[groups["mains"]].min())))
             delta = ta.signed_tail_angles(w.pos[None])[0]
-            if prev is not None and np.abs((delta - prev + 180.0) % 360.0 - 180.0).max() > JUMP_DEG:
-                jumps += 1
+            jump_now = prev is not None and np.abs((delta - prev + 180.0) % 360.0 - 180.0).max() > JUMP_DEG
+            jumps += jump_now
             prev = delta
             dev.append(float(np.abs(delta).max()))
             bend.append(float(abs(delta[-1] - delta[0])))
-            apex += np.hypot(*(w.pos[sk.TAIL_START + 1:] - w.pos[sk.PELVIS]).T).min() < APEX_M
+            apex_now = np.hypot(*(w.pos[sk.TAIL_START + 1:] - w.pos[sk.PELVIS]).T).min() < APEX_M
+            apex += apex_now
+            # singularité du cône : un point de queue près du sommet (bassin), un saut d'angle ou une sortie de cône ;
+            # énergie créée hors muscles pendant ces sous-pas
+            if apex_now or jump_now or exit_now:
+                singular += 1
+                created_singular += created
             pre_max = max(pre_max, LAST["pre_lien"])
             stretched += LAST["pre_lien"] > STRETCH_PRE
             if c.fallen and fall is None:
                 fall = (n + 1) * H
     weight = float(c.world.mass.sum() * config.G)
+    P = np.array(P)
+    crossings = {k: float(v.mean()) for k, v in ja.segment_crossings(P).items()}
+    hands_other_side = float(np.mean(ja.axis_positions(P)[0][:, :, ja.LIMB_POINTS.index("main")] < 0))
     return {"cree_J": float(ledger["hors_muscles+"]), "cree_m": float(ledger["hors_muscles+"]) / weight,
+            "singulier_s": singular * H, "cree_singulier_J": created_singular,
+            "enfoncement_max_groupes_deg": {k: max(0.0, v) for k, v in pen_max.items()},
+            "enfoncement_mains_hist": (np.histogram(np.clip(pen_hands, 0.0, 179.999), PEN_EDGES)[0].tolist()
+                                       if pen_hands else []),
+            "croisements": crossings, "mains_autre_cote": hands_other_side,
             "queue_max": float(ledger["max_tail_error"]), "queue_plus_5_s": over5 * H,
             "sorties_cone": exits, "sortie_max_deg": worst_exit, "os_corps_max": float(ledger["max_length_error"]),
             "hauteur": c.height(), "tombee_a": fall, "vitesse_max": float(ledger["max_speed"]),
@@ -242,10 +306,10 @@ def measure(genome, name="tel_quel"):
             "enfoncement_hist": np.histogram(np.clip(pen, 0.0, 179.999), PEN_EDGES)[0].tolist() if pen else []}
 
 
-def pooled_percentile(rows, q=95.0):
-    """Percentile de l'enfoncement des butées de queue sur tous les sous-pas d'un groupe de grimpes, lu dans les
-    histogrammes (borne haute de la classe qui le contient)."""
-    hists = [r["enfoncement_hist"] for r in rows if r.get("enfoncement_hist")]
+def pooled_percentile(rows, q=95.0, key="enfoncement_hist"):
+    """Percentile de l'enfoncement des butées de queue (key : ou des mains, « enfoncement_mains_hist ») sur tous les
+    sous-pas d'un groupe de grimpes, lu dans les histogrammes (borne haute de la classe qui le contient)."""
+    hists = [r[key] for r in rows if r.get(key)]
     if not hists:
         return 0.0
     total = np.sum(hists, axis=0)
@@ -335,7 +399,26 @@ def summarize(rows):
             "ecart_median_deg": float(np.median([r.get("ecart_median_deg", 0) for r in rows])),
             "ecart_p95_deg": float(np.median([r.get("ecart_p95_deg", 0) for r in rows])),
             "courbure_mediane_deg": float(np.median([r.get("courbure_mediane_deg", 0) for r in rows])),
-            "enfoncement_p95_deg": pooled_percentile(rows), "enfoncement_max_deg": float(max(r["sortie_max_deg"] for r in rows))}
+            "enfoncement_p95_deg": pooled_percentile(rows), "enfoncement_max_deg": float(max(r["sortie_max_deg"] for r in rows)),
+            **_summarize_d(rows)}
+
+
+def _summarize_d(rows):
+    """Mesures ajoutées pour le choix du cône du moteur D : singularité du cône et son énergie, enfoncement par
+    groupe de butées, croisements, mains de l'autre côté de l'axe."""
+    if "singulier_s" not in rows[0]:
+        return {}
+    groups = {k for r in rows for k in r["enfoncement_max_groupes_deg"]}
+    kinds = rows[0]["croisements"].keys()
+    return {"singulier_grimpes": int(sum(r["singulier_s"] > 0 for r in rows)),
+            "singulier_s_total": float(sum(r["singulier_s"] for r in rows)),
+            "cree_singulier_J": float(sum(r["cree_singulier_J"] for r in rows)),
+            "enfoncement_max_par_groupe_deg": {g: float(max(r["enfoncement_max_groupes_deg"].get(g, 0.0) for r in rows))
+                                               for g in sorted(groups)},
+            "enfoncement_mains_p95_deg": pooled_percentile(rows, key="enfoncement_mains_hist"),
+            "croisements_moyens": {k: float(np.mean([r["croisements"][k] for r in rows])) for k in kinds},
+            "croisements_grimpes_plus_5": {k: float(np.mean([r["croisements"][k] > 0.05 for r in rows])) for k in kinds},
+            "mains_autre_cote": float(np.mean([r["mains_autre_cote"] for r in rows]))}
 
 
 def population_lines(r):
@@ -356,7 +439,35 @@ def population_lines(r):
                      f"écart à l'axe {s['ecart_median_deg']:.1f}°, p95 {s['ecart_p95_deg']:.1f}°, courbure "
                      f"{s['courbure_mediane_deg']:.1f}° ; enfoncement des butées de queue : p95 ≤ "
                      f"{s['enfoncement_p95_deg']:.2f}°, max {s['enfoncement_max_deg']:.1f}°")
+        if "singulier_grimpes" in s:
+            c = s["croisements_moyens"]
+            lines.append(f"  {'':22s}   singularité du cône : {s['singulier_grimpes']} grimpes, {s['singulier_s_total']:.3f} s "
+                         f"en tout, énergie créée pendant ces sous-pas {s['cree_singulier_J']:.3f} J ; enfoncement max "
+                         "par groupe : " + ", ".join(f"{g} {v:.2f}°" for g, v in s["enfoncement_max_par_groupe_deg"].items())
+                         + f" ; mains p95 ≤ {s['enfoncement_mains_p95_deg']:.2f}° ; croisements jambe/queue "
+                         f"{c['jambe/queue']:.1%} (grimpes > 5 % : {s['croisements_grimpes_plus_5']['jambe/queue']:.0%}), "
+                         f"bras G/bras D {c['bras G/bras D']:.1%} ; mains de l'autre côté de l'axe "
+                         f"{s['mains_autre_cote']:.1%}")
     return lines
+
+
+def inert(run_dir, variants=VARIANTS, log=print):
+    """La créature inerte (creature.limp_genome) avec chaque variante, sur la config du run `run_dir` (le moteur tel
+    quel est celui du run) : hauteur finale, énergie créée, queue étirée, contre les seuils de tests/test_creature.py
+    (plage de la vidéo −9 à −7,8 m, énergie < 6 J, queue < 10 %)."""
+    ev.use_run_config(run_dir)
+    out = {name: measure(cr.limp_genome(), name) for name in variants}
+    for m in out.values():
+        m["seuils_ok"] = bool(-9.0 <= m["hauteur"] <= -7.8 and m["cree_J"] < 6.0 and m["queue_max"] < 0.10)
+    if log:
+        log(f"diag-projection — créature inerte, config de {run_dir}")
+        for name, m in out.items():
+            log(f"  {name:22s} : hauteur {m['hauteur']:+.3f} m ; créé {m['cree_J']:.3f} J ({100 * m['cree_m']:.2f} cm) ; "
+                f"queue max {100 * m['queue_max']:.2f} % ; singularité {1000 * m['singulier_s']:.0f} ms, "
+                f"{m['cree_singulier_J']:.3f} J ; enfoncement max "
+                + ", ".join(f"{g} {v:.2f}°" for g, v in m["enfoncement_max_groupes_deg"].items())
+                + f" → seuils de la créature inerte {'respectés' if m['seuils_ok'] else 'NON respectés'}")
+    return {"run": run_dir, "variantes": out}
 
 
 def benchmark(run_dir, gen, n=6, rounds=3, variants=VARIANTS, log=print):

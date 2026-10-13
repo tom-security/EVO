@@ -27,8 +27,9 @@ def trace(run_dir, gen, index, log=print, out_dir=None, variante="tel_quel"):
     from evo import diag_projection as dp
 
     ev.use_run_config(run_dir)          # avant la variante : la config du run fixe N_ITER, que passes120 remplace
-    proj, tail, order = dp.split3(variante)
-    variante = proj if (tail, order) == ("cone", "ordre") else f"{proj}:{tail}:{order}"   # « tel_quel:cone » = moteur
+    if dp.engine_angle(variante) is None:   # « D<angle> » : moteur du chantier D, tel quel
+        proj, tail, order = dp.split3(variante)
+        variante = proj if (tail, order) == ("cone", "ordre") else f"{proj}:{tail}:{order}"   # « tel_quel:cone » = moteur
     with dp.configuration(variante, record=True):
         result = _trace(run_dir, gen, index, out_dir, variante)
     if log:

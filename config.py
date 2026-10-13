@@ -204,15 +204,15 @@ TAIL_CHATTER_MAX = 0.10
 # report ne peut que retirer de l'énergie cinétique : il supprime l'énergie créée par les créatures couchées (la
 # projection remontait les points sans corriger leur vitesse vers le bas ; B2 n°868 : 1 292,5 J → 0 J).
 CLEAN_PROJECTION = True
-# [CHOIX] D, candidat (d) — queue tenue par sa courbure plutôt que par un cône vu du bassin (singulier quand un point
-# de queue revient sur le bassin) : le premier segment dans un cône de ±TAIL_CURVATURE_DEG autour du prolongement de
-# la colonne, puis à chaque jonction (point précédent, TAIL_k, TAIL_k+1) un angle à ±TAIL_CURVATURE_DEG de
-# l'alignement. Remplace les butées de cône (mêmes indices 10 à 21) si JOINT_LIMITS et BODY_LIMITS.
-TAIL_CURVATURE_LIMITS = True
-# [CHOIX] D — β retenu par la règle de décision de Tom (dernier tour de mesure, 50 meilleures de la gén. 200 des 3
-# graines C2) : écart médian à l'axe 8,9° (≤ 10°), enfoncement des butées de queue le plus faible (p95 ≤ 1,05°,
-# max 14,6°) ; β = 1° : 6,9°, p95 ≤ 1,20°. Tolérance de la queue : la chaîne de butées couplées s'enfonce plus que la
-# règle de 0,5° des butées articulaires et des pieds.
+# [CHOIX] D, candidat (d), EXPLORÉ ET ÉCARTÉ (décision de Tom, docs/chantier_d.md) — queue tenue par sa courbure
+# plutôt que par un cône vu du bassin : le premier segment dans un cône de ±TAIL_CURVATURE_DEG autour du prolongement
+# de la colonne, puis à chaque jonction (point précédent, TAIL_k, TAIL_k+1) un angle à ±TAIL_CURVATURE_DEG de
+# l'alignement (mêmes indices 10 à 21 que le cône), si JOINT_LIMITS et BODY_LIMITS. Écarté parce que la chaîne de 12
+# butées couplées ne converge pas avec ce solveur : la créature inerte tombe sur la pointe de sa queue tenue droite
+# comme une échasse, la projection redresse la queue à chaque sous-pas en soulevant le torse, et crée 8,16 J hors
+# muscles (−7,74 m), contre 0,09 J (−8,53 m) pour le report dissipatif avec le cône de 30°. Code gardé, drapeau False.
+TAIL_CURVATURE_LIMITS = False
+# [CHOIX] D — β du dernier tour de mesure du candidat (d) (p95 de l'enfoncement ≤ 1,05°) ; sans effet, (d) écarté.
 TAIL_CURVATURE_DEG = 2.5
 # [CHOIX] D (BILAN_V1 §4.3) — chaque main reste de son côté de l'axe bassin–cou, comme les pieds : triplets
 # (NECK, PELVIS, L_HAND / R_HAND), à au moins HAND_AXIS_MARGIN_DEG de l'axe ; posées après la queue (indices 22, 23)

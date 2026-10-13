@@ -106,11 +106,14 @@ def main(argv=None):
     dp.add_argument("--creature", type=int, default=None, help="indice de la créature dans la génération (npz)")
     dp.add_argument("--tombees", action="store_true", help="toutes les créatures tombées de la génération")
     dp.add_argument("--meilleures", type=int, default=None, metavar="N", help="les N meilleures de la génération")
+    dp.add_argument("--inerte", action="store_true",
+                    help="la créature inerte, sur la config du run, contre les seuils de tests/test_creature.py")
     dp.add_argument("--benchmark", action="store_true", help="coût relatif de chaque variante (moteur scalaire)")
     dp.add_argument("--benchmark-batch", action="store_true",
                     help="coût relatif de chaque jeu de butées de queue dans l'évaluateur batché (entraînement)")
     dp.add_argument("--variantes", nargs="+", default=None,
-                    help="variantes « projection[:queue] » (défaut : tel_quel vitesse_proj dissipatif passes120)")
+                    help="variantes « projection[:queue] » (défaut : tel_quel vitesse_proj dissipatif passes120), ou "
+                         "« D<angle> » : le moteur du chantier D avec un cône de queue de ±angle (ex. D10 D15 D30)")
     dp.add_argument("--export", metavar="DIR", default=None, help="écrit les mesures en JSON dans DIR")
 
     planche = sub.add_parser("planche", help="assemble des images côte à côte, légendées (chantier C2)")
@@ -382,6 +385,8 @@ def main(argv=None):
             result, tag = diag_projection.benchmark_batch(run_dir, args.gen), "benchmark_batch"
         elif args.benchmark:
             result, tag = diag_projection.benchmark(run_dir, args.gen, variants=variants), "benchmark"
+        elif args.inerte:
+            result, tag = diag_projection.inert(run_dir, variants=variants), "inerte"
         elif args.tombees or args.meilleures:
             group = "tombees" if args.tombees else "meilleures"
             result = diag_projection.population(run_dir, args.gen, group, variants=variants, top=args.meilleures or 50)
