@@ -442,3 +442,31 @@ script hors dépôt, sous Windows) :
 
 **Non commencé** : rapport `docs/chantier_c_c2.md` et planche contre l'image 11 (les données sont là), nettoyage,
 bilan.
+
+## Étape 8 : décisions de Tom, rapport C2, mesures du chantier D
+
+**Décisions de Tom** :
+- la queue des créatures tombées n'est plus une condition d'arrêt : c'est une limite connue, documentée ;
+- la sortie de cône d'un sous-pas, en l'air, est acceptée et documentée ;
+- les bras croisés de la graine 0 rejoignent les écarts connus (§11) ;
+- **runs à 30° = référence C2** ;
+- dans le bilan : « Chantier D proposé : projection propre » (`vitesse_proj`, butée « mains de leur côté de l'axe »).
+
+**Rapport C2** : `docs/chantier_c_c2.md` et `docs/chantier_c_c2/` (commit `930499c`) ; `pytest` sur le runner,
+157 passent (38360068762).
+
+**Outil `diag-projection`** (commit `176dfae`) : il substitue la variante le temps de la commande, le moteur reste
+inchangé. `pytest` : 158 passent (38360421255).
+
+**Mesures du chantier D** sur le runner (38360431755) ; moteur tel quel identique au bit près dans les 6 cas :
+
+| Cas | Tel quel : créé / queue max / sorties de cône | `vitesse_proj` : créé / queue max / sorties de cône | Hauteur tel quel → variante |
+|---|---|---|---|
+| B2 n°868 (graine 2, gén. 0) | 1 292,5 J / 9,1 % / 0 | 9,6 J / 0,3 % / 0 | −9,37 → −9,19 m |
+| B2 n°760 (graine 1, gén. 200) | 825,2 J / 9,8 % / 0 | 12,9 J / 0,9 % / 0 | −8,88 → −8,42 m |
+| C2 n°677 (graine 0, gén. 200) | 0 J / **43,8 %** / 10 (9°) | 0 J / 0,2 % / 0 | −8,99 → +1,85 m |
+| C2 n°808 (graine 1, gén. 200) | 0 J / 1,0 % / **16 (117°)** | **17,7 J (10,4 cm)** / 0,7 % / 0 | −4,36 → −3,14 m |
+| C2 n°0 (graine 0, gén. 200) | 0 J / 0,4 % / 0 | 0 J / 0,3 % / 0 | +39,91 → +39,84 m |
+| C2 n°0 (graine 1, gén. 200) | 0 J / 0,4 % / 0 | 0 J / 0,2 % / 0 | +37,10 → +37,21 m |
+
+**Prochaine étape** : partie 2, nettoyage, sur la branche `claude/nettoyage-v1`.
