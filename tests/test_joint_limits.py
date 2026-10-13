@@ -246,16 +246,18 @@ def test_local_runs_replay_with_their_own_flag(seed, run_config_restored):
     runs/legacy_no_limits/<graine>, d'avant B2, sans butées."""
     from evo import replay as rp
 
-    cases = [(ev.run_dir_for(seed), True, True),                                              # C2, cône de 30°
-             (os.path.join(config.RUNS_DIR, "butees_corps", str(seed)), True, True),           # C2, cône de 6°
-             (os.path.join(config.RUNS_DIR, "butees_articulaires", str(seed)), True, False),   # B2
-             (os.path.join(config.RUNS_DIR, "legacy_no_limits", str(seed)), False, False)]
+    cases = [(ev.run_dir_for(seed), True, True, False),                                              # C2, cône de 30°
+             (os.path.join(config.RUNS_DIR, "butees_corps", str(seed)), True, True, False),           # C2, cône de 6°
+             (os.path.join(config.RUNS_DIR, "butees_articulaires", str(seed)), True, False, False),   # B2
+             (os.path.join(config.RUNS_DIR, "legacy_no_limits", str(seed)), False, False, False),
+             (os.path.join(config.RUNS_DIR, "chantier_d", str(seed)), True, True, True)]   # D : report, mains, 15°
     present = [case for case in cases if os.path.exists(os.path.join(case[0], "config.json"))]
     if not present:
         pytest.skip("pas de runs locaux")
-    for run_dir, joint_flag, body_flag in present:
+    for run_dir, joint_flag, body_flag, d_flag in present:
         r = rp.Replay(run_dir, rank=1, log=None)
         assert r.ok, run_dir                              # hauteur rejouée = hauteur stockée
         assert config.JOINT_LIMITS is joint_flag, run_dir  # butées selon le run, pas selon config.py
         assert config.BODY_LIMITS is body_flag, run_dir
-        assert not (config.CLEAN_PROJECTION or config.TAIL_CURVATURE_LIMITS or config.HAND_LIMITS), run_dir  # d'avant D
+        assert config.CLEAN_PROJECTION is d_flag and config.HAND_LIMITS is d_flag, run_dir     # chantier D
+        assert config.TAIL_CURVATURE_LIMITS is False, run_dir
