@@ -21,7 +21,22 @@ from evo import tail_audit as ta
 TOP = 8           # sous-pas les plus « créateurs » détaillés dans le résumé
 
 
-def trace(run_dir, gen, index, log=print, out_dir=None):
+def trace(run_dir, gen, index, log=print, out_dir=None, variante="tel_quel"):
+    """Rejeu pas à pas ; `variante` : une variante de diagnostic du chantier D (evo/diag_projection.py), substituée le
+    temps du rejeu seulement (le moteur du dépôt n'est pas modifié)."""
+    from evo import diag_projection as dp
+
+    with dp.variant(variante, record=True):
+        result = _trace(run_dir, gen, index, out_dir, variante)
+    if log:
+        for line in summary_lines(result):
+            log(line)
+    return result
+
+
+def _trace(run_dir, gen, index, out_dir, variante):
+    from evo import diag_projection as dp
+
     ev.use_run_config(run_dir)
     pop, res, _, _ = ev.load_generation(run_dir, gen)
     genome = pop.genome(index)
@@ -52,7 +67,10 @@ def trace(run_dir, gen, index, log=print, out_dir=None):
                "tenus": int(w.held.sum()), "tombee": int(c.fallen),
                "sol_corps": int(on_ground[:sk.TAIL_START].sum()), "sol_queue": int(on_ground[sk.TAIL_START:].sum()),
                "queue_ecart_max_deg": float(np.abs(delta).max()), "queue_os_max": float(err[c.tail_links].max()),
-               "os_corps_max": float(err[~c.tail_links].max()), "hauteur": c.height()}
+               "os_corps_max": float(err[~c.tail_links].max()), "hauteur": c.height(),
+               "variante_ke_vitesse_J": dp.LAST["ke_vitesse"], "variante_alpha": dp.LAST["alpha"],
+               "avant_proj_marge_queue_deg": math.degrees(dp.LAST["pre_marge_queue"]),
+               "avant_proj_lien_max": dp.LAST["pre_lien"], "projection_dp_max_m": dp.LAST["dp_max"]}
         for name, idx in groups.items():
             row[f"actives_{name}"] = int(w.limit_active[idx].sum())
             row[f"marge_min_{name}_deg"] = float(math.degrees(margins[idx].min()))
@@ -60,19 +78,17 @@ def trace(run_dir, gen, index, log=print, out_dir=None):
     stored = float(res["height"][index])
     result = {"run": run_dir, "gen": gen, "indice": index, "poids": weight, "tombee_a": fallen_at,
               "hauteur": c.height(), "hauteur_stockee": stored, "identique": abs(c.height() - stored) <= 1e-9,
-              "cree_J": float(ledger["hors_muscles+"]), "rows": rows}
+              "cree_J": float(ledger["hors_muscles+"]), "rows": rows, "variante": variante}
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
         seed = os.path.basename(os.path.normpath(run_dir))
-        path = os.path.join(out_dir, f"trace_s{seed}_g{gen}_n{index}.csv")
+        suffix = "" if variante == "tel_quel" else f"_{variante}"
+        path = os.path.join(out_dir, f"trace_s{seed}_g{gen}_n{index}{suffix}.csv")
         with open(path, "w", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
             writer.writeheader()
             writer.writerows(rows)
         result["csv"] = path
-    if log:
-        for line in summary_lines(result):
-            log(line)
     return result
 
 
@@ -82,11 +98,19 @@ def summary_lines(r):
     t = np.array([x["t"] for x in rows])
     w = r["poids"]
     fall = r["tombee_a"]
+    variante = r.get("variante", "tel_quel")
+    check = ("identique" if r["identique"] else "ÉCART") if variante == "tel_quel" else \
+        f"variante {variante} (dynamique changée, pas de contrôle au bit près)"
     lines = [f"trace — {r['run']}, gén. {r['gen']}, n°{r['indice']} : hauteur rejouée {r['hauteur']:+.9f} m, stockée "
-             f"{r['hauteur_stockee']:+.9f} m → " + ("identique" if r["identique"] else "ÉCART")
+             f"{r['hauteur_stockee']:+.9f} m → {check}"
              + (f" ; tombée à {fall:.3f} s" if fall else " ; jamais tombée"),
              f"  énergie créée hors muscles : {r['cree_J']:.3f} J ({100 * r['cree_J'] / w:.2f} cm) ; "
              f"sous-pas créateurs (> 1 mJ) : {int((created > 1e-3).sum())}"]
+    if variante != "tel_quel":
+        kev = np.array([x["variante_ke_vitesse_J"] for x in rows])
+        lines.append(f"  report sur la vitesse de la variante : énergie cinétique ajoutée {kev[kev > 0].sum():.3f} J, "
+                     f"retirée {-kev[kev < 0].sum():.3f} J ; dans les sous-pas créateurs : "
+                     f"{kev[created > 1e-3].sum():+.3f} J")
     if fall:
         lines.append(f"  avant la chute : {created[t <= fall].sum():.3f} J ; après : {created[t > fall].sum():.3f} J")
     bins = np.floor(t).astype(int)
@@ -107,7 +131,11 @@ def summary_lines(r):
             break
         st = ", ".join(f"{s} {x[f'd_{s}']:+.3f}" for s in stages if abs(x[f"d_{s}"]) > 1e-4)
         act = ", ".join(f"{q[8:]} {x[q]}" for q in x if q.startswith("actives_"))
-        lines.append(f"    t = {x['t']:.4f} s : créé {x['cree_J']:.4f} J | {st} | tenus {x['tenus']}, au sol corps "
+        extra = (f" | report sur la vitesse {x['variante_ke_vitesse_J']:+.3f} J (α {x['variante_alpha']:.2f})"
+                 if variante != "tel_quel" else "")
+        extra += (f" | avant projection : queue {x['avant_proj_marge_queue_deg']:+.2f}°, lien "
+                  f"{100 * x['avant_proj_lien_max']:.2f} % ; Δp {1000 * x['projection_dp_max_m']:.2f} mm")
+        lines.append(f"    t = {x['t']:.4f} s : créé {x['cree_J']:.4f} J | {st}{extra} | tenus {x['tenus']}, au sol corps "
                      f"{x['sol_corps']} queue {x['sol_queue']} | butées actives : {act} | queue écart max "
                      f"{x['queue_ecart_max_deg']:.1f}°, os de queue {100 * x['queue_os_max']:.2f} %")
     worst_tail = max(rows, key=lambda x: x["queue_ecart_max_deg"])

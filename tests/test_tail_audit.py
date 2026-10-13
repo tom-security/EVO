@@ -128,11 +128,55 @@ def test_diag_projection_leaves_the_engine_untouched(small_run):
     from evo import diag_projection
     from evo import physics
 
-    original = physics.project_links
+    original, n_iter = physics.project_links, config.N_ITER
     r = diag_projection.compare(small_run, 0, 0, log=None)
-    assert physics.project_links is original                  # variante substituée le temps de la commande seulement
+    assert physics.project_links is original and config.N_ITER == n_iter   # variantes le temps de la mesure seulement
     assert r["identique"]                                      # moteur tel quel : rejeu au bit près
+    assert set(diag_projection.VARIANTS) <= set(r)
     assert r["vitesse_proj"]["cree_J"] >= 0.0 and r["tel_quel"]["sorties_cone"] >= 0
+
+
+def test_diag_projection_variants_do_what_they_say():
+    from evo import diag_projection as dp
+    from evo import physics
+
+    with dp.variant("passes120"):
+        assert cr.Creature(cr.diagonal_gait_genome()).world.n_iter == dp.PASSES
+    assert cr.Creature(cr.diagonal_gait_genome()).world.n_iter == config.N_ITER
+    for name, sign in (("dissipatif", -1), ("vitesse_proj", 0)):
+        with dp.variant(name):
+            c = cr.Creature(cr.limp_genome())                 # chute puis impact : la projection corrige beaucoup
+            added = []
+            for _ in range(int(round(2.0 / H))):
+                c.substep(H)
+                added.append(dp.LAST["ke_vitesse"])
+        added = np.array(added)
+        if sign < 0:
+            assert added.max() <= 1e-9                         # le report dissipatif ne crée jamais d'énergie cinétique
+            assert added.min() < 0.0                           # et il en retire à l'impact
+        else:
+            assert np.abs(added).max() > 0.0
+    assert physics.project_links.__name__ == "project_links"
+    with pytest.raises(ValueError):
+        with dp.variant("inconnue"):
+            pass
+
+
+def test_diag_projection_population_and_trace_variant(small_run, tmp_path):
+    from evo import diag_projection as dp
+    from evo import trace
+
+    r = dp.population(small_run, 0, "tombees", variants=("tel_quel", "dissipatif"), log=None)
+    assert r["identique"] and r["n"] > 0
+    assert r["variantes"]["tel_quel"]["n"] == r["variantes"]["dissipatif"]["n"] == r["n"]
+    assert dp.population_lines(r)[0].startswith("diag-projection")
+    _, res, _, _ = ev.load_generation(small_run, 0)
+    i = int(np.flatnonzero(res["fallen"])[0])
+    t = trace.trace(small_run, 0, i, log=None, out_dir=str(tmp_path), variante="dissipatif")
+    assert t["csv"].endswith("_dissipatif.csv")
+    assert max(x["variante_ke_vitesse_J"] for x in t["rows"]) <= 1e-9
+    b = dp.benchmark(small_run, 0, n=1, rounds=1, variants=("tel_quel", "dissipatif"), log=None)
+    assert set(b["secondes"]) == {"tel_quel", "dissipatif"}
 
 
 def test_morphology_factors_stay_within_the_genome_bounds(small_run, tmp_path):

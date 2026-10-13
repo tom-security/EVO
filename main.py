@@ -32,6 +32,8 @@
     python main.py morpho --seed 2 --run-dir runs/butees_corps/2 --compare runs/2   # longueurs d'os par génération
     python main.py planche A.png B.png --labels "B2" "C2" --out planche.png   # images côte à côte
     python main.py trace --seed 2 --gen 0 --creature 868 --export out/diag   # rejeu pas à pas audité (diagnostic)
+    python main.py trace --seed 1 --gen 200 --creature 0 --variante dissipatif   # idem, avec une variante du chantier D
+    python main.py diag-projection --seed 2 --gen 0 --tombees --export out/d   # candidats du chantier D (lecture seule)
 """
 import argparse
 
@@ -90,14 +92,23 @@ def main(argv=None):
     tr.add_argument("--gen", type=int, required=True)
     tr.add_argument("--creature", type=int, required=True, help="indice de la créature dans la génération (npz)")
     tr.add_argument("--export", metavar="DIR", default=None, help="écrit le CSV par sous-pas dans DIR")
+    tr.add_argument("--variante", default="tel_quel",
+                    choices=["tel_quel", "vitesse_proj", "dissipatif", "passes120"],
+                    help="variante de diagnostic du chantier D, substituée le temps du rejeu (moteur non modifié)")
 
     dp = sub.add_parser("diag-projection",
-                        help="diagnostic du chantier D proposé : moteur tel quel contre la variante vitesse_proj "
-                             "(lecture seule, le moteur n'est pas modifié)")
+                        help="diagnostic du chantier D : moteur tel quel contre les variantes vitesse_proj, dissipatif "
+                             "et passes120 (lecture seule, le moteur n'est pas modifié)")
     dp.add_argument("--seed", type=int, default=2)
     dp.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
     dp.add_argument("--gen", type=int, required=True)
-    dp.add_argument("--creature", type=int, required=True, help="indice de la créature dans la génération (npz)")
+    dp.add_argument("--creature", type=int, default=None, help="indice de la créature dans la génération (npz)")
+    dp.add_argument("--tombees", action="store_true", help="toutes les créatures tombées de la génération")
+    dp.add_argument("--meilleures", type=int, default=None, metavar="N", help="les N meilleures de la génération")
+    dp.add_argument("--benchmark", action="store_true", help="coût relatif de chaque variante (moteur scalaire)")
+    dp.add_argument("--variantes", nargs="+", default=None,
+                    help="variantes mesurées (défaut : tel_quel vitesse_proj dissipatif passes120)")
+    dp.add_argument("--export", metavar="DIR", default=None, help="écrit les mesures en JSON dans DIR")
 
     planche = sub.add_parser("planche", help="assemble des images côte à côte, légendées (chantier C2)")
     planche.add_argument("images", nargs="+")
@@ -352,15 +363,35 @@ def main(argv=None):
         import sys
         from evo import evolution, trace
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
-        result = trace.trace(run_dir, args.gen, args.creature, out_dir=args.export)
-        if not result["identique"]:
+        result = trace.trace(run_dir, args.gen, args.creature, out_dir=args.export, variante=args.variante)
+        if args.variante == "tel_quel" and not result["identique"]:
             print("ALERTE : la hauteur rejouée diffère de la hauteur stockée")
             sys.exit(1)
     elif args.command == "diag-projection":
         import sys
+        import json
+        import os
         from evo import diag_projection, evolution
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
-        if not diag_projection.compare(run_dir, args.gen, args.creature)["identique"]:
+        variants = tuple(args.variantes) if args.variantes else diag_projection.VARIANTS
+        seed = os.path.basename(os.path.normpath(run_dir))
+        if args.benchmark:
+            result, tag = diag_projection.benchmark(run_dir, args.gen, variants=variants), "benchmark"
+        elif args.tombees or args.meilleures:
+            group = "tombees" if args.tombees else "meilleures"
+            result = diag_projection.population(run_dir, args.gen, group, variants=variants, top=args.meilleures or 50)
+            tag = group
+        elif args.creature is not None:
+            result, tag = diag_projection.compare(run_dir, args.gen, args.creature, variants=variants), f"n{args.creature}"
+        else:
+            parser.error("diag-projection : --creature, --tombees, --meilleures ou --benchmark")
+        if args.export:
+            os.makedirs(args.export, exist_ok=True)
+            path = os.path.join(args.export, f"diag_s{seed}_g{args.gen}_{tag}.json")
+            with open(path, "w") as fh:
+                json.dump(result, fh, indent=1, ensure_ascii=False)
+            print(path)
+        if result.get("identique") is False:
             print("ALERTE : la hauteur rejouée (moteur tel quel) diffère de la hauteur stockée")
             sys.exit(1)
     elif args.command == "planche":
