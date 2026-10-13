@@ -91,6 +91,14 @@ def main(argv=None):
     tr.add_argument("--creature", type=int, required=True, help="indice de la créature dans la génération (npz)")
     tr.add_argument("--export", metavar="DIR", default=None, help="écrit le CSV par sous-pas dans DIR")
 
+    dp = sub.add_parser("diag-projection",
+                        help="diagnostic du chantier D proposé : moteur tel quel contre la variante vitesse_proj "
+                             "(lecture seule, le moteur n'est pas modifié)")
+    dp.add_argument("--seed", type=int, default=2)
+    dp.add_argument("--run-dir", default=None, help="dossier du run (défaut : runs/<seed>)")
+    dp.add_argument("--gen", type=int, required=True)
+    dp.add_argument("--creature", type=int, required=True, help="indice de la créature dans la génération (npz)")
+
     planche = sub.add_parser("planche", help="assemble des images côte à côte, légendées (chantier C2)")
     planche.add_argument("images", nargs="+")
     planche.add_argument("--labels", nargs="+", default=None, help="une légende par image (défaut : nom du fichier)")
@@ -347,6 +355,13 @@ def main(argv=None):
         result = trace.trace(run_dir, args.gen, args.creature, out_dir=args.export)
         if not result["identique"]:
             print("ALERTE : la hauteur rejouée diffère de la hauteur stockée")
+            sys.exit(1)
+    elif args.command == "diag-projection":
+        import sys
+        from evo import diag_projection, evolution
+        run_dir = args.run_dir or evolution.run_dir_for(args.seed)
+        if not diag_projection.compare(run_dir, args.gen, args.creature)["identique"]:
+            print("ALERTE : la hauteur rejouée (moteur tel quel) diffère de la hauteur stockée")
             sys.exit(1)
     elif args.command == "planche":
         from evo import planches

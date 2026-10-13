@@ -124,6 +124,17 @@ def test_trace_replays_a_creature_step_by_step(small_run, tmp_path):
     assert lines[0].startswith("trace") and "identique" in lines[0]
 
 
+def test_diag_projection_leaves_the_engine_untouched(small_run):
+    from evo import diag_projection
+    from evo import physics
+
+    original = physics.project_links
+    r = diag_projection.compare(small_run, 0, 0, log=None)
+    assert physics.project_links is original                  # variante substituée le temps de la commande seulement
+    assert r["identique"]                                      # moteur tel quel : rejeu au bit près
+    assert r["vitesse_proj"]["cree_J"] >= 0.0 and r["tel_quel"]["sorties_cone"] >= 0
+
+
 def test_morphology_factors_stay_within_the_genome_bounds(small_run, tmp_path):
     table = morphology.factors(small_run, gens=(0, 1, 5))
     assert sorted(table) == [0, 1]                              # générations absentes ignorées
