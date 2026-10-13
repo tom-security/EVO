@@ -152,6 +152,97 @@ Choisir parmi (a), (b) et (c), et dire si (d) doit être mesuré avant l'étape 
 butées de queue à la création de la créature, lecture seule). Ensuite, l'étape 3 du plan (drapeaux, trois
 implémentations, tests au bit près), sans changement.
 
+*(Fait : (b) retenu, (d) mesuré, voir le §5 bis.)*
+
+## 5 bis. Candidat (d) : butées de courbure de queue, avec (b) (mesuré après le choix de (b))
+
+**Décision de l'utilisateur** : (b) `dissipatif` est retenu ; (a) et (c) sont écartés. (d) est mesuré avant l'étape 3,
+avec la même méthode et sans toucher au moteur : les butées de queue sont substituées à la création de la créature
+(`diag-projection --variantes dissipatif:courbure5`, commit `cbad6f0`).
+
+**(d)** :
+- un cône de ±β sur le premier segment, (NECK, PELVIS, TAIL_0) ;
+- puis une butée de courbure ±β à chaque jonction, (TAIL_{k−1}, TAIL_k, TAIL_{k+1}) ;
+- toujours 12 butées de queue ; chaque pivot est à distance fixe de ses deux voisins, donc sans singularité.
+
+**Deux réglages** :
+- **β = 5°**, « équivalent au cône de 30° » : pour une courbure uniforme, le bout de la queue peut s'écarter de 30°
+  de l'axe, comme avec le cône, soit 60° de virage cumulé. L'autre lecture possible, 30° de virage cumulé
+  (β = 2,5°), tombe entre les deux réglages mesurés ;
+- **β = 1°** : le bout s'écarte d'environ 6° au plus, comme sur les images 11, 12 et 40 (1,7 à 5,7°).
+
+Les quatre variantes sont mesurées sur les mêmes créatures. Le moteur tel quel est identique au run dans tous les cas
+(runs 38379927441 à 38380021401 ; `pytest` sur le runner : 161 passent, run 38379914393).
+
+**Toutes les créatures tombées, génération 0** (1 128) :
+
+| | énergie créée totale ; max ; > 5 cm | queue étirée : max ; > 5 % | pénétration des butées de queue > 0,5° : grimpes ; sous-pas ; max | sauts d'angle de la queue > 20° en un sous-pas : grimpes ; sous-pas | point de queue à moins de 5 cm du bassin : grimpes | liens étirés avant projection : max ; temps moyen > 0,2 % | posture : écart à l'axe médian ; p95 ; courbure |
+|---|---|---|---|---|---|---|---|
+| tel quel | 606 J ; 68,1 cm ; 10 | 12,8 % ; 40 | 147 ; 39 687 ; 150° | 160 ; 39 762 | 182 | 12,8 % ; 535 ms | 29,6° ; 30,0° ; 10,9° |
+| (b) | 3,5 J ; 0,5 cm ; 0 | 7,2 % ; 6 | 109 ; 32 717 ; 150° | 160 ; 21 318 | 188 | 7,3 % ; 263 ms | 29,6° ; 30,0° ; 10,8° |
+| (b) + (d) β = 5° | 21,0 J ; 3,2 cm ; 0 | 6,2 % ; 2 | **1 089 ; 809 206 ; 10°** | **0 ; 0** | **0** | 6,7 % ; 290 ms | 22,1° ; 35,1° ; 20,0° |
+| (b) + (d) β = 1° | 22,3 J ; 0,7 cm ; 0 | 7,3 % ; 9 | **1 123 ; 1 219 332 ; 8°** | **0 ; 0** | **0** | 7,8 % ; 483 ms | **6,8° ; 10,2° ; 5,8°** |
+
+**Toutes les créatures tombées, génération 200** (293) :
+
+| | énergie créée ; > 5 cm | queue étirée : max ; > 5 % | pénétration > 0,5° : grimpes ; max | sauts d'angle : grimpes | sommet du cône : grimpes | posture : écart médian ; p95 |
+|---|---|---|---|---|---|---|
+| tel quel | 0,1 J ; 0 | 43,8 % ; 7 | 162 ; 150° | 196 | 206 | 29,5° ; 30,0° |
+| (b) | 0 J ; 0 | 6,9 % ; 1 | 95 ; 150° | 200 | 211 | 29,5° ; 30,0° |
+| (b) + (d) β = 5° | 1,2 J ; 0 | 11,3 % ; 3 | 292 ; 24° | **0** | **0** | 21,0° ; 36,7° |
+| (b) + (d) β = 1° | 0,1 J ; 0 | 9,8 % ; 2 | 293 ; 19° | **0** | **0** | **7,0° ; 11,5°** |
+
+**Les 50 meilleures de la génération 200** (150 grimpes) :
+
+| | pénétration > 0,5° : grimpes ; max | sauts d'angle : grimpes | sommet du cône : grimpes | liens étirés avant projection : temps moyen > 0,2 % | posture : écart médian ; p95 ; courbure | Δh médiane ; min | tombées |
+|---|---|---|---|---|---|---|---|
+| tel quel | 0 ; 0° | 6 | 11 | 1 372 ms | 25,4° ; 30,0° ; 14,1° | 0 ; 0 | 0 |
+| (b) | 0 ; 0° | 9 | 12 | 1 350 ms | 25,6° ; 30,0° ; 14,4° | −0,04 m ; −8,81 m | 0 |
+| (b) + (d) β = 5° | 67 ; 19° | 0 | 0 | 45 ms | 12,6° ; 27,3° ; 9,0° | −0,42 m ; −45,6 m | 3 |
+| (b) + (d) β = 1° | 150 ; 12° | 0 | 0 | 51 ms | 6,9° ; 10,2° ; 5,9° | −2,62 m ; −45,6 m | 33 |
+
+Par graine, avec β = 1° : écart de hauteur médian −0,71 / **−43,76** / −1,82 m. Toute l'élite de la graine 1 tombe :
+sa démarche repose sur une queue courbée de 28° (médiane).
+
+**Les cas** :
+- n°808 : 0 J avec les trois variantes. Sorties de cône (tel quel) : 16 sous-pas, jusqu'à 117°. Avec (d), plus aucun
+  saut ni approche du sommet, mais des butées de courbure enfoncées de 4° (β = 5°) ou 3° (β = 1°).
+- n°541 (6°) : 116 sous-pas hors du cône, jusqu'à 161° tel quel ; avec (d), 1° au plus.
+- n°677 : queue étirée à l'impact de 43,8 % tel quel, 0,2 % avec (b), 2,8 % (β = 5°) ou 6,0 % (β = 1°).
+- n°868 et n°760 sont des runs B2, sans butées du corps : (d) n'y change rien (0 J avec (b)).
+
+**Coût**, en alternance, sur le runner :
+
+| | moteur scalaire | évaluateur batché (entraînement), 500 créatures |
+|---|---|---|
+| butées actuelles (cône) | ×1,00 (tel quel) ; ×1,15 avec (b) | 12,45 s, ×1,00 |
+| (d) β = 5° | ×1,20 avec (b) | 18,57 s, **×1,49** |
+| (d) β = 1° | ×1,22 avec (b) | 19,79 s, **×1,59** |
+
+Le coût de (b) dans le noyau batché reste estimé (quelques pour cent). Avec β = 1°, la chaîne de 11 butées couplées
+est presque toujours active.
+
+**La grimpeuse n°21 de la graine 1** (−8,81 m avec (b)) :
+- les trajectoires s'écartent de quelques centimètres dès t = 0,59 s (effet chaotique) et restent proches jusqu'à 6 s
+  (20,73 contre 20,66 m) ;
+- entre 6 et 8 s, la version (b) perd 1,7 m puis stagne (27,58 contre 23,02 m à 8 s) : elle finit à 26,77 m au lieu
+  de 35,58 m, sans tomber ;
+- avec (b) seulement, un point de queue passe à 1 mm du bassin entre 4,24 et 4,28 s (20 sous-pas). C'est la
+  singularité du cône, que (d) supprime ;
+- 0 J créé. C'est un cas isolé (les 149 autres sont à quelques centimètres) ; aucune perte d'énergie anormale.
+
+**Lecture** :
+- (d) supprime complètement la singularité : 0 saut d'angle, 0 approche du sommet, sur toutes les populations.
+- La posture avec β = 1° est celle de la vidéo (écart à l'axe de 6,8 à 7,0° en médiane).
+- Mais les butées de courbure, une chaîne de 11 contraintes couplées, ne sont **jamais tout à fait tenues**. Elles
+  sont enfoncées de quelques degrés presque tout le temps (β = 1° : 12° au plus chez les meilleures, 19° chez les
+  tombées). La résolution en vitesse converge mal le long de la chaîne. Il n'y a pas d'énergie créée, mais la limite
+  est « molle ».
+- Les grimpes de la v1 se sont faites avec une queue libre dans un cône de 30° : changer la queue sans réentraîner
+  casse une partie des démarches (graine 1). Les écarts de hauteur des meilleures ne jugent donc pas (d) lui-même ;
+  il faudra réentraîner.
+- (d) coûte +49 à +59 % en entraînement, en plus du ×2,2 de C2.
+
 ## 6. Question pour la v2 (hors chantier D) : le score « hauteur à 10 s »
 
 Le score lit la hauteur à t = 10 s pile. Une créature qui a lâché le mur et tombe est notée **à l'endroit où elle se
