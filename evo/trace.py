@@ -27,7 +27,9 @@ def trace(run_dir, gen, index, log=print, out_dir=None, variante="tel_quel"):
     from evo import diag_projection as dp
 
     ev.use_run_config(run_dir)          # avant la variante : la config du run fixe N_ITER, que passes120 remplace
-    with dp.variant(variante, record=True):
+    proj, tail = dp.split(variante)
+    variante = proj if tail == "cone" else f"{proj}:{tail}"     # « tel_quel:cone » = le moteur tel quel
+    with dp.variant(proj, record=True), dp.tail_limits(tail):
         result = _trace(run_dir, gen, index, out_dir, variante)
     if log:
         for line in summary_lines(result):
@@ -89,7 +91,7 @@ def _trace(run_dir, gen, index, out_dir, variante):
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
         seed = os.path.basename(os.path.normpath(run_dir))
-        suffix = "" if variante == "tel_quel" else f"_{variante}"
+        suffix = "" if variante == "tel_quel" else "_" + variante.replace(":", "-")
         path = os.path.join(out_dir, f"trace_s{seed}_g{gen}_n{index}{suffix}.csv")
         with open(path, "w", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=list(rows[0]))

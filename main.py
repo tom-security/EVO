@@ -93,8 +93,9 @@ def main(argv=None):
     tr.add_argument("--creature", type=int, required=True, help="indice de la créature dans la génération (npz)")
     tr.add_argument("--export", metavar="DIR", default=None, help="écrit le CSV par sous-pas dans DIR")
     tr.add_argument("--variante", default="tel_quel",
-                    choices=["tel_quel", "vitesse_proj", "dissipatif", "passes120"],
-                    help="variante de diagnostic du chantier D, substituée le temps du rejeu (moteur non modifié)")
+                    help="variante de diagnostic du chantier D, « projection[:queue] » (projection : tel_quel, "
+                         "vitesse_proj, dissipatif, passes120 ; queue : cone, courbure5, courbure1), substituée le temps "
+                         "du rejeu (moteur non modifié)")
 
     dp = sub.add_parser("diag-projection",
                         help="diagnostic du chantier D : moteur tel quel contre les variantes vitesse_proj, dissipatif "
@@ -106,8 +107,10 @@ def main(argv=None):
     dp.add_argument("--tombees", action="store_true", help="toutes les créatures tombées de la génération")
     dp.add_argument("--meilleures", type=int, default=None, metavar="N", help="les N meilleures de la génération")
     dp.add_argument("--benchmark", action="store_true", help="coût relatif de chaque variante (moteur scalaire)")
+    dp.add_argument("--benchmark-batch", action="store_true",
+                    help="coût relatif de chaque jeu de butées de queue dans l'évaluateur batché (entraînement)")
     dp.add_argument("--variantes", nargs="+", default=None,
-                    help="variantes mesurées (défaut : tel_quel vitesse_proj dissipatif passes120)")
+                    help="variantes « projection[:queue] » (défaut : tel_quel vitesse_proj dissipatif passes120)")
     dp.add_argument("--export", metavar="DIR", default=None, help="écrit les mesures en JSON dans DIR")
 
     planche = sub.add_parser("planche", help="assemble des images côte à côte, légendées (chantier C2)")
@@ -364,7 +367,7 @@ def main(argv=None):
         from evo import evolution, trace
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
         result = trace.trace(run_dir, args.gen, args.creature, out_dir=args.export, variante=args.variante)
-        if args.variante == "tel_quel" and not result["identique"]:
+        if result["variante"] == "tel_quel" and not result["identique"]:
             print("ALERTE : la hauteur rejouée diffère de la hauteur stockée")
             sys.exit(1)
     elif args.command == "diag-projection":
@@ -375,7 +378,9 @@ def main(argv=None):
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
         variants = tuple(args.variantes) if args.variantes else diag_projection.VARIANTS
         seed = os.path.basename(os.path.normpath(run_dir))
-        if args.benchmark:
+        if args.benchmark_batch:
+            result, tag = diag_projection.benchmark_batch(run_dir, args.gen), "benchmark_batch"
+        elif args.benchmark:
             result, tag = diag_projection.benchmark(run_dir, args.gen, variants=variants), "benchmark"
         elif args.tombees or args.meilleures:
             group = "tombees" if args.tombees else "meilleures"

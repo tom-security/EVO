@@ -179,8 +179,29 @@ def test_diag_projection_population_and_trace_variant(small_run, tmp_path):
     base = trace.trace(small_run, 0, i, log=None)
     more = trace.trace(small_run, 0, i, log=None, variante="passes120")   # la variante s'applique bien (N_ITER)
     assert base["identique"] and more["hauteur"] != base["hauteur"]
-    b = dp.benchmark(small_run, 0, n=1, rounds=1, variants=("tel_quel", "dissipatif"), log=None)
-    assert set(b["secondes"]) == {"tel_quel", "dissipatif"}
+    b = dp.benchmark(small_run, 0, n=1, rounds=1, variants=("tel_quel", "dissipatif:courbure5"), log=None)
+    assert set(b["secondes"]) == {"tel_quel", "dissipatif:courbure5"}
+
+
+def test_curvature_tail_limits_replace_the_cone_without_touching_the_engine():
+    from evo import diag_projection as dp
+
+    original = cr.body_limits
+    with dp.tail_limits("courbure5"):
+        w = cr.Creature(cr.diagonal_gait_genome()).world
+    assert cr.body_limits is original
+    assert len(w.limit_lo) == 22                               # 8 articulations, 2 pieds, 12 butées de queue
+    tail = sk.TAIL_START
+    np.testing.assert_array_equal(w.limit_joints[10], [sk.NECK, sk.PELVIS, tail])          # cône du 1er segment
+    np.testing.assert_array_equal(w.limit_joints[11], [sk.PELVIS, tail, tail + 1])          # courbure, 1re jonction
+    np.testing.assert_array_equal(w.limit_joints[21], [tail + 9, tail + 10, tail + 11])     # dernière jonction
+    np.testing.assert_allclose(w.limit_violation()[10:], math.radians(5.0), atol=1e-9)      # queue droite au repos
+    with dp.tail_limits("courbure1"):
+        m = dp.measure(cr.diagonal_gait_genome(), "dissipatif:courbure1")
+    assert m["cree_J"] >= 0.0 and m["ecart_p95_deg"] < 15.0     # queue presque droite
+    assert dp.split("dissipatif") == ("dissipatif", "cone")
+    with pytest.raises(ValueError):
+        dp.split("dissipatif:spirale")
 
 
 def test_morphology_factors_stay_within_the_genome_bounds(small_run, tmp_path):
