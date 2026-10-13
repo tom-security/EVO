@@ -1,49 +1,80 @@
-# Sauvegarde des runs par défaut
+# Sauvegarde des runs d'EVO
 
-Cette branche ne contient pas de code. Elle garde une copie des runs d'évolution par défaut du projet, qui sont
-hors git dans les branches de code (`runs/` est dans `.gitignore`). Le projet est décrit dans
-`docs/PASSATION.md` de la branche `claude/chantier-c-collisions`.
+Cette branche ne contient pas de code. Elle garde une copie des runs d'évolution de référence du projet. Dans les
+branches de code, ces runs sont hors git (`runs/` est dans `.gitignore`). Le projet est décrit dans
+`docs/PASSATION.md` de la branche `main`.
+
+Depuis le gel de la v1 (tag `v1.0`), **les runs par défaut sont ceux de C2 à 30°**. Les runs de B2 restent ici, sous
+leur nom d'origine.
 
 ## Contenu
 
-Une archive par graine. Chacune contient `runs/S/` (201 fichiers `gen_0000.npz` à `gen_0200.npz`, `stats.csv`,
-`config.json`, `audit.csv`) et le journal d'entraînement `runs/train_sS.log`.
+Chaque archive contient un run de 200 générations × 1 000 créatures :
+- les fichiers `gen_0000.npz` à `gen_0200.npz` ;
+- `stats.csv`, `config.json`, `audit.csv` ;
+- le journal d'entraînement.
 
-Ce sont les runs du chantier B2 : 200 générations × 1000 créatures, entraînés avec les butées articulaires
-(`JOINT_LIMITS = True` dans leur `config.json`).
+Pour C2 s'y ajoute `pip_freeze.txt`, l'environnement du runner GitHub.
 
-| Archive | Graine | Champion de la génération 200 | Taille | SHA-256 |
-|---|---|---|---|---|
-| `runs_0.tar.gz` | 0 | +34,2 m | 24 829 993 octets | `4cfee42c86d3b1f510bb61f5a6cbf99df0a955e3d1e2c9a5279e662f82422e23` |
-| `runs_1.tar.gz` | 1 | +33,4 m | 25 132 536 octets | `93f89aca6b9668bbd7db65ceb7e31a5ef283277d900dc6f4a128eafd913ffb3e` |
-| `runs_2.tar.gz` | 2 | +35,3 m (référence des écrans) | 24 552 780 octets | `e4a321392f7af91e92d89e05f51157663f299a0a4a3a707e736517ac0107080b` |
+| Archive | Contenu de l'archive | Place dans le dépôt depuis la v1 | Champion gén. 200 | Taille (octets) | SHA-256 |
+|---|---|---|---|---|---|
+| `runs_butees_corps_30_0.tar.gz` | `runs/butees_corps_30/0`, `runs/train_butees_corps_30_s0.log` | `runs/0` (défaut) | +39,5 m | 23 976 495 | `76ff29a110fc84350ea6480059e92a0b0c0fbba0205a4db080fda3d9334df21e` |
+| `runs_butees_corps_30_1.tar.gz` | `runs/butees_corps_30/1`, `runs/train_butees_corps_30_s1.log` | `runs/1` (défaut) | +37,1 m | 24 302 513 | `626983d2845b66f18956c8e21e42955c0d7e9b720c270bb3385aae1e241edf59` |
+| `runs_butees_corps_30_2.tar.gz` | `runs/butees_corps_30/2`, `runs/train_butees_corps_30_s2.log` | `runs/2` (défaut, écrans) | +42,8 m | 24 989 159 | `56ffbf7e52f692c0d3b3b87253cfa517e2dee1c9f4f5ff39feffc19aef444fe9` |
+| `runs_butees_corps_0.tar.gz` | `runs/butees_corps/0`, `runs/train_butees_corps_s0.log` | `runs/butees_corps/0` | +38,9 m | 25 580 397 | `bf9be312e079e77a085b09b9be42af16ba60f3ed46549a7fb2452bae8346aba0` |
+| `runs_butees_corps_1.tar.gz` | `runs/butees_corps/1`, `runs/train_butees_corps_s1.log` | `runs/butees_corps/1` | +33,9 m | 24 831 091 | `174fc06d232e50aa7253d4eb7a208c52a7fa6ea7c7d79ecf39824869d73f35e3` |
+| `runs_butees_corps_2.tar.gz` | `runs/butees_corps/2`, `runs/train_butees_corps_s2.log` | `runs/butees_corps/2` | +48,5 m | 24 284 829 | `a3f357f4aaad54b25e3ff0bf96882f3620ddb3ecab312d49d94b717a362780b2` |
+| `runs_0.tar.gz` | `runs/0`, `runs/train_s0.log` | `runs/butees_articulaires/0` | +34,2 m | 24 829 993 | `4cfee42c86d3b1f510bb61f5a6cbf99df0a955e3d1e2c9a5279e662f82422e23` |
+| `runs_1.tar.gz` | `runs/1`, `runs/train_s1.log` | `runs/butees_articulaires/1` | +33,4 m | 25 132 536 | `93f89aca6b9668bbd7db65ceb7e31a5ef283277d900dc6f4a128eafd913ffb3e` |
+| `runs_2.tar.gz` | `runs/2`, `runs/train_s2.log` | `runs/butees_articulaires/2` | +35,3 m | 24 552 780 | `e4a321392f7af91e92d89e05f51157663f299a0a4a3a707e736517ac0107080b` |
 
-## Restaurer
+**Provenance des runs** :
+- **C2 à 30°** (référence, `BODY_LIMITS = True`, `TAIL_CONE_DEG = 30`) : run GitHub Actions 38278062446 ;
+- **C2 à 6°** (pour le rapport C2) : run 38266975229 ;
+- **B2** (butées articulaires seules, `JOINT_LIMITS = True`) : conteneur cloud, chantier B2.
 
-À la racine d'un clone de la branche de code :
+Rapports : `docs/chantier_c_c2.md` et `docs/chantier_b_b2.md`.
+
+## Restaurer (dispositions de la v1)
+
+À la racine d'un clone de la branche de code, avec bash (le runner GitHub, Linux, macOS) :
 
 ```
 git fetch origin sauvegarde-runs
-git show origin/sauvegarde-runs:runs_2.tar.gz > runs_2.tar.gz
-sha256sum runs_2.tar.gz          # doit égaler la valeur du tableau
-tar -xzf runs_2.tar.gz           # recrée runs/2 et runs/train_s2.log
+for s in 0 1 2; do
+  for a in runs_butees_corps_30_$s runs_butees_corps_$s runs_$s; do
+    git show "FETCH_HEAD:$a.tar.gz" > "$a.tar.gz"
+  done
+done
+sha256sum runs_*.tar.gz            # comparer au tableau
+mkdir -p runs/butees_articulaires
+for s in 0 1 2; do tar -xzf runs_$s.tar.gz && mv runs/$s runs/butees_articulaires/$s; done
+for s in 0 1 2; do tar -xzf runs_butees_corps_30_$s.tar.gz && mv runs/butees_corps_30/$s runs/$s; done
+for s in 0 1 2; do tar -xzf runs_butees_corps_$s.tar.gz; done
 ```
 
-Même chose pour les graines 0 et 1. Les archives se téléchargent aussi depuis GitHub, sur cette branche.
+Ces commandes recréent `runs/S` (C2 à 30°), `runs/butees_articulaires/S` (B2) et `runs/butees_corps/S` (C2 à 6°).
+Les journaux d'entraînement restent dans `runs/`. Le workflow `.github/workflows/train.yml` restaure de la même
+façon.
+
+Sous Windows (PowerShell 5.1), ne pas rediriger `git show` vers un fichier, car la redirection abîme les octets.
+Cloner plutôt cette branche (`git clone --branch sauvegarde-runs --single-branch …`), ou télécharger les archives
+depuis GitHub.
 
 ## Avec quel code
 
-Ces runs se rejouent au bit près (hauteur rejouée = hauteur stockée) avec le code de
-`claude/modest-ritchie-mkwjnd` à partir du commit 2a9b55d, et avec `claude/chantier-c-collisions`. Le test
+Ces runs se rejouent au bit près (hauteur rejouée = hauteur stockée) avec le code de `main` à partir du tag `v1.0`, **sur
+Linux** (runner GitHub ubuntu-24.04, Python 3.11, numpy 2.4.6, numba 0.67.0). Le test
 `tests/test_joint_limits.py::test_local_runs_replay_with_their_own_flag` le vérifie quand les runs sont présents.
+Sous Windows, la bibliothèque mathématique diffère et les rejeux divergent.
 
 ## S'ils manquaient
 
-Réentraîner, environ 15 à 18 min par graine sur 4 cœurs :
+Réentraîner sur le runner GitHub, en 18 à 56 min par graine pour C2 :
 
 ```
-python main.py train --seed S --generations 200 --pop 1000 --set AUDIT_EVERY=10
+gh workflow run train.yml --ref main -f mode=train -f run_name=<nom> -f generations=200
 ```
 
-Le run est déterministe, mais l'identité au bit près avec ces archives n'est garantie qu'avec les mêmes versions
-du code, de numpy, de numba et de la bibliothèque mathématique du système.
+Le run est déterministe sur une même machine. L'identité au bit près avec ces archives n'est garantie qu'avec les
+mêmes versions du code, de numpy, de numba et de la bibliothèque mathématique du système.
