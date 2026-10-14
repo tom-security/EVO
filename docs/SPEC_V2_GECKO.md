@@ -22,7 +22,7 @@ Trois joueurs, sur le même moteur (moteur D, v1.1) et avec la même règle de v
 
 | Manche | Ce que le joueur règle | Corps | Référence évolution |
 | --- | --- | --- | --- |
-| 1. Le chorégraphe | Période, 4 poses, prises, 16 forces | Imposé : longueurs de référence | Run d'évolution témoin à corps figé, à entraîner (3 graines) |
+| 1. Le chorégraphe | Période, 4 poses, prises, 8 forces (une par muscle, appliquée aux deux côtés) | Imposé : longueurs de référence | Run d'évolution témoin à corps figé, à entraîner (3 graines) |
 | 2. Le créateur | Tout le génome, longueurs des 7 os comprises | Libre, dans les bornes du génome | Les runs par défaut (moteur D) |
 
 ## Règles fixées à l'avance
@@ -30,6 +30,8 @@ Trois joueurs, sur le même moteur (moteur D, v1.1) et avec la même règle de v
 Écrites avant la première partie, elles ne changent plus après avoir vu un résultat.
 
 - **Budget annoncé** : 50 essais par manche, un seul génome par essai, aucun lot.
+- **Forces symétriques** : dans les deux manches, le génome donne 8 forces, une par muscle, appliquées à l'identique à
+  gauche et à droite, comme pour l'évolution et le hasard pur (décision de Tom du 14 octobre 2026).
 - **Prolongation** : le LLM continue jusqu'à 200 essais pour savoir s'il plafonne. Le résultat à 50 reste celui qu'on annonce.
 - **Critère de victoire, la « hauteur accrochée »** : hauteur du centre du torse au dernier instant où au moins une patte tient le tronc, sur 10 s. Un saut final ne rapporte rien (cas de la créature n°677 : la hauteur à 10 s récompensait une créature en chute).
 - **Départage** : l'énergie dépensée, la plus basse gagne.
