@@ -169,9 +169,10 @@ def ligne_ecart(verif):
     if verif.get("identique"):
         return MARQUE_ECART + f"aucun ({verif['libelle']} : résultat et états identiques au bit près)."
     r = verif["resultat"]
-    return (MARQUE_ECART + f"hauteur accrochée {_n(verif['ecart_hauteur_accrochee'])} m "
-            f"({verif['libelle']} : {_n(r['hauteur_accrochee'])} m), hauteur à 10 s {_n(verif['ecart_hauteur_10s'])} m, "
-            f"énergie {_n(verif['ecart_energie'])} ; états différents.")
+    return (MARQUE_ECART + f"hauteur accrochée {_n(verif['ecart_hauteur_accrochee'], '+.3f')} m "
+            f"({verif['libelle']} : {_n(r['hauteur_accrochee'], '+.3f')} m), hauteur à 10 s "
+            f"{_n(verif['ecart_hauteur_10s'], '+.3f')} m, énergie {_n(verif['ecart_energie'], '+.3f')}"
+            + (", chute différente" if verif.get("chute_differente") else "") + " ; états différents.")
 
 
 def rapport(entete_essai, resultat, mes, plat, verif=None):

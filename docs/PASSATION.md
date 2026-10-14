@@ -82,7 +82,10 @@ Les autres documents du dépôt restent la référence pour le détail :
     leurs commits sont dans `main` ;
   - `sauvegarde-runs` : archives des runs de référence (D, C2 à 30°, C2 à 6°, B2).
 - **Prochaine étape :** la v2, d'après `docs/SPEC_V2_GECKO.md` : outils du duel (GECKO-9), puis témoins et parties.
-- **Tests :** 185 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
+- **Outils du duel (v2, GECKO-9)** : hauteur accrochée, génome JSON (`genome`), `essai`, `verifier-partie`, fichiers
+  d'états (`replay --export-etats`) ; voir §4.5. Plateforme officielle des essais : le runner (option C,
+  `config.DUEL_PLATEFORME_OFFICIELLE`).
+- **Tests :** 214 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
   locaux échouent, et c'est attendu (§3.5).
 
 ---
@@ -262,7 +265,9 @@ README.md, CLAUDE.md, config.py, main.py, requirements.txt, pytest.ini (pythonpa
 docs/      spec, rapports des chantiers B et C, bilan, journal, ce document, images de référence, figures
 assets/fonts/   Questrial-Regular.ttf, NunitoSans-SemiBold.ttf, leurs licences OFL, README (sources, SHA-256)
 evo/       le code (§4)
-tests/     15 fichiers, 185 tests (§14)
+tests/     19 fichiers, 214 tests (§14)
+duel/      v2 : parties du duel (génomes, rapports, résultats, carnet), gardées octet pour octet (.gitattributes) ;
+           leurs fichiers d'états (etats*.json) restent hors git
 runs/      runs d'évolution            ← hors git (.gitignore)
 out/       exports PNG/MP4 par phase   ← hors git
 cache/     couches de décor pré-rendues ← hors git
@@ -369,6 +374,7 @@ numba 0.67.0, pygame 2.6.1. Entrée `mode` :
 | `train` | matrice sur `seeds` (3 graines en parallèle) ; `train --pop 1000 --set AUDIT_EVERY=10 <extra_set>` dans `runs/<run_name>/S` ; archive `runs_<run_name>_S.tar.gz` + SHA-256 + `pip_freeze.txt`, en artefact gardé 30 jours |
 | `reproductibilite` | restaure les runs de référence depuis `sauvegarde-runs` (`.github/scripts/restaurer_runs.sh`, SHA-256 vérifiés), rejoue les champions de la génération 200 de D (`runs/S`), de C2 à 30° (`runs/butees_corps_30/S`) et de B2 (`runs/butees_articulaires/S`), échoue sur tout écart |
 | `pytest` | la suite complète, avec les runs de référence restaurés (le test des runs locaux les rejoue) et, en option, les archives de un ou deux runs `train` (`source_run_id`, `source_run_id_2`) |
+| `verification` | v2 : `verifier-partie <partie>` (entrée `partie`, dossier `duel/…` commité sur la branche) : rejoue tous les essais d'une partie, chiffres officiels (hauteur accrochée, énergie, empreinte des états) et écart par essai, rapports mis à jour, états officiels ; artefact gardé 90 jours, à reporter dans la partie avec `verifier-partie <partie> --integrer artefacts/<id>` |
 | `analyse` | runs de référence et archives des runs sources ; garde-fou (rejeu des champions D, C2 à 30° et B2) ; captures de la vidéo remplacées par des aplats (les artefacts sont publics) ; cache du décor ; `commandes` = sous-commandes de `main.py` séparées par « ; » (liste blanche, sans shell, sans guillemets ni espaces dans les valeurs) ; `out/` et les journaux en artefact |
 
 ```
@@ -420,6 +426,9 @@ gh run download <id> -D artefacts/<id>
 | `trace.py` | C2 : commande `trace`, rejeu pas à pas d'une créature avec l'audit d'énergie à chaque sous-pas (diagnostic) |
 | `diag_projection.py` | chantier D : commande `diag-projection`, moteur tel quel contre des variantes substituées le temps de la mesure (projection : `vitesse_proj`, `dissipatif`, `passes120` ; queue : `courbure<β>` ; ordre : `alterne`), ou le moteur D avec un cône de ±θ (`D<θ>`) ; créature inerte (`--inerte`) ; énergie, queue, enfoncement par groupe de butées, singularité du cône, croisements, mains (lecture seule) |
 | `diag_alterne.py` | chantier D : copies des noyaux du solveur où les butées de queue sont parcourues à l'envers une passe sur deux (mesure seulement) |
+| `genome_json.py` | v2 : génome JSON du duel (« gecko-genome-1 ») : format, bornes, vérification avec messages, conversion vers `Genome`, schéma, exemple |
+| `essai.py` | v2 : commande `essai` (simulation observée, recoupement au bit près avec l'évaluateur batché, rapport d'essai, partie, carnet, budget) et `verifier-partie` (rejeu officiel d'une partie, intégration) |
+| `etats.py` | v2 : fichiers d'états pour le rendu (simulation à 60 images/s, en-tête, empreinte SHA-256), plateforme et commit |
 
 ### 4.2 Commandes (`main.py`)
 
@@ -442,6 +451,10 @@ python main.py morpho --seed S [--run-dir DIR] [--compare AUTRE_RUN] [--gens G �
 python main.py trace --seed S --gen G --creature I [--run-dir DIR] [--export DIR]
 python main.py diag-projection --seed S --gen G --creature I [--run-dir DIR]
 python main.py planche IMAGE … --out PNG [--labels …] [--height H] [--crop X0 Y0 X1 Y1]
+python main.py genome --schema | --exemple [--manche 1|2] | --verifier FICHIER [--manche 1|2]
+python main.py essai GENOME.json --manche 1|2 [--partie DIR --hypothese "…"] [--sortie DIR]
+python main.py verifier-partie DIR [--sortie out/verification] | --integrer ARTEFACT
+python main.py replay --seed S --gen G --rank R --export-etats FICHIER.json
 ```
 
 - `--seed` vaut 2 par défaut pour les écrans, 42 pour `train` et `graphs`.
@@ -492,6 +505,26 @@ python main.py planche IMAGE … --out PNG [--labels …] [--height H] [--crop X
   un état par frame (1/60 s). `JungleView`, `AnalysisView` et `CompareView` dessinent ces états.
 - La vue population n'utilise pas le moteur scalaire (≈ 18 min pour 1000 créatures) : elle recalcule les poses
   finales par l'évaluateur batché (≈ 5 s) et vérifie que les hauteurs égalent les hauteurs stockées.
+
+### 4.5 Outils du duel (v2, GECKO-9)
+
+- **Hauteur accrochée** : hauteur du centre du torse à la fin du dernier sous-pas où au moins une patte tient le tronc
+  (`Creature.hang_height()`, `batch.evaluate(...)["hang_height"]`, identiques au bit près) ; jamais accrochée : hauteur
+  à 10 s. Simple mesure : ni la simulation, ni le score, ni les runs ne changent.
+- **Génome JSON** (`evo/genome_json.py`) : os en m (manche 2 seulement), 8 forces appliquées aux deux côtés, 4 poses
+  avec angles anatomiques (α épaule et hanche, β coude et genou, §15) et prises ; cible φ = radians(angle − repos).
+- **Essai** (`evo/essai.py`) : génome vérifié (invalide : aucun essai consommé), simulation scalaire observée,
+  recoupement batché au bit près, `rapport.txt` (6 sections de la spec), `resultat.json`, `etats.json`, copie du
+  génome. En partie : `essai_NNN`, jamais d'écrasement, hypothèse au carnet avant la simulation, budget 50 / 200.
+  Environ 2 s par essai sur le PC.
+- **Plateforme** : chaque rapport et `resultat.json` la notent ; hors de `config.DUEL_PLATEFORME_OFFICIELLE`, l'essai
+  est non officiel et la ligne « Écart avec la plateforme officielle » est complétée par la vérification.
+- **Vérification** : `verifier-partie` (mode `verification` du workflow) rejoue la partie sur le runner, écrit
+  `resultat.json` (bloc `verification`), `rapport.txt` (écart), `rapport_officiel.txt`, `etats_officiels.json` et
+  `verification.csv` ; `--integrer` les reporte dans la partie après contrôle du SHA-256 du génome.
+- **États** (`evo/etats.py`) : 601 images (60 images/s), positions des 27 points, 4 prises, 16 activations, hauteur,
+  énergie ; en-tête (source, commit, plateforme, graine, axes et conversion Blender, points, os, muscles) ; empreinte
+  SHA-256. `replay --export-etats` exporte un champion de l'évolution (refusé si le rejeu diverge : sur le runner).
 
 ---
 
@@ -1261,6 +1294,11 @@ Détail : `docs/chantier_d_diagnostic.md`, `docs/chantier_d.md`, journal (étape
 | Chantier D (projection propre) | **appliqué** (v1.1) : report dissipatif de la projection (b) ; butées des mains ; cône de 15° ; (a) `vitesse_proj` et (c) 120 passes écartés ; (d) courbure de queue explorée puis écartée (énergie de la créature inerte), code gardé derrière son drapeau (False) |
 | Graine 0 du chantier D | champion à 30,9 m (C2 : 39,5 m) : **accepté**, effet attendu de la butée des mains |
 | Cap du projet | la v1.1 est sur `main` ; la v2 (duel LLM contre évolution) partira d'elle |
+| v2 : plateforme des essais | option C : le LLM joue sur le PC (Windows), chiffres officiels refaits sur le runner (`verifier-partie`, mode `verification`), écart PC/runner dans chaque rapport et `resultat.json` ; WSL testé et en échec (Windows n'installe pas la Plateforme d'ordinateur virtuel, journal v2) ; bascule par `config.DUEL_PLATEFORME_OFFICIELLE` si WSL rejoue un jour le runner au bit près |
+| v2 : forces | 8 forces, appliquées aux deux côtés, comme l'évolution (spec mise à jour) |
+| v2 : hauteur accrochée | jamais accrochée : hauteur à 10 s, mention « jamais accrochée » ; départage : énergie sur 10 s |
+| v2 : génome JSON | format « gecko-genome-1 » validé tel que l'exemple du plan (`genome --exemple`) |
+| v2 : joueur LLM (GECKO-11) | sa session ne doit pas pouvoir lire le code du projet |
 
 ---
 
@@ -1524,7 +1562,7 @@ meilleures et 50 créatures au hasard de la génération 200 :
 
 ## 14. Tests
 
-`pytest -q tests/` : 185 tests, cas paramétrés compris ; ≈ 4 à 6 min. Avec ffmpeg (ou `imageio-ffmpeg`) pour les
+`pytest -q tests/` : 214 tests, cas paramétrés compris ; ≈ 4 à 6 min. Avec ffmpeg (ou `imageio-ffmpeg`) pour les
 tests vidéo, sinon 2 sont sautés. Sur le runner (`mode=pytest`), tout passe. Sous Windows, les 3 cas de
 `test_local_runs_replay_with_their_own_flag` échouent, et c'est attendu (§3.5).
 
@@ -1544,6 +1582,10 @@ tests vidéo, sinon 2 sont sautés. Sur le runner (`mode=pytest`), tout passe. S
 | `test_joint_limits.py` | 19 | butées : arrêt pile, sans rebond ni énergie, batché = scalaire, départ hors bornes, drapeau, runs locaux (D, C2 à 30° et à 6°, B2, legacy, chacun avec ses drapeaux) ; moteur de la v1 (drapeaux du chantier D à False) |
 | `test_body_limits.py` | 15 | butées du corps (C2) : disposition et repos, pied libre ou tenu arrêté sur l'axe, queue lancée contre le cône (2, 5, 10 m/s) sans rebond ni énergie, départ hors bornes, batché = scalaire et numba = Python avec les 22 butées, énergie sur deux grimpes, drapeau et `config.json` ; verts à 6° comme à 30° ; moteur de C2 (drapeaux du chantier D à False) |
 | `test_chantier_d.py` | 23 | moteur D : disposition des 24 butées, report dissipatif (ne crée jamais d'énergie cinétique), numba = Python, batché = scalaire au bit près avec pied, main et queue engagés, main lancée vers l'axe, queue contre le cône, départ hors bornes, énergie sur trois grimpes (seuils de la créature inerte inchangés), créatures du diagnostic, drapeaux ; courbure (écartée) : disposition et bit près |
+| `test_hauteur_accrochee.py` | 6 | v2 : hauteur accrochée scalaire = batchée au bit près (moteur D et v1 sans butées), jamais accrochée, accrochée jusqu'au bout, lâcher final, simulation inchangée |
+| `test_genome_json.py` | 12 | v2 : génome JSON (exemple, manche 1, messages d'erreur, tolérance des bornes, conversion, aller-retour, schéma, commande) |
+| `test_essai.py` | 9 | v2 : essai (partie, carnet, rapport, plateforme, recoupement batché, empreinte, refus, bascule de plateforme, vérification et intégration) |
+| `test_etats_replay.py` | 2 | v2 : `replay --export-etats` (même empreinte qu'un essai du même génome ; rejeu divergent jamais exporté) |
 | `test_tail_audit.py` | 14 | outils de C2 sur signaux construits et petit run : oscillation, étirement, pénétration et posture de la queue, verdict de repli, `--tail`, `--fallen`, `trace`, `diag-projection` (moteur rendu intact), `morpho`, `planche`, variantes du diagnostic du chantier D |
 
 `test_local_runs_replay_with_their_own_flag` saute les runs locaux absents (clone neuf, ou runs C2 non extraits).

@@ -65,6 +65,15 @@ python main.py replay --seed 2 --gen 200 --rank 1 --export-video out/replay.mp4
 python main.py joints --seed 2 --gen 200 --top 50 --crossings --tail    # angles, croisements, queue
 ```
 
+Outils du duel de la v2 (`docs/SPEC_V2_GECKO.md`) :
+
+```
+python main.py genome --schema                   # format du génome JSON, bornes, conventions
+python main.py essai genome.json --manche 2 --partie duel/m2/P1 --hypothese "…"   # un essai, son rapport
+python main.py verifier-partie duel/m2/P1        # rejeu officiel d'une partie (sur le runner)
+python main.py replay --seed 2 --gen 200 --rank 1 --export-etats out/etats/champion.json   # états pour le rendu
+```
+
 Les runs (`runs/`), les exports (`out/`) et le cache du décor (`cache/`) restent hors git. Un run de 200 générations
 prend de 15 à 60 minutes selon la machine.
 
