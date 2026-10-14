@@ -34,6 +34,7 @@
     python main.py trace --seed 2 --gen 0 --creature 868 --export out/diag   # rejeu pas à pas audité (diagnostic)
     python main.py trace --seed 1 --gen 200 --creature 0 --variante dissipatif   # idem, avec une variante du chantier D
     python main.py diag-projection --seed 2 --gen 0 --tombees --export out/d   # candidats du chantier D (lecture seule)
+    python main.py genome --schema | --exemple | --verifier genome.json --manche 2   # génome JSON du duel (v2)
 """
 import argparse
 
@@ -206,7 +207,31 @@ def main(argv=None):
                         help="toutes les créatures tombées de la génération : énergie créée hors muscles et queue, "
                              "contre les seuils d'audit (chantier C2)")
 
+    gen = sub.add_parser("genome", help="génome JSON du duel (v2) : format, bornes, exemple, vérification d'un fichier")
+    what = gen.add_mutually_exclusive_group(required=True)
+    what.add_argument("--schema", action="store_true", help="affiche le format, les bornes et les conventions")
+    what.add_argument("--exemple", action="store_true", help="affiche un génome complet valide")
+    what.add_argument("--verifier", metavar="FICHIER", help="vérifie un génome JSON (toutes les erreurs d'un coup)")
+    gen.add_argument("--manche", type=int, choices=(1, 2), default=2,
+                     help="manche 1 : corps imposé, sans os_m ; manche 2 : génome complet (défaut)")
+
     args = parser.parse_args(argv)
+    if args.command == "genome":
+        import sys
+        from evo import genome_json as gj
+        if args.schema:
+            print(gj.schema_texte())
+        elif args.exemple:
+            print(gj.texte_json(gj.exemple(args.manche)), end="")
+        else:
+            try:
+                genome, _, _ = gj.charger(args.verifier, args.manche)
+            except (gj.GenomeInvalide, OSError) as exc:
+                print(exc)
+                sys.exit(1)
+            print(f"génome valide (manche {args.manche}) : période {genome.period:g} s, "
+                  f"masse musculaire {genome.muscle_mass():g}")
+        return
     if args.command == "debug-physics":
         if args.calibrate:
             from evo import calibration
