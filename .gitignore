@@ -6,3 +6,5 @@ runs/
 cache/
 .venv/
 artefacts/
+# v2 : fichiers d'états des essais (≈ 0,8 Mo chacun) ; ceux qui font foi viennent de la vérification sur le runner
+duel/**/etats*.json

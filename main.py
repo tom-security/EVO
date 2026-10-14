@@ -35,6 +35,9 @@
     python main.py trace --seed 1 --gen 200 --creature 0 --variante dissipatif   # idem, avec une variante du chantier D
     python main.py diag-projection --seed 2 --gen 0 --tombees --export out/d   # candidats du chantier D (lecture seule)
     python main.py genome --schema | --exemple | --verifier genome.json --manche 2   # génome JSON du duel (v2)
+    python main.py essai genome.json --manche 2 --partie duel/m2/P1 --hypothese "…"   # un essai du duel (v2)
+    python main.py verifier-partie duel/m2/P1 [--sortie out/verification]   # rejeu officiel d'une partie (runner)
+    python main.py verifier-partie duel/m2/P1 --integrer artefacts/<id>     # reporte la vérification dans la partie
 """
 import argparse
 
@@ -215,7 +218,40 @@ def main(argv=None):
     gen.add_argument("--manche", type=int, choices=(1, 2), default=2,
                      help="manche 1 : corps imposé, sans os_m ; manche 2 : génome complet (défaut)")
 
+    ess = sub.add_parser("essai", help="un essai du duel (v2) : simule un génome JSON, écrit le rapport d'essai et "
+                                       "le fichier d'états")
+    ess.add_argument("genome", metavar="GENOME.json", help="génome JSON (python main.py genome --schema)")
+    ess.add_argument("--manche", type=int, choices=(1, 2), required=True, help="1 : corps imposé ; 2 : génome complet")
+    ess.add_argument("--partie", metavar="DIR",
+                     help="dossier de la partie : essais numérotés, carnet de bord, budget (une hypothèse est exigée)")
+    ess.add_argument("--hypothese", metavar="TEXTE", help="hypothèse de l'essai, écrite au carnet avant la simulation")
+    ess.add_argument("--sortie", metavar="DIR", help="hors partie : dossier de l'essai (défaut : out/essais/<date>)")
+
+    ver = sub.add_parser("verifier-partie",
+                         help="rejoue tous les essais d'une partie sur cette plateforme (le runner : chiffres officiels) ; "
+                              "ou --integrer les fichiers d'une vérification dans la partie")
+    ver.add_argument("partie", metavar="DIR", help="dossier de la partie")
+    ver.add_argument("--sortie", metavar="DIR", default="out/verification", help="dossier des résultats vérifiés")
+    ver.add_argument("--integrer", metavar="ARTEFACT",
+                     help="reporte dans la partie les fichiers d'une vérification rapatriée (gh run download)")
+
     args = parser.parse_args(argv)
+    if args.command == "essai":
+        import sys
+        from evo import essai, genome_json as gj
+        try:
+            essai.jouer(args.genome, args.manche, partie=args.partie, hypothese=args.hypothese, sortie=args.sortie)
+        except (gj.GenomeInvalide, essai.EssaiRefuse, OSError) as exc:
+            print(f"essai refusé : {exc}")
+            sys.exit(1)
+        return
+    if args.command == "verifier-partie":
+        from evo import essai
+        if args.integrer:
+            essai.integrer(args.integrer, args.partie)
+        else:
+            essai.verifier_partie(args.partie, args.sortie)
+        return
     if args.command == "genome":
         import sys
         from evo import genome_json as gj

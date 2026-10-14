@@ -663,3 +663,17 @@ POP_CYCLE_HIST_S = 2.0        # [CHOIX] histogramme entre le tri et l'éliminati
 # apparaît de même dans la case 500 + j, juste sous son parent, dans sa posture de repos (pas encore évalué).
 POP_ELIM_S = 1.5
 POP_CHILD_S = 1.5
+
+# ---------------------------------------------------------------------------
+# v2 : duel LLM contre évolution (docs/SPEC_V2_GECKO.md) ; outils du duel (GECKO-9) : commande `essai`, vérification
+# des parties sur le runner, fichiers d'états. Aucun effet sur la simulation.
+# ---------------------------------------------------------------------------
+# [CHOIX] Tom, 14 octobre 2026 (option C) — plateforme dont les résultats font foi : « runner » (runner GitHub
+# ubuntu-24.04, celui de l'évolution) ; un essai joué ailleurs (« windows ») est non officiel, et la vérification
+# d'une partie sur le runner (`verifier-partie`) donne les chiffres officiels et l'écart. Si une autre plateforme
+# rejoue le runner au bit près (« wsl », à vérifier comme en mesure de préparation, journal v2), il suffit de la
+# mettre ici : les essais qui y sont joués deviennent officiels, sans rien réécrire.
+DUEL_PLATEFORME_OFFICIELLE = "runner"
+DUEL_BUDGET_ANNONCE = 50      # [CHOIX] spec v2 — essais annoncés par partie ; le résultat annoncé est celui-ci
+DUEL_BUDGET_MAX = 200         # [CHOIX] spec v2 — prolongation jusqu'à 200 essais, pour voir si le LLM plafonne
+DUEL_TRAJECTOIRE_PAS_S = 0.5  # [CHOIX] spec v2 — rapport d'essai : hauteur du torse toutes les 0,5 s
