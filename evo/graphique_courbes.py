@@ -166,7 +166,7 @@ for (const f of D.figures) {
   const Y = v => M.t + (1 - (v - y0) / (y1 - y0)) * (H - M.t - M.b);
   for (let v = y0; v <= y1; v += 10) {
     el("line", {x1:M.l, x2:W - M.r, y1:Y(v), y2:Y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width":1}, svg);
-    el("text", {x:M.l - 8, y:Y(v) + 4, "text-anchor":"end", class:"tick"}, svg).textContent = (v > 0 ? "+" : "") + v;
+    el("text", {x:M.l - 8, y:Y(v) + 4, "text-anchor":"end", class:"tick"}, svg).textContent = (v > 0 ? "+" : "") + String(v).replace("-", "−");
   }
   for (let p = 0; Math.pow(10, p) <= xmax; p++) {
     const n = Math.pow(10, p);

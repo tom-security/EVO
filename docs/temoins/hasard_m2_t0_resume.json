@@ -1,0 +1,49 @@
+{
+ "nom": "hasard_m2_t0",
+ "evaluations": 200,
+ "meilleure_hauteur_accrochee": 3.494960809733625,
+ "atteinte_a_l_evaluation": 49,
+ "generation": 0,
+ "indice": 48,
+ "energie_du_meilleur": 18.285154405098197,
+ "hauteur_10s_du_meilleur": 3.494960809733625,
+ "jamais_accrochees": 0,
+ "hauteur_accrochee_differente": 72,
+ "lectures": {
+  "50": 3.494960809733625,
+  "200": 3.494960809733625
+ },
+ "paliers": [
+  [
+   1,
+   0.02944583195710848
+  ],
+  [
+   7,
+   0.057591438145284
+  ],
+  [
+   10,
+   0.5780458433538698
+  ],
+  [
+   19,
+   0.6071567087356815
+  ],
+  [
+   27,
+   0.9791611011756451
+  ],
+  [
+   49,
+   3.494960809733625
+  ]
+ ],
+ "source": "hasard",
+ "manche": 2,
+ "tirage": 0,
+ "graine": 100,
+ "frozen_body": false,
+ "secondes": 6.4,
+ "cout_evaluation_s": 6.4
+}

@@ -180,3 +180,41 @@ Puis GECKO-10 en autonomie, sur `claude/gecko-10-temoins` : évolution témoin �
 l'évolution en hauteur accrochée, hasard pur (2 manches), sauvegarde des runs témoins. Arrêt si un test échoue, si un
 rejeu n'est plus identique au bit près, si de l'énergie est créée hors muscles ou si un champion témoin passe sous
 20 m ; sinon arrêt et rapport à la fin, avec les courbes des trois joueurs par manche.
+
+## Étape 6 : GECKO-10, témoins du duel (branche `claude/gecko-10-temoins`)
+
+| Étape | Commit | Contenu | `pytest` runner | `reproductibilite` |
+|---|---|---|---|---|
+| décisions | `cd23cbb` | démonstration déplacée, exemple neutre, exigences de GECKO-11 | 217 passent (38590468960) | 18/18 (38590474455) |
+| 1 | `8e12d7a` | drapeau `FROZEN_BODY` | 222 (38590768250) | 18/18 (38590773699) |
+| 2 | `74aab7b`, `9e83f4b` | `courbe-evolution`, `hasard`, `courbes-graphique` | 227, 228 (38591811311, 38592332113) | 18/18 (38591817958, 38592335864) |
+| 5 fois | `61ccae6`, `d9cb60f` | hasard en 5 tirages, lectures à 50 et 200, coût ; spec | 230 (38595297124) | 18/18 (38595302082) |
+| 3 | `8afadad` | restauration des 19 archives, 16 champions rejoués, test des runs locaux sur 5 graines | 232 (38602753336) | 16 champions gén. 200 identiques (38602757704) |
+
+**Essai de 5 générations à corps figé** (38590778999) : 8,5 à 14,4 s par génération, 30 à 50 min estimées.
+
+**Runs** (200 générations × 1 000 créatures, `AUDIT_EVERY = 10`) :
+
+| Run | Graines | Champions gén. 200 | Énergie créée hors muscles (21 audits par graine) | Durée |
+|---|---|---|---|---|
+| corps figé (38591806655, 38594977725) | 0 à 4 | +36,67 / +35,98 / +38,10 / +37,31 / +36,48 m | 0 J, aucune alerte | 49,8 / 24,4 / 15,3 / 35,5 / 46,6 min |
+| moteur D (38594982071) | 3, 4 | +33,84 / +34,52 m | 0 J, aucune alerte | 21,0 / 33,9 min |
+
+Aucun champion témoin sous 20 m ; corps de référence vérifié dans toutes les générations contrôlées ; config des graines
+D 3 et 4 identique à celle des graines 0 à 2 hors nouvelles clés de la v2.
+
+**Sauvegarde** : `sauvegarde-runs` passe de `28d7440` à `e6ca06d` en avance rapide (7 archives : D 3 et 4, corps figé 0 à
+4 ; README). Restauration vérifiée sur un clone neuf de la branche : 19 SHA-256 conformes, les 7 runs identiques octet
+pour octet aux artefacts, les runs D 0 à 2 inchangés (3 911 fichiers).
+
+**Courbes** : 10 runs × 101 000 réévaluations, toutes identiques au bit près au run ; hasard : 10 tirages de 200. Lectures,
+coûts et graphique : `docs/temoins/` (README, `courbes_temoins.html`).
+- à 50 essais : évolution D +1,89 m, corps figé +1,74 m, hasard +1,89 m (manche 1) et +2,33 m (manche 2) ;
+- à 200 essais : +3,43 / +3,34 / +2,72 / +2,86 m ; jusqu'à 1 000, l'évolution n'a évalué que sa génération 0, un tirage
+  au hasard ;
+- à 101 000 : évolution D +36,89 m (+30,90 à +43,80), corps figé +37,19 m (+35,98 à +38,96).
+
+**Coût de calcul** (runner, 4 vCPU) : évolution D 2,41 h pour 5 graines (28,9 min par graine, 17,2 ms par évaluation),
+corps figé 2,81 h (33,7 min, 20,0 ms), hasard 6,4 à 6,7 s par tirage de 200 (hors compilation numba).
+
+**Fin de GECKO-10** : arrêt pour validation ; rien n'est fusionné sur `main`.

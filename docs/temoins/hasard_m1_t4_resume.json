@@ -1,0 +1,41 @@
+{
+ "nom": "hasard_m1_t4",
+ "evaluations": 200,
+ "meilleure_hauteur_accrochee": 3.063887893935913,
+ "atteinte_a_l_evaluation": 41,
+ "generation": 0,
+ "indice": 40,
+ "energie_du_meilleur": 18.60281399126151,
+ "hauteur_10s_du_meilleur": 3.063887893935913,
+ "jamais_accrochees": 0,
+ "hauteur_accrochee_differente": 86,
+ "lectures": {
+  "50": 3.063887893935913,
+  "200": 3.063887893935913
+ },
+ "paliers": [
+  [
+   1,
+   -6.6827373320366625
+  ],
+  [
+   2,
+   -4.7776666901678695
+  ],
+  [
+   3,
+   1.2540261955572625
+  ],
+  [
+   41,
+   3.063887893935913
+  ]
+ ],
+ "source": "hasard",
+ "manche": 1,
+ "tirage": 4,
+ "graine": 104,
+ "frozen_body": true,
+ "secondes": 6.7,
+ "cout_evaluation_s": 6.7
+}

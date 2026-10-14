@@ -70,8 +70,9 @@ Les autres documents du dépôt restent la référence pour le détail :
     écrans (§3.5) ;
   - **un run ne se rejoue au bit près que sur le runner Linux** : sous Windows, la bibliothèque mathématique diffère.
 - **Runs** (hors git, tous sauvegardés sur la branche `sauvegarde-runs`, §3.3) :
-  - `runs/<graine>` (graines 0, 1, 2) : **runs par défaut depuis la v1.1**, chantier D (butées articulaires et du
-    corps, mains, cône de queue de 15°, report dissipatif de la projection) ;
+  - `runs/<graine>` (graines 0 à 4 ; 3 et 4 ajoutées pour la v2) : **runs par défaut depuis la v1.1**, chantier D
+    (butées articulaires et du corps, mains, cône de queue de 15°, report dissipatif de la projection) ;
+  - `runs/corps_fige/<graine>` (graines 0 à 4) : v2, témoins de la manche 1, moteur D à corps figé (`FROZEN_BODY`) ;
   - `runs/butees_corps_30/<graine>` : C2 à 30°, les runs par défaut de la v1.0 ;
   - `runs/butees_articulaires/<graine>` : B2 (butées articulaires seules) ;
   - `runs/butees_corps/<graine>` : C2 avec un cône de 6° (rapport C2) ;
@@ -85,7 +86,7 @@ Les autres documents du dépôt restent la référence pour le détail :
 - **Outils du duel (v2, GECKO-9)** : hauteur accrochée, génome JSON (`genome`), `essai`, `verifier-partie`, fichiers
   d'états (`replay --export-etats`) ; voir §4.5. Plateforme officielle des essais : le runner (option C,
   `config.DUEL_PLATEFORME_OFFICIELLE`).
-- **Tests :** 214 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
+- **Tests :** 232 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
   locaux échouent, et c'est attendu (§3.5).
 
 ---
@@ -265,7 +266,7 @@ README.md, CLAUDE.md, config.py, main.py, requirements.txt, pytest.ini (pythonpa
 docs/      spec, rapports des chantiers B et C, bilan, journal, ce document, images de référence, figures
 assets/fonts/   Questrial-Regular.ttf, NunitoSans-SemiBold.ttf, leurs licences OFL, README (sources, SHA-256)
 evo/       le code (§4)
-tests/     19 fichiers, 214 tests (§14)
+tests/     21 fichiers, 232 tests (§14)
 duel/      v2 : parties du duel (génomes, rapports, résultats, carnet), gardées octet pour octet (.gitattributes) ;
            leurs fichiers d'états (etats*.json) restent hors git
 runs/      runs d'évolution            ← hors git (.gitignore)
@@ -299,7 +300,7 @@ exports de `out/`. C'est le choix de l'utilisateur ; les exports se refont en qu
 
 | Dossier | Contenu | Config |
 |---|---|---|
-| `runs/0`, `runs/1`, `runs/2` | **runs par défaut depuis la v1.1** : chantier D, butées articulaires et du corps, mains, cône de queue de 15°, report dissipatif (run GitHub 38411711297) | `CLEAN_PROJECTION = True`, `HAND_LIMITS = True`, `TAIL_CONE_DEG = 15`, `TAIL_CURVATURE_LIMITS = False` |
+| `runs/0` à `runs/4` | **runs par défaut depuis la v1.1** : chantier D, butées articulaires et du corps, mains, cône de queue de 15°, report dissipatif (run GitHub 38411711297 pour 0 à 2 ; 38594982071 pour 3 et 4, v2) | `CLEAN_PROJECTION = True`, `HAND_LIMITS = True`, `TAIL_CONE_DEG = 15`, `TAIL_CURVATURE_LIMITS = False` |
 | `runs/butees_corps_30/0..2` | C2 à 30°, runs par défaut de la v1.0 (run GitHub 38278062446) | `BODY_LIMITS = True`, `TAIL_CONE_DEG = 30`, pas de clé du chantier D, donc False |
 | `runs/butees_articulaires/0..2` | B2, butées articulaires seules ; runs par défaut jusqu'au gel de la v1 | `JOINT_LIMITS = True`, pas de clé `BODY_LIMITS`, donc False |
 | `runs/butees_corps/0..2` | C2 avec un cône de 6°, gardé pour le rapport C2 (run GitHub 38266975229) | `BODY_LIMITS = True`, `TAIL_CONE_DEG = 6` |
@@ -429,6 +430,8 @@ gh run download <id> -D artefacts/<id>
 | `genome_json.py` | v2 : génome JSON du duel (« gecko-genome-1 ») : format, bornes, vérification avec messages, conversion vers `Genome`, schéma, exemple |
 | `essai.py` | v2 : commande `essai` (simulation observée, recoupement au bit près avec l'évaluateur batché, rapport d'essai, partie, carnet, budget) et `verifier-partie` (rejeu officiel d'une partie, intégration) |
 | `etats.py` | v2 : fichiers d'états pour le rendu (simulation à 60 images/s, en-tête, empreinte SHA-256), plateforme et commit |
+| `courbes.py` | v2 : courbes des témoins : réévaluation d'un run dans son ordre (garde-fou au bit près), hasard pur, paliers, lectures à 50 et 200, coût de calcul |
+| `graphique_courbes.py` | v2 : page HTML des courbes, une figure par manche (moyenne et bande min–max par joueur) |
 
 ### 4.2 Commandes (`main.py`)
 
@@ -455,6 +458,10 @@ python main.py genome --schema | --exemple [--manche 1|2] | --verifier FICHIER [
 python main.py essai GENOME.json --manche 1|2 [--partie DIR --hypothese "…"] [--sortie DIR]
 python main.py verifier-partie DIR [--sortie out/verification] | --integrer ARTEFACT
 python main.py replay --seed S --gen G --rank R --export-etats FICHIER.json
+python main.py genome --exemple-neutre [--manche 1|2]      # l'exemple de la fiche du joueur (ne grimpe pas)
+python main.py courbe-evolution --run-dir runs/S [--nom N] [--sortie DIR]   # sur le runner (mode analyse)
+python main.py hasard --manche 1|2 --tirage 0..4 [--sortie DIR]
+python main.py courbes-graphique DOSSIER [--sortie FICHIER.html]
 ```
 
 - `--seed` vaut 2 par défaut pour les écrans, 42 pour `train` et `graphs`.
@@ -1261,6 +1268,13 @@ Détail : `docs/chantier_d_diagnostic.md`, `docs/chantier_d.md`, journal (étape
   à jour (branche `claude/gecko-13-renommage`). Le dossier du projet et le paquet `evo/` ne sont pas renommés.
   Journal : `docs/journal_v2.md`.
 
+### GECKO-10 : témoins du duel (14 octobre 2026)
+
+- Drapeau `FROZEN_BODY` (corps figé, manche 1) ; chaque camp joue 5 fois (décision de Tom et Dorian) : 5 graines de
+  témoins à corps figé, graines 3 et 4 du moteur D, 5 tirages de hasard pur par manche.
+- Courbes recalculées sur le runner (505 000 réévaluations identiques au bit près), graphique et lectures :
+  `docs/temoins/`. Runs sauvegardés sur `sauvegarde-runs` (`e6ca06d`).
+
 ---
 
 ## 10. Décisions de l'utilisateur, à ne pas remettre en cause
@@ -1298,7 +1312,10 @@ Détail : `docs/chantier_d_diagnostic.md`, `docs/chantier_d.md`, journal (étape
 | v2 : forces | 8 forces, appliquées aux deux côtés, comme l'évolution (spec mise à jour) |
 | v2 : hauteur accrochée | jamais accrochée : hauteur à 10 s, mention « jamais accrochée » ; départage : énergie sur 10 s |
 | v2 : génome JSON | format « gecko-genome-1 » validé tel que l'exemple du plan (`genome --exemple`) |
-| v2 : joueur LLM (GECKO-11) | sa session ne doit pas pouvoir lire le code du projet |
+| v2 : joueur LLM (GECKO-11) | l'arène ne lit ni le code, ni la démonstration, ni `demo_dorian`, ni aucun génome de l'évolution ; elle accepte n'importe quel modèle d'IA ; elle enregistre les tokens de chaque essai |
+| v2 : chaque camp joue 5 fois | 5 parties par manche pour le LLM (prolongation à 200 en manche 2, pour 2 parties sur 5), 5 graines d'évolution, 5 tirages de hasard ; duel à coût égal (spec) |
+| v2 : témoins | manche 1 : évolution à corps figé (`FROZEN_BODY`), runs `runs/corps_fige/S` ; hasard pur : graines 100 à 104 (`HASARD_GRAINES`), générateur de la génération 0 |
+| v2 : exemple du génome | `genome --exemple` grimpe (+8,6 m) : jamais montré au joueur ; la fiche utilise `genome --exemple-neutre` |
 
 ---
 
@@ -1562,7 +1579,7 @@ meilleures et 50 créatures au hasard de la génération 200 :
 
 ## 14. Tests
 
-`pytest -q tests/` : 214 tests, cas paramétrés compris ; ≈ 4 à 6 min. Avec ffmpeg (ou `imageio-ffmpeg`) pour les
+`pytest -q tests/` : 232 tests, cas paramétrés compris ; ≈ 4 à 6 min. Avec ffmpeg (ou `imageio-ffmpeg`) pour les
 tests vidéo, sinon 2 sont sautés. Sur le runner (`mode=pytest`), tout passe. Sous Windows, les 3 cas de
 `test_local_runs_replay_with_their_own_flag` échouent, et c'est attendu (§3.5).
 
@@ -1583,8 +1600,10 @@ tests vidéo, sinon 2 sont sautés. Sur le runner (`mode=pytest`), tout passe. S
 | `test_body_limits.py` | 15 | butées du corps (C2) : disposition et repos, pied libre ou tenu arrêté sur l'axe, queue lancée contre le cône (2, 5, 10 m/s) sans rebond ni énergie, départ hors bornes, batché = scalaire et numba = Python avec les 22 butées, énergie sur deux grimpes, drapeau et `config.json` ; verts à 6° comme à 30° ; moteur de C2 (drapeaux du chantier D à False) |
 | `test_chantier_d.py` | 23 | moteur D : disposition des 24 butées, report dissipatif (ne crée jamais d'énergie cinétique), numba = Python, batché = scalaire au bit près avec pied, main et queue engagés, main lancée vers l'axe, queue contre le cône, départ hors bornes, énergie sur trois grimpes (seuils de la créature inerte inchangés), créatures du diagnostic, drapeaux ; courbure (écartée) : disposition et bit près |
 | `test_hauteur_accrochee.py` | 6 | v2 : hauteur accrochée scalaire = batchée au bit près (moteur D et v1 sans butées), jamais accrochée, accrochée jusqu'au bout, lâcher final, simulation inchangée |
-| `test_genome_json.py` | 12 | v2 : génome JSON (exemple, manche 1, messages d'erreur, tolérance des bornes, conversion, aller-retour, schéma, commande) |
+| `test_genome_json.py` | 15 | v2 : génome JSON (exemple, exemple neutre qui ne grimpe pas, manche 1, messages d'erreur, tolérance des bornes, conversion, aller-retour, schéma, commande) |
 | `test_essai.py` | 9 | v2 : essai (partie, carnet, rapport, plateforme, recoupement batché, empreinte, refus, bascule de plateforme, vérification et intégration) |
+| `test_corps_fige.py` | 5 | v2 : corps figé (génération 0 au corps de référence, mutation sans les longueurs, mêmes autres tirages, drapeau absent = corps libre, mini-run) |
+| `test_courbes.py` | 8 | v2 : courbes (ordre et compte des évaluations, garde-fou au bit près, générateur du hasard, 5 graines, lectures à 50 et 200, coût, graphique) |
 | `test_etats_replay.py` | 2 | v2 : `replay --export-etats` (même empreinte qu'un essai du même génome ; rejeu divergent jamais exporté) |
 | `test_tail_audit.py` | 14 | outils de C2 sur signaux construits et petit run : oscillation, étirement, pénétration et posture de la queue, verdict de repli, `--tail`, `--fallen`, `trace`, `diag-projection` (moteur rendu intact), `morpho`, `planche`, variantes du diagnostic du chantier D |
 
