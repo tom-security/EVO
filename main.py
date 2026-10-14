@@ -216,7 +216,10 @@ def main(argv=None):
     gen = sub.add_parser("genome", help="génome JSON du duel (v2) : format, bornes, exemple, vérification d'un fichier")
     what = gen.add_mutually_exclusive_group(required=True)
     what.add_argument("--schema", action="store_true", help="affiche le format, les bornes et les conventions")
-    what.add_argument("--exemple", action="store_true", help="affiche un génome complet valide")
+    what.add_argument("--exemple", action="store_true",
+                      help="affiche un génome complet valide qui grimpe (+8,6 m) : à ne jamais montrer au joueur LLM")
+    what.add_argument("--exemple-neutre", action="store_true",
+                      help="affiche un génome valide qui ne grimpe pas (repos, prises relâchées) : celui de la fiche du joueur")
     what.add_argument("--verifier", metavar="FICHIER", help="vérifie un génome JSON (toutes les erreurs d'un coup)")
     gen.add_argument("--manche", type=int, choices=(1, 2), default=2,
                      help="manche 1 : corps imposé, sans os_m ; manche 2 : génome complet (défaut)")
@@ -262,6 +265,8 @@ def main(argv=None):
             print(gj.schema_texte())
         elif args.exemple:
             print(gj.texte_json(gj.exemple(args.manche)), end="")
+        elif args.exemple_neutre:
+            print(gj.texte_json(gj.exemple_neutre(args.manche)), end="")
         else:
             try:
                 genome, _, _ = gj.charger(args.verifier, args.manche)

@@ -150,6 +150,27 @@ def test_genome_command(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out) == gj.exemple(1)
 
 
+@pytest.mark.parametrize("manche", [1, 2])
+def test_neutral_example_is_valid_and_does_not_climb(manche):
+    """L'exemple montré au joueur LLM (fiche du joueur) : valide, aucune prise, articulations au repos ; simulé, il ne
+    s'accroche jamais et tombe."""
+    data = gj.exemple_neutre(manche)
+    assert gj.verifier(data, manche) == []
+    assert all(v is False for pose in data["poses"] for v in pose["prises"].values())
+    g = gj.depuis_json(data, manche)
+    assert np.all(g.targets == 0.0)                                      # repos : aucune allure suggérée
+    np.testing.assert_array_equal(g.lengths, cr.reference_lengths())
+    c = cr.Creature(g).simulate(10.0)
+    assert not c.hung and c.fallen
+    assert c.hang_height() == c.height() < 0.0
+
+
+def test_schema_points_to_the_neutral_example_only():
+    text = gj.schema_texte()
+    assert "--exemple-neutre" in text and "genome --exemple\n" not in text + "\n"
+    assert gj.exemple_neutre(2) != gj.exemple(2)
+
+
 def test_example_json_is_written_with_radians_from_degrees():
     g = gj.depuis_json(gj.exemple(2), 2)
     assert g.targets[0, 0] == math.radians(-40 - 45)       # épaule gauche, pose 1 : α −40°, repos 45°

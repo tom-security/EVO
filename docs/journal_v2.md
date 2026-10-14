@@ -146,3 +146,24 @@ change pas leur hauteur. Empreintes : `16fd76e9…`, `a8fa12da…`, `431461d3…
 **Fin de GECKO-9** : les 4 points sont faits, aucun rejeu n'a divergé. Rien n'est fusionné sur `main` ; arrêt pour
 validation. Suite (spec, étape 5) : fiche du joueur, témoins (évolution à corps figé, hasard pur), parties ; GECKO-11 :
 la session du joueur ne doit pas pouvoir lire le code.
+
+## Étape 5 : GECKO-9 validé ; décisions de Tom
+
+1. `main` avancée sur `claude/gecko-9-outils-duel` (`8f5bfb9`).
+2. Partie de démonstration gardée, déplacée de `duel/demo_outils` vers `duel/demonstration/demo_outils` (sous `duel/`,
+   le mode `verification` du workflow l'accepte toujours) ; les étapes précédentes de ce journal citent l'ancien chemin.
+3. L'exemple `genome --exemple` grimpe (+8,6 m) : il ne doit jamais être montré au joueur LLM. Nouvelle option
+   `genome --exemple-neutre` (articulations au repos, toutes les prises relâchées, forces égales, horloge de 1 s, corps
+   de référence) : valide, ne s'accroche jamais et tombe (test) ; le schéma renvoie vers lui. Il servira pour la fiche
+   du joueur.
+4. **Exigences de GECKO-11** (rien à coder maintenant) :
+   - la session du joueur LLM ne doit pouvoir lire ni le code du projet, ni la partie de démonstration
+     (`duel/demonstration/`), ni le dossier `demo_dorian/`, ni aucun génome issu de l'évolution (runs, champions,
+     fichiers d'états de l'évolution) ;
+   - l'arène doit accepter n'importe quel modèle d'IA, pas seulement Claude, pour servir de banc de test à chaque
+     nouveau modèle.
+
+Puis GECKO-10 en autonomie, sur `claude/gecko-10-temoins` : évolution témoin à corps figé (manche 1), courbes de
+l'évolution en hauteur accrochée, hasard pur (2 manches), sauvegarde des runs témoins. Arrêt si un test échoue, si un
+rejeu n'est plus identique au bit près, si de l'énergie est créée hors muscles ou si un champion témoin passe sous
+20 m ; sinon arrêt et rapport à la fin, avec les courbes des trois joueurs par manche.

@@ -251,6 +251,21 @@ def exemple(manche=2):
     return data
 
 
+def exemple_neutre(manche=2):
+    """Génome d'exemple neutre, montrable au joueur LLM : valide, mais il ne grimpe pas et ne révèle aucune allure.
+    Toutes les articulations visent leur angle de repos dans les 4 poses, toutes les prises sont relâchées (le lézard
+    tombe), forces moyennes égales, horloge de 1 s, corps de référence. (`exemple()` grimpe : ne jamais le montrer.)"""
+    rest = rest_angles()
+    pose = {"angles_deg": {side: {key: rest[key] for key, _, _, _ in ARTICULATIONS} for side in COTES},
+            "prises": {key: False for key, _ in PRISES}}
+    data = {"format": FORMAT, "periode_s": 1.0}
+    if manche == 2:
+        data["os_m"] = {key: b[1] for key, b in bornes()["os_m"].items()}
+    data["forces"] = {key: 0.8 for key in FORCE_KEYS}
+    data["poses"] = [json.loads(json.dumps(pose)) for _ in range(N_POSES)]
+    return data
+
+
 def texte_json(data):
     """Génome JSON mis en page : une pose par bloc, lisible par un humain."""
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
@@ -298,5 +313,6 @@ def schema_texte():
     lines += ["  prises.<patte> : true si la patte tient le tronc dans cette pose, false si elle est libre ;",
               "    pattes : " + ", ".join(f"{k} ({label})" for k, label in PRISES) + ".",
               "",
-              "Exemple complet : python main.py genome --exemple"]
+              "Exemple complet, valide mais qui ne grimpe pas (articulations au repos, toutes les prises relâchées) :",
+              "python main.py genome --exemple-neutre [--manche 1|2]"]
     return "\n".join(lines)
