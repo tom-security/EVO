@@ -28,4 +28,16 @@ fichier fourni : rien à commiter.
 - non renommés : le dossier local, le paquet `evo/` et ses modules (les `config.json` des runs en dépendent),
   l'historique et les rapports passés.
 
-**Vérifications** : push, `pytest` et `reproductibilite` sur le runner (ci-dessous).
+**Vérifications** (commit `d29b267`, dépôt déjà renommé) :
+- push vers `tom-security/Gecko` : OK (git authentifié par `gh auth login`) ;
+- `pytest` sur le runner : **185 passent**, 0 échec, avec les runs de référence restaurés (run 38541628281) ;
+- `reproductibilite` : les 9 champions de la gén. 200 (D, C2 à 30°, B2) et les 9 créatures n°0 de la gén. 0
+  rejoués à l'identique (run 38541631664, 1 min 47 s).
+
+**Reste à décider par Tom** : avance rapide de `main` sur `claude/gecko-13-renommage`.
+
+## Étape 2 : GECKO-9, outils du duel : plan (rien n'est codé)
+
+Mesure de préparation, en lecture seule : les génomes des runs D (entraînés sur le runner) réévalués sous Windows
+par l'évaluateur batché (`out/mesures_v2/ecart_plateforme.py`, hors git), contre les hauteurs stockées. Chiffres dans le
+plan présenté à Tom.
