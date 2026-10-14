@@ -254,7 +254,17 @@ def main(argv=None):
     has.add_argument("--tirage", type=int, choices=(0, 1, 2), required=True, help="tirage (graine HASARD_GRAINES[k])")
     has.add_argument("--sortie", default="out/courbes", help="dossier des sorties")
 
+    gra = sub.add_parser("courbes-graphique",
+                         help="v2 : page HTML des courbes des joueurs, une figure par manche (résumés de courbe-evolution "
+                              "et hasard)")
+    gra.add_argument("dossier", help="dossier des *_resume.json (cherchés récursivement)")
+    gra.add_argument("--sortie", default="out/courbes/courbes.html", help="page HTML écrite")
+
     args = parser.parse_args(argv)
+    if args.command == "courbes-graphique":
+        from evo import graphique_courbes
+        print(graphique_courbes.graphique(args.dossier, args.sortie))
+        return
     if args.command == "courbe-evolution":
         from evo import courbes
         courbes.courbe_evolution(args.run_dir, args.sortie, nom=args.nom)
