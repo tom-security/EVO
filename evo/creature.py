@@ -193,6 +193,8 @@ def random_genome(rng, n_poses=None):
     """Génome aléatoire de la génération 0, avec les plages d'init du §2.5."""
     k = config.N_POSES if n_poses is None else n_poses
     lengths = reference_lengths() * rng.uniform(*config.LENGTH_FACTOR_RANGE, size=len(BONE_NAMES))
+    if config.FROZEN_BODY:  # corps figé (v2, manche 1) : tirage fait puis écarté, corps de référence
+        lengths = reference_lengths()
     if config.SYMMETRIC_MORPHOLOGY:
         half = rng.uniform(0.0, config.S_MAX, size=(4, 2))
         strengths = np.stack([half, half])

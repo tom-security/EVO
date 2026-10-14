@@ -93,6 +93,8 @@ def mutate(parents, rng):
     lo, hi = config.LENGTH_FACTOR_RANGE
     ref = cr.reference_lengths()
     lengths = _mutate_values(parents.lengths, frac * ref * (hi - lo), ref * lo, ref * hi, rng)
+    if config.FROZEN_BODY:  # corps figé (v2, manche 1) : tirages faits puis écartés, longueurs des parents gardées
+        lengths = parents.lengths.copy()
 
     if config.SYMMETRIC_MORPHOLOGY:  # une seule moitié mutée, recopiée de l'autre côté
         half = _mutate_values(parents.strengths[:, 0], frac * config.S_MAX, 0.0, config.S_MAX, rng)
@@ -232,7 +234,7 @@ def saved_generations(run_dir):
 # Valeur d'une clé absente de la config d'un run : celle d'avant son introduction (les runs d'avant les butées
 # articulaires se rejouent sans elles).
 LEGACY_DEFAULTS = {"JOINT_LIMITS": False, "BODY_LIMITS": False, "CLEAN_PROJECTION": False,
-                   "TAIL_CURVATURE_LIMITS": False, "HAND_LIMITS": False}
+                   "TAIL_CURVATURE_LIMITS": False, "HAND_LIMITS": False, "FROZEN_BODY": False}
 
 
 def run_config(run_dir):

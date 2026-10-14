@@ -677,3 +677,8 @@ DUEL_PLATEFORME_OFFICIELLE = "runner"
 DUEL_BUDGET_ANNONCE = 50      # [CHOIX] spec v2 — essais annoncés par partie ; le résultat annoncé est celui-ci
 DUEL_BUDGET_MAX = 200         # [CHOIX] spec v2 — prolongation jusqu'à 200 essais, pour voir si le LLM plafonne
 DUEL_TRAJECTOIRE_PAS_S = 0.5  # [CHOIX] spec v2 — rapport d'essai : hauteur du torse toutes les 0,5 s
+# [CHOIX] spec v2, manche 1 (GECKO-10) — évolution témoin à corps figé : longueurs des os fixées aux valeurs de référence
+# (creature.reference_lengths()), jamais mutées. Les tirages aléatoires des longueurs restent faits puis écartés : à
+# graine égale, les autres gènes suivent les mêmes tirages qu'un run à corps libre. Absent de la config d'un run :
+# False (evolution.LEGACY_DEFAULTS), les runs existants se rejouent et se reprennent tels quels.
+FROZEN_BODY = False
