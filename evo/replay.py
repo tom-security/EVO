@@ -85,9 +85,28 @@ class Replay:
             for _ in range(config.SUBSTEPS):
                 c.substep(H)
             record(f)
+        self.creature = c       # créature finale : hauteur accrochée, os (fichier d'états, v2)
         self.height_replay = c.height()
         self.error = abs(self.height_replay - self.stored["height"])
         self.ok = self.error <= 1e-9
+
+    def export_etats(self, path):
+        """Fichier d'états (v2, evo/etats.py) du rejeu, si la hauteur rejouée est la hauteur stockée ; renvoie
+        l'empreinte. Un rejeu qui diverge n'est jamais exporté : ce ne serait pas ce que le run a simulé."""
+        from evo import etats
+        from evo import genome_json as gj
+        if not self.ok:
+            raise RuntimeError(f"rejeu divergent ({self.error:.3g} m) : états non exportés")
+        try:
+            genome = gj.vers_json(self.genome, 2)
+        except ValueError:
+            genome = None
+        source = {"type": "evolution", "run": os.path.normpath(self.run_dir).replace(os.sep, "/"), "generation": self.gen,
+                  "indice": self.index, "rang": self.rank, "hauteur_stockee": self.stored["height"]}
+        imgs = etats.images(self.t, self.pos, self.held, self.activation, self.height, self.energy)
+        head = etats.entete(source, self.creature, genome_json=genome, graine=self.seed,
+                            resultat=etats.resultat_creature(self.creature))
+        return etats.ecrire(path, head, imgs)
 
     @property
     def n_frames(self):

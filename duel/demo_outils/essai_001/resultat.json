@@ -1,0 +1,380 @@
+{
+ "format": "gecko-resultat-1",
+ "partie": "demo_outils",
+ "essai": 1,
+ "manche": 2,
+ "horodatage": "2026-10-14T12:11:10+02:00",
+ "genome_sha256": "afb7173e2905dc2fef741450467e517d51b7679c41c203ab8484077ac6a4e3d1",
+ "plateforme": {
+  "id": "windows",
+  "libelle": "Windows (PC)",
+  "officielle": false,
+  "plateforme_officielle": "runner",
+  "systeme": "Windows-10-10.0.26300-SP0",
+  "python": "3.11.9",
+  "numpy": "2.4.6",
+  "numba": "0.67.0"
+ },
+ "officiel": false,
+ "commit": {
+  "hash": "b5e77d3cd410b0d844cf13d24285138aeb84291e",
+  "modifie": true
+ },
+ "resultat": {
+  "hauteur_accrochee": 8.602622610700365,
+  "jamais_accrochee": false,
+  "instant_derniere_prise": 9.999999999999593,
+  "hauteur_10s": 8.602622610700365,
+  "energie": 24.02003950742118,
+  "masse_musculaire": 15.600000000000001,
+  "tombee": false,
+  "instant_chute": null,
+  "points_chute": []
+ },
+ "mesures": {
+  "trajectoire": [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    0.49999999999999883,
+    0.12628478475951432
+   ],
+   [
+    0.9999999999999971,
+    0.5618700057470427
+   ],
+   [
+    1.500000000000022,
+    0.9945818887916982
+   ],
+   [
+    2.0000000000000466,
+    1.2673221160529486
+   ],
+   [
+    2.500000000000018,
+    1.6066217967457117
+   ],
+   [
+    2.99999999999999,
+    2.0524800762739517
+   ],
+   [
+    3.4999999999999614,
+    2.5720038101983143
+   ],
+   [
+    3.999999999999933,
+    3.090754007296404
+   ],
+   [
+    4.499999999999905,
+    3.545985075286211
+   ],
+   [
+    4.9999999999998765,
+    3.914645905685326
+   ],
+   [
+    5.499999999999848,
+    4.286237250973143
+   ],
+   [
+    5.99999999999982,
+    4.818634619332311
+   ],
+   [
+    6.499999999999791,
+    5.349893523363011
+   ],
+   [
+    6.999999999999763,
+    5.934300160016392
+   ],
+   [
+    7.499999999999734,
+    6.350378701748728
+   ],
+   [
+    7.999999999999706,
+    6.639365903399963
+   ],
+   [
+    8.499999999999678,
+    7.154397197713081
+   ],
+   [
+    8.99999999999965,
+    7.507172832454213
+   ],
+   [
+    9.499999999999622,
+    8.205200452507217
+   ],
+   [
+    9.999999999999593,
+    8.602622610700365
+   ]
+  ],
+  "chute": null,
+  "prises": [
+   {
+    "pose": 1,
+    "jouee": 9,
+    "pattes": [
+     {
+      "patte": "main G",
+      "demandee": true,
+      "tenue": 9,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "main D",
+      "demandee": false,
+      "tenue": 0,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "pied G",
+      "demandee": false,
+      "tenue": 0,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "pied D",
+      "demandee": true,
+      "tenue": 9,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     }
+    ]
+   },
+   {
+    "pose": 2,
+    "jouee": 9,
+    "pattes": [
+     {
+      "patte": "main G",
+      "demandee": true,
+      "tenue": 9,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "main D",
+      "demandee": true,
+      "tenue": 9,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "pied G",
+      "demandee": true,
+      "tenue": 9,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "pied D",
+      "demandee": true,
+      "tenue": 9,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     }
+    ]
+   },
+   {
+    "pose": 3,
+    "jouee": 8,
+    "pattes": [
+     {
+      "patte": "main G",
+      "demandee": false,
+      "tenue": 0,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "main D",
+      "demandee": true,
+      "tenue": 8,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "pied G",
+      "demandee": true,
+      "tenue": 8,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "pied D",
+      "demandee": false,
+      "tenue": 0,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     }
+    ]
+   },
+   {
+    "pose": 4,
+    "jouee": 8,
+    "pattes": [
+     {
+      "patte": "main G",
+      "demandee": true,
+      "tenue": 8,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "main D",
+      "demandee": true,
+      "tenue": 8,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "pied G",
+      "demandee": true,
+      "tenue": 8,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     },
+     {
+      "patte": "pied D",
+      "demandee": true,
+      "tenue": 8,
+      "hors_du_tronc": 0,
+      "tombee": 0,
+      "depassement_max_m": 0.0
+     }
+    ]
+   }
+  ],
+  "articulations": [
+   {
+    "articulation": "épaule G",
+    "angle": "α",
+    "butees": [
+     -60.0,
+     90.0
+    ],
+    "min": 8.42283754744738,
+    "max": 63.4768781018641,
+    "en_butee": 0.0
+   },
+   {
+    "articulation": "coude G",
+    "angle": "β",
+    "butees": [
+     0.0,
+     140.0
+    ],
+    "min": 29.833844549593042,
+    "max": 81.11699078683546,
+    "en_butee": 0.0
+   },
+   {
+    "articulation": "hanche G",
+    "angle": "α",
+    "butees": [
+     -80.0,
+     75.0
+    ],
+    "min": -44.99279383814295,
+    "max": 3.8638592549736077,
+    "en_butee": 0.0
+   },
+   {
+    "articulation": "genou G",
+    "angle": "β",
+    "butees": [
+     0.0,
+     140.0
+    ],
+    "min": 23.64591588161973,
+    "max": 80.97247328097144,
+    "en_butee": 0.0
+   },
+   {
+    "articulation": "épaule D",
+    "angle": "α",
+    "butees": [
+     -60.0,
+     90.0
+    ],
+    "min": 10.07186776725278,
+    "max": 62.91543612592256,
+    "en_butee": 0.0
+   },
+   {
+    "articulation": "coude D",
+    "angle": "β",
+    "butees": [
+     0.0,
+     140.0
+    ],
+    "min": 26.530132399959196,
+    "max": 96.94926657430997,
+    "en_butee": 0.0
+   },
+   {
+    "articulation": "hanche D",
+    "angle": "α",
+    "butees": [
+     -80.0,
+     75.0
+    ],
+    "min": -52.7084784182971,
+    "max": -19.80280000850457,
+    "en_butee": 0.0
+   },
+   {
+    "articulation": "genou D",
+    "angle": "β",
+    "butees": [
+     0.0,
+     140.0
+    ],
+    "min": 7.2921029831422315,
+    "max": 74.14521837451967,
+    "en_butee": 0.0
+   }
+  ],
+  "corps": {
+   "autre_cote_de_l_axe": 0.0,
+   "autre_cote_par_patte": {
+    "main G": 0.0,
+    "main D": 0.0,
+    "pied G": 0.0,
+    "pied D": 0.0
+   },
+   "jambe_sur_queue": 0.0,
+   "jambe_sur_queue_pied_tenu": null
+  }
+ },
+ "empreinte_etats": "sha256:6f3afb6785a89e783d69ea47ca5a7389f045569be4fff95e10bf735b352a2b02",
+ "verification": null
+}

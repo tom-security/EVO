@@ -38,6 +38,7 @@
     python main.py essai genome.json --manche 2 --partie duel/m2/P1 --hypothese "…"   # un essai du duel (v2)
     python main.py verifier-partie duel/m2/P1 [--sortie out/verification]   # rejeu officiel d'une partie (runner)
     python main.py verifier-partie duel/m2/P1 --integrer artefacts/<id>     # reporte la vérification dans la partie
+    python main.py replay --seed 2 --gen 200 --rank 1 --export-etats out/etats/champion_g2.json   # états (v2)
 """
 import argparse
 
@@ -161,6 +162,8 @@ def main(argv=None):
     replay.add_argument("--no-cache", action="store_true", help="régénère le décor au lieu de relire le cache")
     replay.add_argument("--fps-report", action="store_true",
                         help="joue le replay une fois à vitesse normale puis affiche le fps moyen et minimum")
+    replay.add_argument("--export-etats", metavar="JSON",
+                        help="fichier d'états du rejeu pour le rendu (v2) ; refusé si le rejeu n'est pas identique au run")
 
     analyze = sub.add_parser("analyze", help="mode analyse biomécanique : zoom, muscles + os, % (§7.4)")
     analyze.add_argument("--seed", type=int, default=2, help="graine du run (défaut : 2, run de référence)")
@@ -334,6 +337,12 @@ def main(argv=None):
         run_dir = args.run_dir or evolution.run_dir_for(args.seed)
         index = None if args.creature is None else args.creature - 1
         r = rp.Replay(run_dir, gen=args.gen, rank=args.rank, index=index)
+        if args.export_etats:
+            if not r.ok:
+                print("ALERTE : la hauteur rejouée diffère de la hauteur stockée ; états non exportés")
+                sys.exit(1)
+            print(f"{args.export_etats} : empreinte {r.export_etats(args.export_etats)}, hauteur accrochée "
+                  f"{r.creature.hang_height():+.9f} m" + ("" if r.creature.hung else " (jamais accrochée)"))
         if args.export:
             paths, _ = rp.export(r, args.export, use_cache=not args.no_cache, subtitle=args.title_card)
             for path in paths:
@@ -342,7 +351,7 @@ def main(argv=None):
             from evo import video
             video.record_view(lambda: rp.JungleView(r, use_cache=not args.no_cache, subtitle=args.title_card), r,
                               args.export_video, speed=args.speed, slow=args.slow)
-        if not (args.export or args.export_video):
+        if not (args.export or args.export_video or args.export_etats):
             rp.run_interactive(r, use_cache=not args.no_cache, fps_report=args.fps_report, speed=args.speed,
                                subtitle=args.title_card, slow=args.slow)
         if not r.ok:

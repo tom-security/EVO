@@ -1,0 +1,37 @@
+Rapport d'essai : partie demo_outils, essai 3 (manche 2)
+Plateforme : Windows (PC), non officielle ; les chiffres officiels viennent du rejeu de la partie sur la plateforme officielle (runner GitHub (ubuntu-24.04)).
+Écart avec la plateforme officielle : pas encore connu (vérification de la partie à venir).
+
+1. Résultat
+- Hauteur accrochée : −8,78 m (jamais accrochée : hauteur à 10 s)
+- Hauteur à 10 s : −8,78 m
+- Énergie dépensée sur 10 s : 16,79
+- Masse musculaire : 15,60
+
+2. Trajectoire (hauteur du centre du torse, m)
+   0,0 s : +0,00 | 0,5 s : −1,29 | 1,0 s : −4,96 | 1,5 s : −8,22 | 2,0 s : −8,27 | 2,5 s : −8,45 | 3,0 s : −9,05
+   3,5 s : −8,77 | 4,0 s : −8,77 | 4,5 s : −8,15 | 5,0 s : −8,44 | 5,5 s : −8,78 | 6,0 s : −8,69 | 6,5 s : −8,84
+   7,0 s : −8,69 | 7,5 s : −8,80 | 8,0 s : −8,68 | 8,5 s : −8,58 | 9,0 s : −8,75 | 9,5 s : −8,49 | 10,0 s : −8,78
+
+3. Chute
+- À 1,13 s : pied G touche le sol.
+
+4. Prises (au début de chaque pose : tenue, échouée hors du tronc, ou impossible après la chute)
+- Pose 1 (jouée 9 fois) : main G libre ; main D libre ; pied G libre ; pied D libre.
+- Pose 2 (jouée 9 fois) : main G libre ; main D libre ; pied G libre ; pied D libre.
+- Pose 3 (jouée 8 fois) : main G libre ; main D libre ; pied G libre ; pied D libre.
+- Pose 4 (jouée 8 fois) : main G libre ; main D libre ; pied G libre ; pied D libre.
+
+5. Articulations (angle anatomique parcouru, en degrés ; part du temps à moins de 2° d'une butée)
+- épaule G (α, butées −60 / 90) : −60,0 à +55,3 ; en butée 1,3 %
+- coude G (β, butées 0 / 140) : +32,4 à +66,8 ; en butée 0,0 %
+- hanche G (α, butées −80 / 75) : −57,2 à +49,2 ; en butée 0,0 %
+- genou G (β, butées 0 / 140) : +23,4 à +87,6 ; en butée 0,0 %
+- épaule D (α, butées −60 / 90) : −36,1 à +67,9 ; en butée 0,0 %
+- coude D (β, butées 0 / 140) : +30,5 à +66,3 ; en butée 0,0 %
+- hanche D (α, butées −80 / 75) : −58,6 à +75,0 ; en butée 5,8 %
+- genou D (β, butées 0 / 140) : −0,0 à +83,8 ; en butée 5,5 %
+
+6. Corps
+- Main ou pied de l'autre côté de l'axe du corps : 0,0 % du temps (main G 0,0 %, main D 0,0 %, pied G 0,0 %, pied D 0,0 %).
+- Jambe qui croise la queue (vue de dessus) : 0,0 % du temps par jambe.

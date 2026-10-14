@@ -1,0 +1,113 @@
+{
+  "format": "gecko-genome-1",
+  "periode_s": 2.0,
+  "os_m": {
+    "colonne": 3.15,
+    "clavicule": 0.84,
+    "humerus": 1.54,
+    "avant_bras": 1.4,
+    "demi_bassin": 0.7,
+    "femur": 1.68,
+    "tibia": 1.4
+  },
+  "forces": {
+    "deltoide": 0.8,
+    "grand_dorsal": 1.4,
+    "biceps": 1.0,
+    "triceps": 0.6,
+    "flechisseurs_hanche": 0.8,
+    "fessiers": 1.4,
+    "ischios": 0.6,
+    "quadriceps": 1.2
+  },
+  "poses": [
+    {
+      "angles_deg": {
+        "gauche": {
+          "epaule": -40,
+          "coude": 70,
+          "hanche": 60,
+          "genou": 90
+        },
+        "droite": {
+          "epaule": 70,
+          "coude": 30,
+          "hanche": -60,
+          "genou": 20
+        }
+      },
+      "prises": {
+        "main_g": true,
+        "main_d": false,
+        "pied_g": false,
+        "pied_d": true
+      }
+    },
+    {
+      "angles_deg": {
+        "gauche": {
+          "epaule": -40,
+          "coude": 70,
+          "hanche": 60,
+          "genou": 90
+        },
+        "droite": {
+          "epaule": 70,
+          "coude": 30,
+          "hanche": -60,
+          "genou": 20
+        }
+      },
+      "prises": {
+        "main_g": true,
+        "main_d": true,
+        "pied_g": true,
+        "pied_d": true
+      }
+    },
+    {
+      "angles_deg": {
+        "gauche": {
+          "epaule": 70,
+          "coude": 30,
+          "hanche": -60,
+          "genou": 20
+        },
+        "droite": {
+          "epaule": -40,
+          "coude": 70,
+          "hanche": 60,
+          "genou": 90
+        }
+      },
+      "prises": {
+        "main_g": false,
+        "main_d": true,
+        "pied_g": true,
+        "pied_d": false
+      }
+    },
+    {
+      "angles_deg": {
+        "gauche": {
+          "epaule": 70,
+          "coude": 30,
+          "hanche": -60,
+          "genou": 20
+        },
+        "droite": {
+          "epaule": -40,
+          "coude": 70,
+          "hanche": 60,
+          "genou": 90
+        }
+      },
+      "prises": {
+        "main_g": false,
+        "main_d": false,
+        "pied_g": false,
+        "pied_d": false
+      }
+    }
+  ]
+}
