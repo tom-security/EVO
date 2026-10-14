@@ -163,6 +163,19 @@ la session du joueur ne doit pas pouvoir lire le code.
    - l'arène doit accepter n'importe quel modèle d'IA, pas seulement Claude, pour servir de banc de test à chaque
      nouveau modèle.
 
+**Changement de règle (Tom et Dorian, en cours de GECKO-10, avant toute partie)** : chaque camp joue 5 fois.
+- évolution témoin à corps figé : 5 graines (0 à 2 déjà lancées, 3 et 4 ajoutées sans relancer les autres) ;
+- évolution normale (moteur D) : graines 3 et 4 entraînées avec le moteur D actuel (config identique à celle des runs 0
+  à 2, hors nouvelles clés de la v2 ; `AUDIT_EVERY = 10` comme eux), sauvegardées sur `sauvegarde-runs` ;
+- hasard pur : 5 tirages de 200 génomes par manche (graines 100 à 104), courbes lues à 50 et à 200 essais ;
+- coût : temps de calcul réellement consommé par chaque camp, noté pour le duel à coût égal ;
+- spec mise à jour : 5 parties par manche pour le LLM, 5 tirages, 5 graines ; prolongation à 200 seulement en manche 2,
+  pour 2 parties sur 5 (désignées avant de jouer) ; section « Duel à coût égal » (tokens au tarif public de l'API,
+  temps de calcul au tarif public d'une machine équivalente au runner, tarifs relevés et datés avant de jouer) ;
+- **exigence de plus pour GECKO-11** : l'arène enregistre les tokens consommés à chaque essai (entrée, sortie, cache),
+  avec le modèle et sa version. À régler aussi dans l'arène : le budget de chaque partie (50 en manche 1 ; 50 ou 200 en
+  manche 2) ; la commande `essai` borne aujourd'hui toutes les parties à 200.
+
 Puis GECKO-10 en autonomie, sur `claude/gecko-10-temoins` : évolution témoin à corps figé (manche 1), courbes de
 l'évolution en hauteur accrochée, hasard pur (2 manches), sauvegarde des runs témoins. Arrêt si un test échoue, si un
 rejeu n'est plus identique au bit près, si de l'énergie est créée hors muscles ou si un champion témoin passe sous
