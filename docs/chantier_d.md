@@ -1,6 +1,9 @@
 # Chantier D : projection propre (étapes 3 et 4)
 
-Diagnostic : `docs/chantier_d_diagnostic.md`. Branche `claude/chantier-d`. Rien n'est fusionné sur `main`.
+Diagnostic : `docs/chantier_d_diagnostic.md`. Branche `claude/chantier-d`, fusionnée sur `main` (tag `v1.1`).
+
+> **Chemins** : ce rapport cite les chemins du chantier. Depuis la v1.1, les runs D (`runs/chantier_d/S`) sont les
+> runs par défaut, `runs/S`, et les runs C2 à 30° (`runs/S` pendant le chantier) sont dans `runs/butees_corps_30/S`.
 
 ## 1. Le moteur D
 
@@ -219,12 +222,39 @@ parenthèses) :
 - **Le résidu jambe–queue de la graine 2 augmente** : 23,4 % du temps, sur 100 % de ses 50 meilleures. C'est le tibia
   qui croise la queue, que le cône de 15° garde plus près des jambes. B2 était à 50,1 %, C2 à 6° à 0 %.
 
-## 7. Points ouverts pour Tom
+## 7. Croisement jambe–queue : pied tenu ou pied levé
 
-1. **Graine 0 plus basse** : 30,9 m au lieu de 39,5 m, sous la vidéo (36 m). C'est l'effet direct de la butée des mains.
-2. **Résidu jambe–queue de la graine 2** : 23,4 % à 15°. Décision du bilan v1 (n°1) toujours ouverte : collision ciblée
-   tibia–queue, ou rien.
-3. **Sauvegarde des runs D** : les artefacts expirent le 12 novembre 2026. Les runs ne sont ni sur `sauvegarde-runs` ni
-   sur `main` (pas sans décision).
-4. **Fusion sur `main`** et runs D comme runs par défaut : à décider.
-5. Le score « hauteur à 10 s » (créature n°677), consigné pour la v2 (`docs/chantier_d_diagnostic.md` §6).
+`joints --crossings` mesure maintenant, pour chaque instant où une jambe (fémur ou tibia) croise un segment de la
+queue en vue de dessus, si le pied de cette jambe est tenu (run 38424970175, gén. 200) :
+
+| Run | Groupe | Jambe sur la queue (part du temps) | Pied tenu | Pied levé |
+|---|---|---|---|---|
+| D, graine 2 | 50 meilleures | 23,4 % (100 % des grimpes au-delà de 5 %) | 16,2 % | 83,8 % |
+| D, graine 2 | 50 au hasard | 25,4 % | 21,5 % | 78,5 % |
+| D, graine 1 | 50 meilleures / au hasard | 0 % / 0 % | — | — |
+| C2 à 30°, graine 2 | 50 meilleures | 7,5 % | 5,2 % | 94,8 % |
+| C2 à 30°, graine 1 | 50 meilleures | 6,8 % | 64,7 % | 35,3 % |
+
+- Chez D, le croisement se fait surtout **pied levé** (84 %) : la jambe passe au-dessus de la queue en l'air, pendant
+  le retour de la patte.
+- Pied tenu (16 %), la patte est posée sur le mur par-dessus la queue.
+- **Décision de Tom : pas de collision.** En vue de dessus, une patte qui croise la queue passe au-dessus d'elle :
+  c'est de la profondeur, pas une interpénétration. Noté dans les écarts connus (PASSATION §11).
+
+## 8. Décisions de Tom et v1.1
+
+1. **Graine 0 à 30,9 m : accepté**, effet attendu de la butée des mains ; noté dans les écarts connus.
+2. **Croisement jambe–queue : pas de collision** (§7).
+3. **Sauvegarde** :
+   - archives `runs_chantier_d_S.tar.gz` sur `sauvegarde-runs` (commit `28d7440`, en avance rapide), SHA-256 dans
+     le README de la branche ;
+   - restauration vérifiée sur un clone neuf depuis GitHub : 12 SHA-256 conformes, et les 615 fichiers des runs D sont
+     identiques octet par octet aux runs locaux.
+4. **Runs D par défaut** :
+   - `runs/S` = D, et C2 à 30° dans `runs/butees_corps_30/S` ;
+   - test des runs locaux, cas du diagnostic, `restaurer_runs.sh` et workflow (`reproductibilite` et garde-fou de
+     `analyse` : D, C2 à 30° et B2) mis à jour ;
+   - sur la branche : `pytest` 185 passent (38425730531), et `reproductibilite` rejoue les 9 champions à
+     l'identique (38425744067).
+
+   Puis avance rapide de `main`, `pytest` sur le runner, tag `v1.1` (journal, étape 15).

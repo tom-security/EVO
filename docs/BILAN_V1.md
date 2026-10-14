@@ -17,6 +17,20 @@ et quelles décisions attendent l'utilisateur, avec des propositions qui ne sont
 >
 > Le reste de ce document est l'état d'avant le gel.
 
+> **v1.1, chantier D fait les 13 et 14 octobre 2026** (validé par l'utilisateur ; `docs/chantier_d_diagnostic.md`,
+> `docs/chantier_d.md`, PASSATION §9 à §12) :
+> - moteur D : report dissipatif de la projection (b), butées des mains, cône de queue de 15° ; la courbure de queue
+>   (d) a été explorée puis écartée (énergie de la créature inerte), son code reste derrière son drapeau (False) ;
+> - réentraînement des 3 graines : champions 30,9 / 40,9 / 43,6 m ; 0 J créé hors muscles dans les 63 audits ;
+>   créatures tombées : 0 au-delà de 5 cm (C2 : 10, jusqu'à 68 cm) ;
+> - mains et bras de la graine 0 réglés (0 % de l'autre côté de l'axe, contre 91,4 %) ; queue à 15° de l'axe ;
+> - décisions : graine 0 à 30,9 m acceptée ; croisement jambe–queue (graine 2 : 23,4 %) sans collision, car en vue
+>   de dessus la patte passe au-dessus de la queue (point 1 du §5 réglé) ;
+> - runs D par défaut (`runs/S`), C2 à 30° dans `runs/butees_corps_30/S` ; runs D sauvegardés sur
+>   `sauvegarde-runs` ; `main` avancée, tag `v1.1`.
+>
+> Les §4 et §5 ci-dessous gardent l'état d'avant le chantier D, annoté.
+
 **État au 13 octobre 2026, avant le gel** :
 
 | Branche | Commit | Contenu |
@@ -114,7 +128,10 @@ de 5 générations, pénétration des butées ≤ 0,03°.
 **Coût** : avec les 14 butées du corps, l'évaluation coûte ×2,2 (26 s contre 12 s par génération sur le PC,
 18 à 44 min par graine sur le runner).
 
-## 4. Chantier D proposé : « projection propre » (préalable à la v2, rien n'est appliqué)
+## 4. Chantier D : « projection propre » (proposé au gel ; fait depuis, v1.1)
+
+> Fait : voir `docs/chantier_d.md`. Le correctif retenu est le report dissipatif, et non `vitesse_proj` (§4.2), qui
+> créait lui-même de l'énergie (n°808, expliqué par la singularité du cône dans `docs/chantier_d_diagnostic.md`).
 
 ### 4.1 Le problème
 
@@ -197,13 +214,14 @@ fausser une comparaison LLM contre évolution.
 ## 5. Décisions qui attendent l'utilisateur
 
 1. **Le résidu jambe–queue** des graines 1 et 2 à 30° (6,8 et 7,5 % du temps ; B2 : 72 et 50 %) : collision ciblée
-   tibia–queue, ou rien.
+   tibia–queue, ou rien. *Tranché au chantier D : pas de collision (la patte passe au-dessus de la queue).*
 2. **Le jugement visuel de la queue à 30°**. Elle est tenue dans le cône et courbée de 13 à 16° (médiane), soit 24 à
    28° d'écart à l'axe, contre une queue droite à 1,7 à 5,7° dans la vidéo.
    - Planche : `docs/chantier_c_c2/queue_pieds_avant_apres.png` ; version avec l'image 11 :
      `out/chantierC/planches/queue_pieds_contre_image11.png` (hors git).
    - À 6°, la queue était droite, mais ce cône a déclenché le repli (§3 du rapport C2).
-3. **Le chantier D** (§4) : à faire avant la v2, pendant, ou pas.
+   - *Chantier D : cône de 15°, queue à 15° de l'axe ; toujours un écart connu.*
+3. **Le chantier D** (§4) : à faire avant la v2, pendant, ou pas. *Fait (v1.1).*
 4. **Les écarts de calibration** (§3) : à reprendre pour la v1, ou à laisser en l'état pour la v2.
 5. **Les courbes au style vidéo du §7.3**, seule mise en forme manquante de la spec.
 6. **`docs/reference/`** : les 40 captures de la vidéo de Code BH sont versionnées dans le dépôt public depuis le
@@ -211,7 +229,7 @@ fausser une comparaison LLM contre évolution.
    effacerait pas de l'historique git.
 7. **La sauvegarde des runs C2.** Les archives `runs_butees_corps_30_S.tar.gz` et `runs_butees_corps_S.tar.gz` ne
    sont que des artefacts GitHub, et elles **expirent le 11 novembre 2026**. Il existe une copie locale dans `runs/`
-   sur le PC.
+   sur le PC. *Réglé au gel, puis runs D ajoutés à la v1.1.*
 8. **Le coût ×2,2** des butées du corps, pour les entraînements de la v2.
 
 ## 6. Propositions pour le gel (aucune n'est appliquée)

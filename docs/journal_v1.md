@@ -590,3 +590,29 @@ et tombées des générations 0 et 200, avec les génomes de la v1.
 
 Mesures sur les nouveaux runs : 38419154828 à 38419216213. Rapport : `docs/chantier_d.md`. Rien n'est fusionné ; arrêt
 pour validation.
+
+## Étape 15 : décisions de Tom, sauvegarde, runs D par défaut, v1.1
+
+**Décisions** :
+- graine 0 à 30,9 m acceptée ;
+- croisement jambe–queue sans collision (la patte passe au-dessus de la queue), documenté avec le temps pied tenu et
+  pied levé ;
+- sauvegarde des runs D ;
+- en autonomie : runs D par défaut, avance rapide de `main`, `pytest` sur le runner, tag `v1.1`, PASSATION et BILAN
+  à jour ; arrêt après le tag.
+
+**Croisements** (`joints --crossings`, nouvelle mesure pied tenu ou levé, commit `f6b4b2b`, run 38424970175) :
+- D graine 2 : jambe sur la queue 23,4 % du temps, pied tenu 16,2 %, levé 83,8 % ;
+- C2 graine 2 : 7,5 %, 5,2 % / 94,8 % ; C2 graine 1 : 6,8 %, 64,7 % / 35,3 % ; D graine 1 : 0 %.
+
+**Sauvegarde** : `sauvegarde-runs` passe de `7f53c9c` à `28d7440` en avance rapide (3 archives D, README).
+Restauration vérifiée sur un clone neuf : 12 SHA-256 conformes, 615 fichiers D identiques octet par octet.
+
+**Runs par défaut** (commit `323ef81`) :
+- local : `runs/S` (C2 à 30°) devient `runs/butees_corps_30/S`, et `runs/chantier_d/S` devient `runs/S` ;
+- test des runs locaux, `restaurer_runs.sh`, workflow mis à jour ;
+- sur la branche : `pytest` 185 passent (38425730531) ; `reproductibilite` rejoue D, C2 à 30° et B2 à l'identique
+  (38425744067).
+
+**Documents** : `chantier_d.md` (§7 croisements, §8 décisions), PASSATION, BILAN, README, CLAUDE.md.
+

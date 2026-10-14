@@ -5,8 +5,8 @@ Avance phase par phase (section 10), et ne passe à la phase suivante qu'après 
 Tout ce qui est marqué [CHOIX] ou [DÉDUIT] va dans config.py.
 
 État du projet, décisions et règles détaillées : docs/PASSATION.md (à lire en entier en arrivant), puis
-docs/BILAN_V1.md. La v1 (reproduction de la vidéo de Code BH) est gelée ; la suite est la v2 (duel LLM contre
-évolution).
+docs/BILAN_V1.md. La v1 (reproduction de la vidéo de Code BH) est terminée : tag v1.0, puis v1.1 avec le chantier D
+(projection propre) ; la suite est la v2 (duel LLM contre évolution).
 
 Règles essentielles :
 - Tout en français : code, commentaires, commits, rapports, échanges.

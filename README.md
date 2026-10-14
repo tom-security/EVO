@@ -15,7 +15,8 @@ n'est pas visible dans la vidéo est déduit ou choisi ici, et signalé comme te
   - liens rigides par correction de vitesse itérée (Gauss-Seidel) ;
   - contraction des muscles par couples de forces de somme nulle ;
   - sol avec frottement ;
-  - butées articulaires, et butées du corps (pieds de leur côté de l'axe, queue dans un cône).
+  - butées articulaires, et butées du corps (pieds et mains de leur côté de l'axe, queue dans un cône) ;
+  - projection de position dont la correction est reportée sur la vitesse sans jamais créer d'énergie.
 - **Lézards** de squelette imposé : 14 points, 13 os, une tête, une queue, 16 muscles, pilotés par une horloge et
   quatre poses.
 - **Algorithme évolutif** : 1 000 créatures, 10 s chacune ; les 500 meilleures ont chacune un enfant muté ;
@@ -77,7 +78,7 @@ Les entraînements, les rejeux vérifiés, les tests de rejeu et les mesures pas
 - `docs/CODEBH_GRIMPE_SPEC.md` : la description détaillée de la vidéo, point de départ du projet ;
 - `docs/PASSATION.md` : l'état du projet de A à Z, les décisions et les règles de travail ;
 - `docs/BILAN_V1.md` : le bilan de la v1, les écarts restants avec la vidéo et la suite ;
-- `docs/chantier_*.md` : les rapports de chaque chantier (butées articulaires, butées du corps).
+- `docs/chantier_*.md` : les rapports de chaque chantier (butées articulaires, butées du corps, projection propre).
 
 ## Licences
 
