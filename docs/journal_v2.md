@@ -78,3 +78,7 @@ lire le code du projet.
   pas activée » ;
 - `wsl --install --no-distribution` (élevé) active la « Plateforme d'ordinateur virtuel » : **redémarrage du PC
   nécessaire**. Le test reprend après le redémarrage.
+- Après le 1er redémarrage : « Plateforme d'ordinateur virtuel » activée, hyperviseur présent, WSL 3.0.3.0 installé,
+  mais le composant « Sous-système Windows pour Linux » restait désactivé (`wsl --install` le disait activé sans le
+  faire). Activé avec `dism /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart`
+  (élevé) : **second redémarrage nécessaire**.
