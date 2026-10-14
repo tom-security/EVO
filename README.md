@@ -1,14 +1,18 @@
-# EVO : l'évolution de créatures qui grimpent
+# Gecko : l'évolution de créatures qui grimpent
 
-EVO reproduit, en Python, la simulation de la vidéo YouTube de **Code BH**
+Gecko (ex-EVO) reproduit, en Python, la simulation de la vidéo YouTube de **Code BH**
 [« J'ai codé l'évolution de créatures qui grimpent »](https://www.youtube.com/watch?v=PiWgzThhF9M) (2025).
+
+> Le projet s'appelait **EVO** jusqu'au 14 octobre 2026 (dépôt `tom-security/EVO`, devenu
+> [`tom-security/Gecko`](https://github.com/tom-security/Gecko)). Le paquet Python garde son nom, `evo/` : les
+> `config.json` des runs en dépendent. Les rapports écrits avant le renommage parlent d'EVO.
 
 **L'idée, la mise en scène et le style visuel sont de Code BH.** Ce dépôt en est une reconstruction indépendante,
 écrite à partir de ce que la vidéo montre et explique. Code BH n'a publié ni son code ni ses constantes. Tout ce qui
 n'est pas visible dans la vidéo est déduit ou choisi ici, et signalé comme tel dans `config.py` ([VU], [DÉDUIT],
 [CHOIX]). Pour découvrir le projet d'origine, regardez sa vidéo.
 
-## Ce que fait EVO
+## Ce que fait Gecko
 
 - **Moteur physique 2D maison** :
   - points, gravité, prises sur le mur ;
@@ -34,6 +38,8 @@ Le code, les commentaires et les documents sont en français.
 Python 3.11 :
 
 ```
+git clone https://github.com/tom-security/Gecko.git
+cd Gecko
 python -m venv .venv
 .venv\Scripts\activate          # Windows (Linux, macOS : source .venv/bin/activate)
 pip install -r requirements.txt
@@ -78,6 +84,7 @@ Les entraînements, les rejeux vérifiés, les tests de rejeu et les mesures pas
 - `docs/CODEBH_GRIMPE_SPEC.md` : la description détaillée de la vidéo, point de départ du projet ;
 - `docs/PASSATION.md` : l'état du projet de A à Z, les décisions et les règles de travail ;
 - `docs/BILAN_V1.md` : le bilan de la v1, les écarts restants avec la vidéo et la suite ;
+- `docs/SPEC_V2_GECKO.md` : la spécification de la v2, le duel LLM contre évolution ;
 - `docs/chantier_*.md` : les rapports de chaque chantier (butées articulaires, butées du corps, projection propre).
 
 ## Licences

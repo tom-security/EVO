@@ -1,4 +1,9 @@
-# Passation du projet EVO : tout, de A à Z
+# Passation du projet Gecko (ex-EVO) : tout, de A à Z
+
+> **Renommage (14 octobre 2026, GECKO-13)** : le projet EVO s'appelle désormais **Gecko**, et le dépôt GitHub
+> `tom-security/EVO` est devenu `tom-security/Gecko` (GitHub redirige l'ancienne adresse). Le paquet Python `evo/` et
+> ses modules gardent leur nom : les `config.json` des runs en dépendent. L'historique (§9) et les rapports passés
+> gardent le nom EVO.
 
 Ce document est écrit pour une IA qui rejoint le projet en cours de route. Il rassemble ce que contiennent le
 dépôt, les échanges avec l'utilisateur et les rapports de chaque phase : le but, les règles de travail, le code,
@@ -11,8 +16,9 @@ chaque décision prise avec sa raison, les chiffres mesurés, les écarts connus
   de queue de 15°.
 - Chantier D : `docs/chantier_d_diagnostic.md` et `docs/chantier_d.md`, validés par l'utilisateur.
 
-**Cap** : EVO devient le socle d'une vidéo YouTube, la **v2 : duel LLM contre évolution**. La v1.1 (la reproduction de
-la vidéo de Code BH, avec une physique sans création d'énergie hors muscles) en est le point de départ.
+**Cap** : Gecko (ex-EVO) devient le socle d'une vidéo YouTube, la **v2 : duel LLM contre évolution**, spécifiée par
+`docs/SPEC_V2_GECKO.md` (elle fait foi pour la v2). La v1.1 (la reproduction de la vidéo de Code BH, avec une physique
+sans création d'énergie hors muscles) en est le point de départ.
 
 Les autres documents du dépôt restent la référence pour le détail :
 - `docs/CODEBH_GRIMPE_SPEC.md` : la spec, **à lire avant toute modification** (règle du `CLAUDE.md`) ;
@@ -75,7 +81,7 @@ Les autres documents du dépôt restent la référence pour le détail :
   - `claude/chantier-c2-butees-corps`, `claude/nettoyage-v1`, `claude/chantier-d-diagnostic` et `claude/chantier-d` :
     leurs commits sont dans `main` ;
   - `sauvegarde-runs` : archives des runs de référence (D, C2 à 30°, C2 à 6°, B2).
-- **Prochaine étape :** la v2 (`docs/BILAN_V1.md`).
+- **Prochaine étape :** la v2, d'après `docs/SPEC_V2_GECKO.md` : outils du duel (GECKO-9), puis témoins et parties.
 - **Tests :** 185 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
   locaux échouent, et c'est attendu (§3.5).
 
@@ -227,6 +233,19 @@ remplacée en phase 1 par la règle de nommage des images.
   - git et la CLI GitHub (`gh`) sont installés ; `gh` est connecté au compte de l'utilisateur ;
   - les nouvelles sessions doivent recharger le PATH (`git`, `gh`) si le terminal a été ouvert avant leur
     installation.
+- **Réinstallation du 14 octobre 2026** : le PC n'avait plus ni le dépôt, ni Python, ni `gh`. Le dépôt a été recloné
+  dans `Bureau\Gecko` (`C:\Users\Lenovo Loq\Desktop\Gecko`), les runs restaurés depuis `sauvegarde-runs`
+  (`restaurer_runs.sh`, 12 SHA-256 conformes), et :
+  ```
+  winget install --id Python.Python.3.11 --version 3.11.9 --scope user
+  winget install --id GitHub.cli
+  & "C:\Program Files\GitHub CLI\gh.exe" auth login     # dans le terminal de l'utilisateur (navigateur, HTTPS)
+  ```
+  - `python` n'est pas dans le PATH (alias du Microsoft Store) : le venv se crée avec
+    `$env:LOCALAPPDATA\Programs\Python\Python311\python.exe -m venv .venv` ;
+  - `gh auth login` a aussi configuré git (HTTPS) : le push marche depuis une session non interactive ;
+  - dans un dossier au chemin très long (dossier temporaire d'une session), le clone échoue (« Filename too long ») :
+    `git -c core.longpaths=true clone …`.
 - numba parallélise l'évaluation batchée (blocs de `BATCH_BLOCK` = 64 créatures, 8 blocs au plus pour 500 enfants).
 - **ffmpeg** : `pip install imageio-ffmpeg` (ou ffmpeg dans le PATH). `evo/video.py` cherche ffmpeg dans le PATH,
   puis via `imageio-ffmpeg`, sinon il écrit une séquence PNG et affiche la commande ffmpeg. Sans lui, 2 tests vidéo
@@ -315,6 +334,7 @@ exports de `out/`. C'est le choix de l'utilisateur ; les exports se refont en qu
 | `claude/chantier-d-diagnostic` | `main` (`v1.0`) + le diagnostic du chantier D (outils de mesure, rapport) |
 | `claude/chantier-d` | la branche de diagnostic + le moteur D, ses mesures, son réentraînement et les runs D par défaut |
 | `sauvegarde-runs` | pas de code : archives des runs de référence (D, C2 à 30°, C2 à 6°, B2 ; `28d7440`, §3.3) |
+| `claude/gecko-13-renommage` | `main` + le renommage EVO → Gecko dans les docs et le workflow (v2) |
 
 Chacune contient la précédente : nettoyage ⊂ diagnostic D ⊂ chantier D. `main` a été avancée sur
 `claude/nettoyage-v1` au gel de la v1 (tag `v1.0`), puis sur `claude/chantier-d` (tag `v1.1`).
@@ -359,6 +379,8 @@ gh run watch <id>
 gh run download <id> -D artefacts/<id>
 ```
 
+- Ces commandes se lancent depuis le clone : `gh` vise le dépôt de `origin`, `tom-security/Gecko` (ex-EVO). Hors du
+  clone, ajouter `-R tom-security/Gecko`.
 - `gh run download` crée un sous-dossier par artefact.
 - Vérifier les SHA-256 avant d'extraire (`Get-FileHash … -Algorithm SHA256`), puis `tar -xzf` à la racine du dépôt.
 - Les images de `docs/reference/` ne sortent jamais dans les artefacts. Les planches avec les captures de la vidéo se
@@ -1198,6 +1220,13 @@ Détail : `docs/chantier_d_diagnostic.md`, `docs/chantier_d.md`, journal (étape
   collision (décision).
 - **v1.1** : runs D par défaut (C2 à 30° dans `runs/butees_corps_30/S`), sauvegardés sur `sauvegarde-runs`, `main`
   avancée, tag `v1.1` après `pytest` sur le runner.
+
+### Gecko : spécification de la v2 et renommage (14 octobre 2026)
+
+- `docs/SPEC_V2_GECKO.md` : spécification du duel LLM contre évolution, écrite par Tom ; elle fait foi pour la v2.
+- **GECKO-13** : EVO devient Gecko. Dépôt GitHub renommé (`gh repo rename`), remote local mis à jour, docs et workflow
+  à jour (branche `claude/gecko-13-renommage`). Le dossier du projet et le paquet `evo/` ne sont pas renommés.
+  Journal : `docs/journal_v2.md`.
 
 ---
 

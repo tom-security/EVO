@@ -1,4 +1,4 @@
-# Entraînements et contrôles d'EVO sur les runners GitHub (Linux, 4 vCPU).
+# Entraînements et contrôles de Gecko (ex-EVO) sur les runners GitHub (Linux, 4 vCPU), dépôt tom-security/Gecko.
 # Lancement depuis le PC (le fichier doit être sur main pour que workflow_dispatch apparaisse) :
 #   gh workflow run train.yml --ref main -f mode=reproductibilite
 #   gh workflow run train.yml --ref <branche> -f mode=pytest [-f source_run_id=<id d'un run train>]

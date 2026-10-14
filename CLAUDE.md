@@ -4,9 +4,13 @@ de la vidéo (ex. 21_schema_contraction_newton_t4m32s.png = « t = 4:32 » dans 
 Avance phase par phase (section 10), et ne passe à la phase suivante qu'après validation.
 Tout ce qui est marqué [CHOIX] ou [DÉDUIT] va dans config.py.
 
+Le projet s'appelle Gecko (ex-EVO, renommé le 14 octobre 2026) ; dépôt GitHub tom-security/Gecko
+(ex-tom-security/EVO). Le paquet Python reste evo/ : les config.json des runs en dépendent, il n'est pas renommé.
+
 État du projet, décisions et règles détaillées : docs/PASSATION.md (à lire en entier en arrivant), puis
 docs/BILAN_V1.md. La v1 (reproduction de la vidéo de Code BH) est terminée : tag v1.0, puis v1.1 avec le chantier D
-(projection propre) ; la suite est la v2 (duel LLM contre évolution).
+(projection propre) ; la suite est la v2 (duel LLM contre évolution), spécifiée par docs/SPEC_V2_GECKO.md, qui fait
+foi.
 
 Règles essentielles :
 - Tout en français : code, commentaires, commits, rapports, échanges.

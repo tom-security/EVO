@@ -1,5 +1,8 @@
 # Bilan de la v1
 
+> Le projet s'appelle **Gecko** depuis le 14 octobre 2026 (ex-EVO ; dépôt `tom-security/Gecko`, ex-`tom-security/EVO`).
+> Ce bilan garde le nom de son époque.
+
 **La v1 d'EVO reproduit la vidéo de Code BH**
 [« J'ai codé l'évolution de créatures qui grimpent »](https://www.youtube.com/watch?v=PiWgzThhF9M) : moteur physique
 maison, lézards qui grimpent, sélection naturelle, rendu jungle, HUD et écrans d'analyse. Elle est finie et nettoyée,
