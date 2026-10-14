@@ -1,0 +1,2 @@
+# v2 : les fichiers des parties du duel sont gardés octet pour octet (le SHA-256 du génome est vérifié sur le runner)
+duel/** -text
