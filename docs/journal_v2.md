@@ -82,3 +82,10 @@ lire le code du projet.
   mais le composant « Sous-système Windows pour Linux » restait désactivé (`wsl --install` le disait activé sans le
   faire). Activé avec `dism /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart`
   (élevé) : **second redémarrage nécessaire**.
+- Après le 2e redémarrage : les deux composants se déclarent activés, l'hyperviseur tourne, mais WSL2 ne démarre
+  toujours pas. Cause trouvée : `vmcompute.exe` (service de calcul Hyper-V, fourni par la « Plateforme d'ordinateur
+  virtuel ») est absent ; le composant était marqué activé sans être installé. Tom choisit de réparer WSL avant de
+  passer à l'option C.
+- Réparation : `dism /disable-feature VirtualMachinePlatform` (désactivé aussitôt, preuve qu'il n'était pas installé),
+  puis `dism /enable-feature VirtualMachinePlatform /all`, qui installe cette fois réellement le composant (progression
+  jusqu'à 100 %) : **3e redémarrage nécessaire**.
