@@ -100,3 +100,49 @@ lire le code du projet.
 **Pour reprendre** : vérifier `Test-Path C:\Windows\System32\vmcompute.exe` et `wsl --status` ; si WSL2 démarre,
 `wsl --install -d Ubuntu-24.04`, Python 3.11 et les versions épinglées, puis les 18 créatures de `reproductibilite`
 et les gén. 0, 100 et 200 des runs D (3 graines) contre les hauteurs du runner.
+
+## Étape 4 : GECKO-9, outils du duel (option C), en autonomie
+
+**Décision de Tom** : option C ; chaque rapport et chaque `resultat.json` notent la plateforme et l'écart avec le runner
+quand il est connu ; job de vérification d'une partie sur le runner prévu dès maintenant ; plateforme configurable
+(bascule vers WSL sans rien réécrire). Branche `claude/gecko-9-outils-duel`.
+
+| Point | Commit | Contenu | `pytest` runner | `reproductibilite` |
+|---|---|---|---|---|
+| 1 | `4521bbf` | hauteur accrochée, scalaire = batchée au bit près | 191 passent (38546515611) | 18/18 identiques (38546520230) |
+| 2 | `123d02a` | génome JSON, commande `genome` | 203 passent (38547611459) | 18/18 (38547615394) |
+| 3 | `b5e77d3` | `essai`, rapport, partie, carnet, budget, plateforme, `verifier-partie` | 212 passent (38547706556) | 18/18 (38547709809) |
+| 4 | `f26b124`, `4b6fdd4` | `replay --export-etats`, mode `verification` du workflow, partie de démonstration, parties gardées octet pour octet | 214 passent (38547887904) | 18/18 (38547892172) |
+
+| fin | `045ea7e` | écart au millimètre dans le rapport ; PASSATION, README | 214 passent (38548886054) | 18/18 (38548889932) |
+
+pytest local (Windows) : 211 passent, plus les 3 rejeux Windows connus.
+
+**Choix d'exécution** :
+- `config.DUEL_PLATEFORME_OFFICIELLE = "runner"` [CHOIX] ; budgets 50 / 200 et pas de 0,5 s de la trajectoire dans
+  `config.py` ; un essai joué ailleurs est noté non officiel, avec la ligne « Écart avec la plateforme officielle » ;
+- le génome d'un essai est copié tel quel (octets du fichier) : son SHA-256 est contrôlé à la vérification ; d'où
+  `duel/** -text` dans `.gitattributes`, sans quoi git change les fins de ligne et la vérification refuse l'essai
+  (trouvé avant le premier envoi) ;
+- un génome invalide ne consomme pas d'essai ; une hypothèse est exigée dans une partie, écrite au carnet avant la
+  simulation ;
+- les fichiers d'états des parties restent hors git (≈ 0,8 Mo chacun) ; les états officiels viennent de la
+  vérification.
+
+**Partie de démonstration** `duel/demo_outils` (4 essais joués sur le PC, ≈ 2 s chacun), vérifiée sur le runner (runs
+38547897355 puis 38548882028, mêmes chiffres ; le second est intégré dans la partie avec `--integrer`) :
+
+| Essai | Génome | Hauteur accrochée PC | Runner | Écart | États |
+|---|---|---|---|---|---|
+| 1 | exemple du format | +8,603 m | +8,603 m | 6·10⁻¹⁰ m | différents |
+| 2 | horloge 0,9 s, poussée plus forte | +8,127 m | +8,118 m | +9,5 mm | différents |
+| 3 | aucune prise (jamais accrochée, chute à 1,13 s) | −8,780 m | −8,761 m | −18,9 mm | différents |
+| 4 | pose 4 sans prise (dernière prise à 9,50 s ; à 10 s : −1,71 m) | −0,373 m | −0,373 m | +0,09 mm | différents |
+
+**Champions D exportés sur le runner** (`replay --export-etats`, run 38547901338) : rejeux identiques ; hauteur accrochée
+= hauteur à 10 s pour les trois (+30,897 / +40,878 / +43,627 m) : ils tiennent le tronc jusqu'au bout, la règle ne
+change pas leur hauteur. Empreintes : `16fd76e9…`, `a8fa12da…`, `431461d3…`.
+
+**Fin de GECKO-9** : les 4 points sont faits, aucun rejeu n'a divergé. Rien n'est fusionné sur `main` ; arrêt pour
+validation. Suite (spec, étape 5) : fiche du joueur, témoins (évolution à corps figé, hasard pur), parties ; GECKO-11 :
+la session du joueur ne doit pas pouvoir lire le code.

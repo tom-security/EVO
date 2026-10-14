@@ -1,6 +1,6 @@
 Rapport d'essai : partie demo_outils, essai 2 (manche 2)
 Plateforme : Windows (PC), non officielle ; les chiffres officiels viennent du rejeu de la partie sur la plateforme officielle (runner GitHub (ubuntu-24.04)).
-Écart avec la plateforme officielle : pas encore connu (vérification de la partie à venir).
+Écart avec la plateforme officielle : hauteur accrochée +0,010 m (runner GitHub (ubuntu-24.04) : +8,118 m), hauteur à 10 s +0,010 m, énergie +0,002 ; états différents.
 
 1. Résultat
 - Hauteur accrochée : +8,13 m (dernière prise tenue à 10,00 s)

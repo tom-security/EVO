@@ -383,5 +383,43 @@
   }
  },
  "empreinte_etats": "sha256:0ee3edd9bb835d244b064f0ccc88a147db929564e385abbe5f6c72fd95b82b4e",
- "verification": null
+ "verification": {
+  "plateforme": {
+   "id": "runner",
+   "libelle": "runner GitHub (ubuntu-24.04)",
+   "officielle": true,
+   "plateforme_officielle": "runner",
+   "systeme": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+   "python": "3.11.17",
+   "numpy": "2.4.6",
+   "numba": "0.67.0"
+  },
+  "libelle": "runner GitHub (ubuntu-24.04)",
+  "officielle": true,
+  "commit": {
+   "hash": "045ea7ea7781645d629d7caca8098a78e127189d",
+   "modifie": false
+  },
+  "run_id": "38548882028",
+  "horodatage": "2026-10-14T10:21:45+00:00",
+  "resultat": {
+   "hauteur_accrochee": -8.760969266542038,
+   "jamais_accrochee": true,
+   "instant_derniere_prise": null,
+   "hauteur_10s": -8.760969266542038,
+   "energie": 16.649378836810296,
+   "masse_musculaire": 15.600000000000001,
+   "tombee": true,
+   "instant_chute": 1.1270833333333368,
+   "points_chute": [
+    "pied G"
+   ]
+  },
+  "empreinte_etats": "sha256:6ca748280586db2501dac570068765b8fdaa20654069d520537b1983e96021ff",
+  "identique": false,
+  "ecart_hauteur_accrochee": -0.018885908347179736,
+  "ecart_hauteur_10s": -0.018885908347179736,
+  "ecart_energie": 0.141826710144084,
+  "chute_differente": false
+ }
 }

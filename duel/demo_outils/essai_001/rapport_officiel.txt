@@ -1,0 +1,36 @@
+Rapport d'essai : partie demo_outils, essai 1 (manche 2), rejeu officiel
+Plateforme : runner GitHub (ubuntu-24.04), officielle.
+
+1. Résultat
+- Hauteur accrochée : +8,60 m (dernière prise tenue à 10,00 s)
+- Hauteur à 10 s : +8,60 m
+- Énergie dépensée sur 10 s : 24,02
+- Masse musculaire : 15,60
+
+2. Trajectoire (hauteur du centre du torse, m)
+   0,0 s : +0,00 | 0,5 s : +0,13 | 1,0 s : +0,56 | 1,5 s : +0,99 | 2,0 s : +1,27 | 2,5 s : +1,61 | 3,0 s : +2,05
+   3,5 s : +2,57 | 4,0 s : +3,09 | 4,5 s : +3,55 | 5,0 s : +3,91 | 5,5 s : +4,29 | 6,0 s : +4,82 | 6,5 s : +5,35
+   7,0 s : +5,93 | 7,5 s : +6,35 | 8,0 s : +6,64 | 8,5 s : +7,15 | 9,0 s : +7,51 | 9,5 s : +8,21 | 10,0 s : +8,60
+
+3. Chute
+- Pas de chute.
+
+4. Prises (au début de chaque pose : tenue, échouée hors du tronc, ou impossible après la chute)
+- Pose 1 (jouée 9 fois) : main G tenue 9/9 ; main D libre ; pied G libre ; pied D tenue 9/9.
+- Pose 2 (jouée 9 fois) : main G tenue 9/9 ; main D tenue 9/9 ; pied G tenue 9/9 ; pied D tenue 9/9.
+- Pose 3 (jouée 8 fois) : main G libre ; main D tenue 8/8 ; pied G tenue 8/8 ; pied D libre.
+- Pose 4 (jouée 8 fois) : main G tenue 8/8 ; main D tenue 8/8 ; pied G tenue 8/8 ; pied D tenue 8/8.
+
+5. Articulations (angle anatomique parcouru, en degrés ; part du temps à moins de 2° d'une butée)
+- épaule G (α, butées −60 / 90) : +8,4 à +63,5 ; en butée 0,0 %
+- coude G (β, butées 0 / 140) : +29,8 à +81,1 ; en butée 0,0 %
+- hanche G (α, butées −80 / 75) : −45,0 à +3,9 ; en butée 0,0 %
+- genou G (β, butées 0 / 140) : +23,6 à +81,0 ; en butée 0,0 %
+- épaule D (α, butées −60 / 90) : +10,1 à +62,9 ; en butée 0,0 %
+- coude D (β, butées 0 / 140) : +26,5 à +96,9 ; en butée 0,0 %
+- hanche D (α, butées −80 / 75) : −52,7 à −19,8 ; en butée 0,0 %
+- genou D (β, butées 0 / 140) : +7,3 à +74,1 ; en butée 0,0 %
+
+6. Corps
+- Main ou pied de l'autre côté de l'axe du corps : 0,0 % du temps (main G 0,0 %, main D 0,0 %, pied G 0,0 %, pied D 0,0 %).
+- Jambe qui croise la queue (vue de dessus) : 0,0 % du temps par jambe.

@@ -1,0 +1,36 @@
+Rapport d'essai : partie demo_outils, essai 4 (manche 2), rejeu officiel
+Plateforme : runner GitHub (ubuntu-24.04), officielle.
+
+1. Résultat
+- Hauteur accrochée : −0,37 m (dernière prise tenue à 9,50 s)
+- Hauteur à 10 s : −1,71 m
+- Énergie dépensée sur 10 s : 17,79
+- Masse musculaire : 15,60
+
+2. Trajectoire (hauteur du centre du torse, m)
+   0,0 s : +0,00 | 0,5 s : +0,14 | 1,0 s : +0,12 | 1,5 s : +0,38 | 2,0 s : −0,15 | 2,5 s : −0,18 | 3,0 s : −0,17
+   3,5 s : +0,53 | 4,0 s : −0,49 | 4,5 s : −0,49 | 5,0 s : −0,43 | 5,5 s : +0,22 | 6,0 s : −0,61 | 6,5 s : −0,46
+   7,0 s : −0,40 | 7,5 s : +0,16 | 8,0 s : −0,95 | 8,5 s : −0,72 | 9,0 s : −0,62 | 9,5 s : −0,37 | 10,0 s : −1,71
+
+3. Chute
+- Pas de chute.
+
+4. Prises (au début de chaque pose : tenue, échouée hors du tronc, ou impossible après la chute)
+- Pose 1 (jouée 5 fois) : main G tenue 5/5 ; main D libre ; pied G libre ; pied D tenue 5/5.
+- Pose 2 (jouée 5 fois) : main G tenue 5/5 ; main D tenue 5/5 ; pied G tenue 5/5 ; pied D tenue 5/5.
+- Pose 3 (jouée 5 fois) : main G libre ; main D tenue 5/5 ; pied G tenue 5/5 ; pied D libre.
+- Pose 4 (jouée 5 fois) : main G libre ; main D libre ; pied G libre ; pied D libre.
+
+5. Articulations (angle anatomique parcouru, en degrés ; part du temps à moins de 2° d'une butée)
+- épaule G (α, butées −60 / 90) : +4,8 à +79,9 ; en butée 0,0 %
+- coude G (β, butées 0 / 140) : +4,4 à +68,6 ; en butée 0,0 %
+- hanche G (α, butées −80 / 75) : −79,8 à +30,6 ; en butée 0,5 %
+- genou G (β, butées 0 / 140) : −0,0 à +83,7 ; en butée 1,9 %
+- épaule D (α, butées −60 / 90) : −37,5 à +66,7 ; en butée 0,0 %
+- coude D (β, butées 0 / 140) : +26,2 à +76,4 ; en butée 0,0 %
+- hanche D (α, butées −80 / 75) : −54,1 à +60,2 ; en butée 0,0 %
+- genou D (β, butées 0 / 140) : −0,0 à +88,4 ; en butée 29,6 %
+
+6. Corps
+- Main ou pied de l'autre côté de l'axe du corps : 0,0 % du temps (main G 0,0 %, main D 0,0 %, pied G 0,0 %, pied D 0,0 %).
+- Jambe qui croise la queue (vue de dessus) : 0,0 % du temps par jambe.
