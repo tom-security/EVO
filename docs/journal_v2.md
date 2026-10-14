@@ -89,3 +89,14 @@ lire le code du projet.
 - Réparation : `dism /disable-feature VirtualMachinePlatform` (désactivé aussitôt, preuve qu'il n'était pas installé),
   puis `dism /enable-feature VirtualMachinePlatform /all`, qui installe cette fois réellement le composant (progression
   jusqu'à 100 %) : **3e redémarrage nécessaire**.
+- Après le 3e redémarrage : **échec**. Les deux composants restent « activés » pour DISM, l'hyperviseur tourne
+  (la virtualisation du processeur est donc active dans le BIOS), mais `vmcompute.exe` est toujours absent et WSL
+  répond que ni WSL1 ni WSL2 ne peuvent démarrer. Les composants sont enregistrés sans que leurs fichiers soient
+  installés : un défaut de maintenance de Windows (build 26300), hors de portée du projet. Aucun rejeu n'a pu être
+  fait sous WSL.
+- **Décision de Tom** : il répare Windows lui-même, puis le test WSL sera refait. Rien n'est codé pour la partie 2 en
+  attendant.
+
+**Pour reprendre** : vérifier `Test-Path C:\Windows\System32\vmcompute.exe` et `wsl --status` ; si WSL2 démarre,
+`wsl --install -d Ubuntu-24.04`, Python 3.11 et les versions épinglées, puis les 18 créatures de `reproductibilite`
+et les gén. 0, 100 et 200 des runs D (3 graines) contre les hauteurs du runner.
