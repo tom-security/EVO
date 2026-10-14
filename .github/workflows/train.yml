@@ -125,7 +125,7 @@ jobs:
   reproductibilite:
     # Prouve que le runner rejoue les runs de référence restaurés depuis sauvegarde-runs (graines 0, 1, 2, génération
     # 200, champion) à la hauteur stockée : chantier D (runs/S, défaut depuis la v1.1), C2 à 30°
-    # (runs/butees_corps_30/S) et B2 (runs/butees_articulaires/S).
+    # (runs/butees_corps_30/S), B2 (runs/butees_articulaires/S) et les témoins à corps figé de la v2 (runs/corps_fige/S).
     if: inputs.mode == 'reproductibilite'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -147,8 +147,9 @@ jobs:
           echo "| run | résultat |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           status=0
-          for d in runs/0 runs/1 runs/2 runs/butees_corps_30/0 runs/butees_corps_30/1 runs/butees_corps_30/2 \
-                   runs/butees_articulaires/0 runs/butees_articulaires/1 runs/butees_articulaires/2; do
+          for d in runs/0 runs/1 runs/2 runs/3 runs/4 runs/butees_corps_30/0 runs/butees_corps_30/1 runs/butees_corps_30/2 \
+                   runs/butees_articulaires/0 runs/butees_articulaires/1 runs/butees_articulaires/2 \
+                   runs/corps_fige/0 runs/corps_fige/1 runs/corps_fige/2 runs/corps_fige/3 runs/corps_fige/4; do
             tag=${d//\//_}
             python main.py replay --run-dir "$d" --gen 200 --rank 1 --export "out/repro_$tag" 2>&1 | tee "repro_$tag.log"
             code=${PIPESTATUS[0]}
@@ -251,15 +252,16 @@ jobs:
             (cd "$d" && ls -l && sha256sum -c *.sha256 && for a in *.tar.gz; do tar -xzf "$a" -C ../..; done)
           done
           ls runs
-      - name: "Garde-fou : rejeu au bit près des champions de référence (D, C2 et B2)"
+      - name: "Garde-fou : rejeu au bit près des champions de référence (D, C2, B2 et témoins à corps figé)"
         shell: bash
         run: |
           python - <<'FIN'
           import sys
           from evo import replay as rp
           ok = True
-          for d in ("runs/0", "runs/1", "runs/2", "runs/butees_corps_30/0", "runs/butees_corps_30/1",
-                    "runs/butees_corps_30/2", "runs/butees_articulaires/0", "runs/butees_articulaires/1", "runs/butees_articulaires/2"):
+          for d in ("runs/0", "runs/1", "runs/2", "runs/3", "runs/4", "runs/butees_corps_30/0", "runs/butees_corps_30/1",
+                    "runs/butees_corps_30/2", "runs/butees_articulaires/0", "runs/butees_articulaires/1", "runs/butees_articulaires/2",
+                    "runs/corps_fige/0", "runs/corps_fige/1", "runs/corps_fige/2", "runs/corps_fige/3", "runs/corps_fige/4"):
               r = rp.Replay(d, rank=1)
               ok &= bool(r.ok)
           sys.exit(0 if ok else 1)

@@ -238,26 +238,31 @@ def run_config_restored():
     cr._torque_unit.cache_clear()
 
 
-@pytest.mark.parametrize("seed", [0, 1, 2])
+@pytest.mark.parametrize("seed", [0, 1, 2, 3, 4])   # D et témoins : 5 graines (v2) ; C2 et B2 : 0 à 2
 def test_local_runs_replay_with_their_own_flag(seed, run_config_restored):
     """Runs locaux (hors git, test ignoré s'ils manquent), chacun rejoué au bit près avec sa propre config :
     runs/<graine>, le défaut depuis la v1.1 (chantier D : report dissipatif, mains, cône de 15°) ;
     runs/butees_corps_30/<graine> (C2, cône de 30°, défaut de la v1.0) ; runs/butees_corps/<graine> (C2, cône de 6°) ; runs/butees_articulaires/<graine> (B2, butées articulaires seules) ;
-    runs/legacy_no_limits/<graine>, d'avant B2, sans butées."""
+    runs/legacy_no_limits/<graine>, d'avant B2, sans butées ; runs/corps_fige/<graine>, témoins de la manche 1 de la v2
+    (moteur D, corps figé)."""
     from evo import replay as rp
 
-    cases = [(ev.run_dir_for(seed), True, True, True),                     # D (défaut depuis la v1.1) : report, mains, 15°
-             (os.path.join(config.RUNS_DIR, "butees_corps_30", str(seed)), True, True, False),        # C2, cône de 30°
-             (os.path.join(config.RUNS_DIR, "butees_corps", str(seed)), True, True, False),           # C2, cône de 6°
-             (os.path.join(config.RUNS_DIR, "butees_articulaires", str(seed)), True, False, False),   # B2
-             (os.path.join(config.RUNS_DIR, "legacy_no_limits", str(seed)), False, False, False)]
+    cases = [(ev.run_dir_for(seed), True, True, True, False),              # D (défaut depuis la v1.1) : report, mains, 15°
+             (os.path.join(config.RUNS_DIR, "butees_corps_30", str(seed)), True, True, False, False),   # C2, cône de 30°
+             (os.path.join(config.RUNS_DIR, "butees_corps", str(seed)), True, True, False, False),      # C2, cône de 6°
+             (os.path.join(config.RUNS_DIR, "butees_articulaires", str(seed)), True, False, False, False),  # B2
+             (os.path.join(config.RUNS_DIR, "legacy_no_limits", str(seed)), False, False, False, False),
+             (os.path.join(config.RUNS_DIR, "corps_fige", str(seed)), True, True, True, True)]  # v2, témoins manche 1
     present = [case for case in cases if os.path.exists(os.path.join(case[0], "config.json"))]
     if not present:
         pytest.skip("pas de runs locaux")
-    for run_dir, joint_flag, body_flag, d_flag in present:
+    for run_dir, joint_flag, body_flag, d_flag, frozen in present:
         r = rp.Replay(run_dir, rank=1, log=None)
         assert r.ok, run_dir                              # hauteur rejouée = hauteur stockée
         assert config.JOINT_LIMITS is joint_flag, run_dir  # butées selon le run, pas selon config.py
         assert config.BODY_LIMITS is body_flag, run_dir
         assert config.CLEAN_PROJECTION is d_flag and config.HAND_LIMITS is d_flag, run_dir     # chantier D
         assert config.TAIL_CURVATURE_LIMITS is False, run_dir
+        assert config.FROZEN_BODY is frozen, run_dir       # v2 : corps figé selon le run
+        if frozen:
+            assert np.all(r.genome.lengths == cr.reference_lengths()), run_dir
