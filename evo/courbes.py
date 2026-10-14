@@ -45,6 +45,9 @@ def _sortie(sortie, nom, gens, idx, hang, height, energy, hung, extra, log):
               "energie_du_meilleur": float(energy[k]), "hauteur_10s_du_meilleur": float(height[k]),
               "jamais_accrochees": int(np.sum(~hung)),
               "hauteur_accrochee_differente": int(np.sum(hang != height)),
+              # lectures de la courbe aux budgets du joueur LLM (50 annoncés, 200 en prolongation)
+              "lectures": {str(n): float(best[n - 1]) for n in (config.DUEL_BUDGET_ANNONCE, config.DUEL_BUDGET_MAX)
+                           if n <= len(best)},
               "paliers": [[int(i) + 1, float(best[i])] for i in new]}
     resume.update(extra)
     with open(os.path.join(sortie, f"{nom}_resume.json"), "w", encoding="utf-8") as fh:
@@ -78,9 +81,12 @@ def courbe_evolution(run_dir, sortie, nom=None, log=print):
             log(f"  {run_dir} gén. {gen} : {sum(len(a) for a in out['idx'])} évaluations, "
                 f"{time.perf_counter() - t0:.0f} s")
     arr = {k: np.concatenate(v) for k, v in out.items()}
+    stats = ev.read_stats(run_dir)
     extra = {"source": "evolution", "run": os.path.normpath(run_dir).replace(os.sep, "/"),
              "generations": len(gens_saved) - 1, "reevaluations_identiques": True,
-             "frozen_body": bool(config.FROZEN_BODY), "secondes": round(time.perf_counter() - t0, 1)}
+             "frozen_body": bool(config.FROZEN_BODY), "secondes": round(time.perf_counter() - t0, 1),
+             # coût de calcul de l'entraînement : temps de chaque génération (évaluation et mutations) noté par le run
+             "cout_evaluation_s": round(sum(float(r["eval_seconds"]) for r in stats), 1)}
     return _sortie(sortie, nom, arr["gen"], arr["idx"], arr["hang"], arr["height"], arr["energy"], arr["hung"], extra,
                    log)
 
@@ -105,7 +111,8 @@ def hasard(manche, tirage, sortie, n=None, log=print):
     r = batch.evaluate(genomes, duration=config.SIM_DURATION)
     idx = np.arange(len(genomes))
     nom = f"hasard_m{manche}_t{tirage}"
+    secondes = round(time.perf_counter() - t0, 1)
     extra = {"source": "hasard", "manche": manche, "tirage": tirage, "graine": graine,
-             "frozen_body": manche == 1, "secondes": round(time.perf_counter() - t0, 1)}
+             "frozen_body": manche == 1, "secondes": secondes, "cout_evaluation_s": secondes}
     return _sortie(sortie, nom, np.zeros(len(idx), int), idx, r["hang_height"], r["height"], r["energy"], r["hung"],
                    extra, log)

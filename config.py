@@ -682,8 +682,8 @@ DUEL_TRAJECTOIRE_PAS_S = 0.5  # [CHOIX] spec v2 — rapport d'essai : hauteur du
 # graine égale, les autres gènes suivent les mêmes tirages qu'un run à corps libre. Absent de la config d'un run :
 # False (evolution.LEGACY_DEFAULTS), les runs existants se rejouent et se reprennent tels quels.
 FROZEN_BODY = False
-# [CHOIX] spec v2 (GECKO-10) — hasard pur : 3 tirages de HASARD_ESSAIS génomes, générateur de la génération 0 de
-# l'évolution (default_rng([graine, 0])) ; graines distinctes de celles des runs (0, 1, 2), donc tirages indépendants
-# de leur génération 0. Autant d'essais que le budget maximal du joueur LLM.
-HASARD_GRAINES = (100, 101, 102)
+# [CHOIX] spec v2 (GECKO-10) — hasard pur : 5 tirages de HASARD_ESSAIS génomes (décision de Tom et Dorian : chaque camp
+# joue 5 fois), générateur de la génération 0 de l'évolution (default_rng([graine, 0])) ; graines distinctes de celles
+# des runs (0 à 4), donc tirages indépendants de leur génération 0. Autant d'essais que le budget maximal du joueur LLM.
+HASARD_GRAINES = (100, 101, 102, 103, 104)
 HASARD_ESSAIS = 200

@@ -251,7 +251,8 @@ def main(argv=None):
     cev.add_argument("--sortie", default="out/courbes", help="dossier des sorties")
     has = sub.add_parser("hasard", help="v2 : hasard pur, un tirage de HASARD_ESSAIS génomes aléatoires et sa courbe")
     has.add_argument("--manche", type=int, choices=(1, 2), required=True, help="1 : corps figé ; 2 : corps libre")
-    has.add_argument("--tirage", type=int, choices=(0, 1, 2), required=True, help="tirage (graine HASARD_GRAINES[k])")
+    has.add_argument("--tirage", type=int, choices=(0, 1, 2, 3, 4), required=True,
+                     help="tirage k (graine HASARD_GRAINES[k])")
     has.add_argument("--sortie", default="out/courbes", help="dossier des sorties")
 
     gra = sub.add_parser("courbes-graphique",

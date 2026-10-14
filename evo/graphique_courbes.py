@@ -125,7 +125,7 @@ details summary { cursor:pointer; color:var(--text-secondary); margin-top:8px; }
 <body class="viz-root"><main>
 <h1>__TITRE__</h1>
 <p class="lead">Meilleure hauteur accrochée (m) en fonction du nombre de lézards testés, échelle logarithmique.
-Trait : moyenne des 3 graines (ou tirages) ; bande : du minimum au maximum. Chiffres recalculés sur le runner GitHub.</p>
+Trait : moyenne des graines (évolution) ou des tirages (hasard) ; bande : du minimum au maximum. Chiffres recalculés sur le runner GitHub.</p>
 <div id="figs"></div>
 </main>
 <script>

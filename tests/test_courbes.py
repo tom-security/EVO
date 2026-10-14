@@ -55,6 +55,9 @@ def test_evolution_curve_counts_every_evaluation_in_order(mini_run, tmp_path, co
     assert steps[0][0] == 1 and steps[-1][0] == 50
     assert all(b[1] >= a[1] for a, b in zip(steps, steps[1:]))           # courbe croissante
     assert steps[-1][1] == data["hauteur_accrochee"].max() == res["meilleure_hauteur_accrochee"]
+    assert res["lectures"] == {"50": res["meilleure_hauteur_accrochee"]}         # lecture à 50 essais ; pas de 200
+    stats = ev.read_stats(mini_run)
+    assert res["cout_evaluation_s"] == round(sum(r["eval_seconds"] for r in stats), 1) > 0
 
 
 def test_evolution_curve_stops_on_a_diverging_reevaluation(mini_run, tmp_path, config_intacte):
@@ -118,6 +121,19 @@ def test_chart_groups_players_by_round(tmp_path):
     page = gc.graphique(str(tmp_path), str(tmp_path / "c.html"))
     text = open(page, encoding="utf-8").read()
     assert "Manche 1" in text and "__DONNEES__" not in text and "Évolution à corps figé" in text
+
+
+def test_five_random_draws_with_distinct_seeds():
+    assert len(config.HASARD_GRAINES) == 5 and len(set(config.HASARD_GRAINES)) == 5
+    assert not set(config.HASARD_GRAINES) & {0, 1, 2, 3, 4}                       # indépendants des runs
+
+
+def test_random_curve_readings_at_50_and_200(tmp_path):
+    res = courbes.hasard(2, 4, str(tmp_path), n=200, log=lambda *_: None)
+    data = np.load(tmp_path / "hasard_m2_t4_evaluations.npz")
+    best = np.maximum.accumulate(data["hauteur_accrochee"])
+    assert res["lectures"] == {"50": best[49], "200": best[199]} and res["graine"] == config.HASARD_GRAINES[4]
+    assert res["cout_evaluation_s"] == res["secondes"] > 0
 
 
 def test_random_curve(tmp_path):
