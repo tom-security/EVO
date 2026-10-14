@@ -39,6 +39,8 @@
     python main.py verifier-partie duel/m2/P1 [--sortie out/verification]   # rejeu officiel d'une partie (runner)
     python main.py verifier-partie duel/m2/P1 --integrer artefacts/<id>     # reporte la vérification dans la partie
     python main.py replay --seed 2 --gen 200 --rank 1 --export-etats out/etats/champion_g2.json   # états (v2)
+    python main.py courbe-evolution --run-dir runs/2 --nom D_g2   # meilleure hauteur accrochée cumulée (v2, runner)
+    python main.py hasard --manche 1 --tirage 0                   # hasard pur, un tirage et sa courbe (v2)
 """
 import argparse
 
@@ -241,7 +243,26 @@ def main(argv=None):
     ver.add_argument("--integrer", metavar="ARTEFACT",
                      help="reporte dans la partie les fichiers d'une vérification rapatriée (gh run download)")
 
+    cev = sub.add_parser("courbe-evolution",
+                         help="v2 : meilleure hauteur accrochée cumulée à chaque évaluation d'un run (réévaluation batchée, "
+                              "vérifiée au bit près ; sur le runner)")
+    cev.add_argument("--run-dir", required=True, help="dossier du run (ex. runs/2)")
+    cev.add_argument("--nom", default=None, help="préfixe des fichiers (défaut : dérivé du dossier)")
+    cev.add_argument("--sortie", default="out/courbes", help="dossier des sorties")
+    has = sub.add_parser("hasard", help="v2 : hasard pur, un tirage de HASARD_ESSAIS génomes aléatoires et sa courbe")
+    has.add_argument("--manche", type=int, choices=(1, 2), required=True, help="1 : corps figé ; 2 : corps libre")
+    has.add_argument("--tirage", type=int, choices=(0, 1, 2), required=True, help="tirage (graine HASARD_GRAINES[k])")
+    has.add_argument("--sortie", default="out/courbes", help="dossier des sorties")
+
     args = parser.parse_args(argv)
+    if args.command == "courbe-evolution":
+        from evo import courbes
+        courbes.courbe_evolution(args.run_dir, args.sortie, nom=args.nom)
+        return
+    if args.command == "hasard":
+        from evo import courbes
+        courbes.hasard(args.manche, args.tirage, args.sortie)
+        return
     if args.command == "essai":
         import sys
         from evo import essai, genome_json as gj
