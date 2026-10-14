@@ -15,6 +15,9 @@ Conventions
   (body_limits()), posées à la suite des 8 articulations ; limit_groups() les range par groupe.
 - Chantier D : queue tenue par sa courbure (config.TAIL_CURVATURE_LIMITS), mains de leur côté de l'axe
   (config.HAND_LIMITS), report dissipatif de la projection sur la vitesse (config.CLEAN_PROJECTION).
+- Hauteur accrochée (v2, docs/SPEC_V2_GECKO.md) : hauteur du centre du torse à la fin du dernier sous-pas où au moins
+  une patte tient le tronc ; jamais accrochée : hauteur finale. Simple mesure, sans effet sur la simulation ni sur le
+  score ; même calcul dans l'évaluateur batché (evo/batch.py), au bit près.
 """
 import math
 from dataclasses import dataclass, replace
@@ -53,6 +56,7 @@ JOINT_SIGNS = np.array([s * side for side in (+1.0, -1.0) for s in _PLUS_SIGN_LE
 # Pattes, dans l'ordre des booléens « tenir » d'une pose.
 LIMBS = sk.LIMB_ENDS  # (L_HAND, R_HAND, L_FOOT, R_FOOT)
 LIMB_NAMES = ("main G", "main D", "pied G", "pied D")
+_LIMB_INDEX = np.array(LIMBS)
 
 
 def wrap_angle(a):
@@ -274,6 +278,8 @@ class Creature:
         self.effort = 0.0  # Σ|force musculaire|·dt ; l'énergie du HUD vaut ENERGY_SCALE × effort
         self.fallen = False
         self.activation = np.zeros(len(JOINTS))  # force musculaire signée de chaque articulation
+        self.hang_y = None      # y du centre du torse à la fin du dernier sous-pas avec une patte tenue (v2)
+        self.hang_time = None   # instant de ce sous-pas (s)
 
     @staticmethod
     def _reference(pos):
@@ -289,6 +295,18 @@ class Creature:
 
     def muscle_mass(self):
         return self.genome.muscle_mass()
+
+    @property
+    def hung(self):
+        """Au moins une patte a tenu le tronc à la fin d'un sous-pas."""
+        return self.hang_y is not None
+
+    def hang_height(self):
+        """Hauteur accrochée (m, v2) : hauteur du centre du torse au dernier instant où au moins une patte tient le
+        tronc ; une créature jamais accrochée garde sa hauteur finale (décision de Tom)."""
+        if self.hang_y is None:
+            return self.height()
+        return float(self.hang_y - self.ref_y0)
 
     @property
     def energy(self):
@@ -348,6 +366,9 @@ class Creature:
             if config.FALL_DISABLES_HOLD:
                 self.world.held[:] = False
         self.t += h
+        if self.world.held[_LIMB_INDEX].any():   # hauteur accrochée : mesure seule, après la chute éventuelle
+            self.hang_y = self.reference_point()[1]
+            self.hang_time = self.t
 
     def simulate(self, duration, h=None, callback=None):
         h = config.DT / config.SUBSTEPS if h is None else h

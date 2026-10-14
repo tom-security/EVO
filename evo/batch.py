@@ -6,7 +6,8 @@ ordre, que le moteur scalaire (`Creature.substep` → `physics.substep`) : contr
 horloge + PD, forces des muscles (même ordre d'accumulation que `np.add.at`), prises sur le
 tronc, liens + butées articulaires + contacts sol (même calcul que `_link_velocities_numba`, mêmes
 fonctions partagées pour les butées), projection (et son report dissipatif sur la vitesse, chantier D), chute,
-énergie. Dans un bloc, la boucle intérieure passe d'une créature à l'autre : leurs calculs
+énergie, hauteur accrochée (v2 : y du cou et du bassin à la fin du dernier sous-pas avec une patte tenue ; mesure
+seule, sans effet sur la simulation). Dans un bloc, la boucle intérieure passe d'une créature à l'autre : leurs calculs
 indépendants s'entrelacent et masquent la latence de Gauss-Seidel (×5 par rapport à une
 créature à la fois). Les tests vérifient l'égalité avec le moteur scalaire à 1e-9 près.
 
@@ -31,6 +32,9 @@ except ImportError:  # sans numba : même code, séquentiel
 
     def get_num_threads():
         return 1
+
+_NECK = sk.NECK        # hauteur accrochée : centre du torse = milieu NECK–PELVIS (constantes figées par numba)
+_PELVIS = sk.PELVIS
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +102,7 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
                     links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs, n_body,
                     n_steps, h, g, n_iter, beta, n_pos_iter, clean_projection, ground_y, friction, margin,
                     kp, kd, torque_unit, trunk_x, trunk_half, fall_eps, fall_disables_hold,
-                    energy_out, fallen_out, vel_out):
+                    energy_out, fallen_out, vel_out, hang_out, hang_t_out, hung_out):
     """Créatures first..last-1 simulées en même temps (même suite d'opérations que _simulate_one
     pour chacune) : les calculs indépendants de plusieurs créatures s'entrelacent dans la boucle
     intérieure, ce qui masque la latence de Gauss-Seidel. Résultat identique au bit près."""
@@ -158,6 +162,10 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
     pose = np.zeros(nb, dtype=np.int64)
     energy = np.zeros(nb)
     fallen = np.zeros(nb, dtype=np.bool_)
+    hang_n = np.zeros(nb)          # hauteur accrochée : y du cou et du bassin, instant, au moins une prise
+    hang_p = np.zeros(nb)
+    hang_t = np.zeros(nb)
+    hung = np.zeros(nb, dtype=np.bool_)
     abs_act = np.zeros(8)
     t = 0.0
     gh = g * h
@@ -434,6 +442,14 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
                 if fallen[b] and fall_disables_hold:
                     for p in range(n_points):
                         held[p, b] = False
+            # --- hauteur accrochée (comme Creature.substep : après la chute, à l'instant t + h) ---
+            for l in range(n_limbs):
+                if held[limbs[l], b]:
+                    hung[b] = True
+                    hang_n[b] = py[_NECK, b]
+                    hang_p[b] = py[_PELVIS, b]
+                    hang_t[b] = t + h
+                    break
         t += h
 
     for b in range(nb):
@@ -445,6 +461,10 @@ def _simulate_block(pos, rest, mass, phi_rest, s_plus, s_minus, period, targets,
             vel_out[c, p, 1] = vy[p, b]
         energy_out[c] = energy[b]
         fallen_out[c] = fallen[b]
+        hang_out[c, 0] = hang_n[b]
+        hang_out[c, 1] = hang_p[b]
+        hang_t_out[c] = hang_t[b]
+        hung_out[c] = hung[b]
 
 
 @njit(parallel=True, cache=True, error_model="numpy")
@@ -452,7 +472,7 @@ def _simulate_population(pos, rest, mass, phi_rest, s_plus, s_minus, period, tar
                          links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs,
                          n_body, n_steps, h, g, n_iter, beta, n_pos_iter, clean_projection, ground_y, friction, margin,
                          kp, kd, torque_unit, trunk_x, trunk_half, fall_eps, fall_disables_hold,
-                         energy_out, fallen_out):
+                         energy_out, fallen_out, hang_out, hang_t_out, hung_out):
     n = pos.shape[0]
     vel = np.zeros_like(pos)
     n_blocks = (n + block - 1) // block
@@ -463,7 +483,7 @@ def _simulate_population(pos, rest, mass, phi_rest, s_plus, s_minus, period, tar
                         links, joints, joint_signs, lim_joints, lim_sign, lim_lo, lim_hi, lim_margin, limbs,
                         n_body, n_steps, h, g, n_iter, beta, n_pos_iter, clean_projection,
                         ground_y, friction, margin, kp, kd, torque_unit, trunk_x, trunk_half, fall_eps,
-                        fall_disables_hold, energy_out, fallen_out, vel)
+                        fall_disables_hold, energy_out, fallen_out, vel, hang_out, hang_t_out, hung_out)
     return vel
 
 
@@ -483,6 +503,9 @@ def evaluate(genomes, duration=10.0, packed=None):
     h = config.DT / config.SUBSTEPS
     energy = np.zeros(n)
     fallen = np.zeros(n, dtype=np.bool_)
+    hang = np.zeros((n, 2))
+    hang_t = np.zeros(n)
+    hung = np.zeros(n, dtype=np.bool_)
     vel = _simulate_population(
         pos, arrays["rest"], arrays["mass"], arrays["phi_rest"], arrays["s_plus"], arrays["s_minus"],
         arrays["period"], arrays["targets"], arrays["holds"], int(config.BATCH_BLOCK),
@@ -495,16 +518,21 @@ def evaluate(genomes, duration=10.0, packed=None):
         float(config.GROUND_Y), float(config.GROUND_FRICTION), float(config.CONTACT_MARGIN),
         float(config.KP), float(config.KD), float(cr.torque_unit()), float(config.TRUNK_X),
         float(config.TRUNK_WIDTH / 2), float(config.FALL_CONTACT_EPS), bool(config.FALL_DISABLES_HOLD),
-        energy, fallen)
+        energy, fallen, hang, hang_t, hung)
     energy = config.ENERGY_SCALE * energy  # même opération que Creature.energy
     height = 0.5 * (pos[:, sk.NECK, 1] + pos[:, sk.PELVIS, 1]) - arrays["ref_y0"]
     muscle_mass = arrays["muscle_mass"]
+    # hauteur accrochée (même opération que Creature.hang_height) ; jamais accrochée : hauteur finale
+    hang_height = np.where(hung, 0.5 * (hang[:, 0] + hang[:, 1]) - arrays["ref_y0"], height)
     return {
         "height": height,
         "energy": energy,
         "muscle_mass": muscle_mass,
         "score": cr.fitness(height, energy, muscle_mass),
         "fallen": fallen,
+        "hang_height": hang_height,
+        "hang_time": np.where(hung, hang_t, np.nan),
+        "hung": hung,
         "pos": pos,
         "vel": vel,
     }
