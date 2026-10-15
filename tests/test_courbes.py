@@ -92,6 +92,29 @@ def test_random_draw_uses_the_generation_zero_generator(manche):
         assert not np.all(got.lengths == cr.reference_lengths())
 
 
+def test_small_budget_evolution(tmp_path):
+    """Évolution à petit budget : 10 lézards, 5 survivants, 5 enfants ; corps figé en manche 1 ; audit à chaque
+    génération ; courbe vérifiée au bit près ; config rétablie ; jamais de run réécrit."""
+    res = courbes.petit_budget(1, 0, str(tmp_path / "c"), evaluations=30, run_root=str(tmp_path / "pb"),
+                               log=lambda *_: None)
+    assert config.FROZEN_BODY is False                                     # config du module rétablie
+    assert res["evaluations"] == 30 and res["petit_budget"] and res["manche"] == 1 and res["population"] == 10
+    assert res["frozen_body"] and res["reevaluations_identiques"] and res["audits"] == 5   # gén. 0 à 4
+    assert res["energie_creee_max_m"] <= config.AUDIT_MAX_CREATED_HEIGHT
+    run = str(tmp_path / "pb" / "m1" / "0")
+    for gen in range(5):
+        pop, _, _, _ = ev.load_generation(run, gen)
+        assert len(pop) == 10 and np.all(pop.lengths == cr.reference_lengths())
+    with pytest.raises(FileExistsError):
+        courbes.petit_budget(1, 0, str(tmp_path / "c"), evaluations=30, run_root=str(tmp_path / "pb"),
+                             log=lambda *_: None)
+    with pytest.raises(ValueError, match="nombre entier de générations"):
+        courbes.petit_budget(2, 0, str(tmp_path / "c"), evaluations=32, run_root=str(tmp_path / "pb"),
+                             log=lambda *_: None)
+    assert config.PETIT_BUDGET_POP == 10 and config.PETIT_BUDGET_EVALUATIONS == 200
+    assert (200 - 10) % 5 == 0                                             # 38 générations : 200 évaluations
+
+
 def test_chart_groups_players_by_round(tmp_path):
     from evo import graphique_courbes as gc
 
@@ -108,11 +131,19 @@ def test_chart_groups_players_by_round(tmp_path):
         resume(f"fige_{k}", "evolution", True, [[1, -5.0], [2000, 20.0 + k]], 101000)
         for m in (1, 2):
             resume(f"h{m}_{k}", "hasard", m == 1, [[1, -9.0], [50, 1.0 + k]], 200, manche=m)
+            resume(f"pb{m}_{k}", "evolution", m == 1, [[1, -7.0], [120, 2.0 + k + m]], 200, manche=m)
+            with open(tmp_path / f"pb{m}_{k}_resume.json", encoding="utf-8") as fh:
+                r = json.load(fh)
+            r["petit_budget"] = True
+            with open(tmp_path / f"pb{m}_{k}_resume.json", "w", encoding="utf-8") as fh:
+                json.dump(r, fh)
     data = gc.donnees(str(tmp_path))
     assert [f["manche"] for f in data["figures"]] == [1, 2]
     for f in data["figures"]:
-        assert [s["cle"] for s in f["series"]] == ["evolution", "corps_fige", "hasard"]
-        evo, fige, hasard = f["series"]
+        assert [s["cle"] for s in f["series"]] == ["evolution", "corps_fige", "hasard", "petit_budget"]
+        evo, fige, hasard, pb = f["series"]
+        assert pb["n"][-1] == 200 and pb["moy"][-1] == 3.0 + f["manche"]   # le petit budget de la manche
+        assert fige["n"][-1] == 101000                                      # le grand témoin à corps figé, pas le petit
         assert hasard["n"][-1] == 200 and evo["n"][-1] == 101000
         i = evo["n"].index(500)
         assert evo["moy"][i] == 11.0 and evo["min"][i] == 10.0 and evo["max"][i] == 12.0

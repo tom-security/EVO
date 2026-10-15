@@ -687,3 +687,9 @@ FROZEN_BODY = False
 # des runs (0 à 4), donc tirages indépendants de leur génération 0. Autant d'essais que le budget maximal du joueur LLM.
 HASARD_GRAINES = (100, 101, 102, 103, 104)
 HASARD_ESSAIS = 200
+# [CHOIX] Tom, 15 octobre 2026 (GECKO-10, avant toute partie) — évolution à petit budget : à 50 et 200 essais, la grande
+# évolution (POP_SIZE = 1000) n'a évalué que sa génération 0 et se confond avec le hasard ; le témoin du LLM à ces
+# budgets est une évolution de PETIT_BUDGET_POP lézards (même moteur, mêmes mutations, SURVIVOR_FRACTION), arrêtée à
+# PETIT_BUDGET_EVALUATIONS évaluations (génération 0, puis PETIT_BUDGET_POP / 2 enfants par génération). Graines 0 à 4.
+PETIT_BUDGET_POP = 10
+PETIT_BUDGET_EVALUATIONS = 200

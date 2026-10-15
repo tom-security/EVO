@@ -57,8 +57,9 @@ def _sortie(sortie, nom, gens, idx, hang, height, energy, hung, extra, log):
     return resume
 
 
-def courbe_evolution(run_dir, sortie, nom=None, log=print):
-    """Courbe d'un run d'évolution existant (voir le module) ; erreur si une réévaluation n'est pas identique."""
+def courbe_evolution(run_dir, sortie, nom=None, log=print, champs=None):
+    """Courbe d'un run d'évolution existant (voir le module) ; erreur si une réévaluation n'est pas identique.
+    `champs` : champs ajoutés au résumé (évolution à petit budget, par exemple)."""
     nom = nom or os.path.normpath(run_dir).replace(os.sep, "_").replace("/", "_")
     ev.use_run_config(run_dir)
     gens_saved = ev.saved_generations(run_dir)
@@ -87,8 +88,47 @@ def courbe_evolution(run_dir, sortie, nom=None, log=print):
              "frozen_body": bool(config.FROZEN_BODY), "secondes": round(time.perf_counter() - t0, 1),
              # coût de calcul de l'entraînement : temps de chaque génération (évaluation et mutations) noté par le run
              "cout_evaluation_s": round(sum(float(r["eval_seconds"]) for r in stats), 1)}
+    extra.update(champs or {})
     return _sortie(sortie, nom, arr["gen"], arr["idx"], arr["hang"], arr["height"], arr["energy"], arr["hung"], extra,
                    log)
+
+
+def petit_budget(manche, graine, sortie, evaluations=None, pop=None, run_root=os.path.join("out", "petit_budget"),
+                 log=print):
+    """Évolution à petit budget (témoin du LLM à 50 et 200 essais) : run de `pop` lézards (moteur et mutations de
+    config.py ; corps figé en manche 1), jusqu'à `evaluations` évaluations, audit d'énergie du champion à chaque
+    génération ; puis sa courbe (courbe_evolution, garde-fou au bit près). Erreur si de l'énergie est créée hors
+    muscles au-delà du seuil d'audit. Renvoie le résumé."""
+    pop = config.PETIT_BUDGET_POP if pop is None else pop
+    evaluations = config.PETIT_BUDGET_EVALUATIONS if evaluations is None else evaluations
+    enfants = int(round(pop * config.SURVIVOR_FRACTION))
+    if (evaluations - pop) % enfants:
+        raise ValueError(f"{evaluations} évaluations : pas un nombre entier de générations ({pop}, puis {enfants} par génération)")
+    generations = (evaluations - pop) // enfants
+    run_dir = os.path.join(run_root, f"m{manche}", str(graine))
+    if ev.saved_generations(run_dir):
+        raise FileExistsError(f"{run_dir} existe déjà : un run témoin n'est jamais réécrit")
+    snap = ev.config_snapshot()
+    try:
+        ev.train(graine, generations=generations, pop_size=pop, run_dir=run_dir,
+                 overrides={"FROZEN_BODY": manche == 1}, audit_every=1, log=lambda *_: None)
+    finally:
+        ev.apply_config(snap, strict=False)
+        cr._torque_unit.cache_clear()
+    with open(os.path.join(run_dir, "audit.csv"), newline="") as fh:      # même encodage que son écriture
+        audits = list(csv.DictReader(fh))
+    alertes = [a for a in audits if a["alerts"]]
+    cree = max(float(a["created_height_m"]) for a in audits)
+    if alertes:
+        raise RuntimeError(f"{run_dir} : alertes d'audit {[a['alerts'] for a in alertes]} (énergie créée max {cree:.4f} m)")
+    champs = {"petit_budget": True, "manche": manche, "graine": graine, "population": pop,
+              "audits": len(audits), "energie_creee_max_m": cree}
+    snap = ev.config_snapshot()
+    try:
+        return courbe_evolution(run_dir, sortie, nom=f"petit_budget_m{manche}_g{graine}", log=log, champs=champs)
+    finally:
+        ev.apply_config(snap, strict=False)
+        cr._torque_unit.cache_clear()
 
 
 def tirage_hasard(manche, tirage, n=None):

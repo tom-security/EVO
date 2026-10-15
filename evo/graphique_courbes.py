@@ -3,7 +3,8 @@ lézards testés (échelle log), un trait par joueur (moyenne des graines ou tir
 et 200 essais (budgets du joueur LLM), infobulle au survol et tableau de valeurs. Page HTML autonome, clair et sombre.
 
 Entrée : les résumés `*_resume.json` d'evo/courbes.py (runs d'évolution et tirages du hasard), rangés par joueur :
-évolution à corps libre (`frozen_body` faux), évolution à corps figé, hasard pur de la manche.
+évolution à corps libre (`frozen_body` faux), évolution à corps figé, hasard pur de la manche, évolution à petit budget
+de la manche (`petit_budget`).
 """
 import glob
 import json
@@ -15,13 +16,16 @@ import config
 
 JOUEURS = (("evolution", "Évolution (corps libre)", "--series-1"),
            ("corps_fige", "Évolution à corps figé", "--series-2"),
-           ("hasard", "Hasard pur", "--series-3"))
+           ("hasard", "Hasard pur", "--series-3"),
+           ("petit_budget", "Évolution à petit budget", "--series-4"))
 REPERES = ((config.DUEL_BUDGET_ANNONCE, "50 essais"), (config.DUEL_BUDGET_MAX, "200 essais"))
 POINTS_TABLE = (1, 10, 50, 200, 1000, 10000, 100000)
 MANCHES = ((1, "Manche 1 : le chorégraphe (corps imposé)"), (2, "Manche 2 : le créateur (corps libre)"))
 
 
 def _joueur(resume):
+    if resume.get("petit_budget"):
+        return "petit_budget", resume["manche"]
     if resume["source"] == "hasard":
         return "hasard", resume["manche"]
     return ("corps_fige" if resume["frozen_body"] else "evolution"), None
@@ -62,7 +66,7 @@ def donnees(dossier):
     for manche, titre in MANCHES:
         series = []
         for key, label, var in JOUEURS:
-            rs = res.get((key, manche) if key == "hasard" else (key, None), [])
+            rs = res.get((key, manche) if key in ("hasard", "petit_budget") else (key, None), [])
             if not rs:
                 continue
             n, mean, lo, hi = serie(rs)
@@ -90,14 +94,14 @@ _PAGE = r"""<!doctype html>
 <style>
 .viz-root { color-scheme: light; --surface-1:#fcfcfb; --page:#f9f9f7; --text-primary:#0b0b0b; --text-secondary:#52514e;
   --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
-  --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; }
+  --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100; }
 @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .viz-root { color-scheme: dark;
   --surface-1:#1a1a19; --page:#0d0d0d; --text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;
   --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10); --series-1:#3987e5; --series-2:#d95926;
-  --series-3:#199e70; } }
+  --series-3:#199e70; --series-4:#c98500; } }
 :root[data-theme="dark"] .viz-root { color-scheme: dark; --surface-1:#1a1a19; --page:#0d0d0d; --text-primary:#ffffff;
   --text-secondary:#c3c2b7; --muted:#898781; --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; }
+  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500; }
 html, body { margin:0; }
 body.viz-root { background:var(--page); color:var(--text-primary); font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
 main { max-width:980px; margin:0 auto; padding:24px 16px 48px; }

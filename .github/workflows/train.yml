@@ -307,7 +307,7 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          allowed=" debug-physics debug-creature benchmark graphs histogram population replay analyze compare decor joints morpho trace diag-projection courbe-evolution hasard "
+          allowed=" debug-physics debug-creature benchmark graphs histogram population replay analyze compare decor joints morpho trace diag-projection courbe-evolution hasard petit-budget "
           mkdir -p out journaux
           status=0
           n=0

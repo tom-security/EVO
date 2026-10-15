@@ -255,6 +255,13 @@ def main(argv=None):
                      help="tirage k (graine HASARD_GRAINES[k])")
     has.add_argument("--sortie", default="out/courbes", help="dossier des sorties")
 
+    pb = sub.add_parser("petit-budget",
+                        help="v2 : évolution à petit budget (PETIT_BUDGET_POP lézards, PETIT_BUDGET_EVALUATIONS évaluations), "
+                             "témoin du LLM à 50 et 200 essais ; run, audits et courbe (sur le runner)")
+    pb.add_argument("--manche", type=int, choices=(1, 2), required=True, help="1 : corps figé ; 2 : génome complet")
+    pb.add_argument("--graine", type=int, choices=(0, 1, 2, 3, 4), required=True, help="graine du run")
+    pb.add_argument("--sortie", default="out/courbes", help="dossier des courbes")
+    pb.add_argument("--run-root", default="out/petit_budget", help="dossier des runs (m<manche>/<graine>)")
     gra = sub.add_parser("courbes-graphique",
                          help="v2 : page HTML des courbes des joueurs, une figure par manche (résumés de courbe-evolution "
                               "et hasard)")
@@ -265,6 +272,10 @@ def main(argv=None):
     if args.command == "courbes-graphique":
         from evo import graphique_courbes
         print(graphique_courbes.graphique(args.dossier, args.sortie))
+        return
+    if args.command == "petit-budget":
+        from evo import courbes
+        courbes.petit_budget(args.manche, args.graine, args.sortie, run_root=args.run_root)
         return
     if args.command == "courbe-evolution":
         from evo import courbes
