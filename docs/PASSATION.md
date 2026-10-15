@@ -86,7 +86,7 @@ Les autres documents du dépôt restent la référence pour le détail :
 - **Outils du duel (v2, GECKO-9)** : hauteur accrochée, génome JSON (`genome`), `essai`, `verifier-partie`, fichiers
   d'états (`replay --export-etats`) ; voir §4.5. Plateforme officielle des essais : le runner (option C,
   `config.DUEL_PLATEFORME_OFFICIELLE`).
-- **Tests :** 232 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
+- **Tests :** 233 (`pytest -q tests/`). Sur le runner, tous passent. Sous Windows, les 3 tests qui rejouent les runs
   locaux échouent, et c'est attendu (§3.5).
 
 ---
@@ -266,7 +266,7 @@ README.md, CLAUDE.md, config.py, main.py, requirements.txt, pytest.ini (pythonpa
 docs/      spec, rapports des chantiers B et C, bilan, journal, ce document, images de référence, figures
 assets/fonts/   Questrial-Regular.ttf, NunitoSans-SemiBold.ttf, leurs licences OFL, README (sources, SHA-256)
 evo/       le code (§4)
-tests/     21 fichiers, 232 tests (§14)
+tests/     21 fichiers, 233 tests (§14)
 duel/      v2 : parties du duel (génomes, rapports, résultats, carnet), gardées octet pour octet (.gitattributes) ;
            leurs fichiers d'états (etats*.json) restent hors git
 runs/      runs d'évolution            ← hors git (.gitignore)
@@ -461,6 +461,7 @@ python main.py replay --seed S --gen G --rank R --export-etats FICHIER.json
 python main.py genome --exemple-neutre [--manche 1|2]      # l'exemple de la fiche du joueur (ne grimpe pas)
 python main.py courbe-evolution --run-dir runs/S [--nom N] [--sortie DIR]   # sur le runner (mode analyse)
 python main.py hasard --manche 1|2 --tirage 0..4 [--sortie DIR]
+python main.py petit-budget --manche 1|2 --graine 0..4 [--sortie DIR] [--run-root DIR]   # sur le runner (mode analyse)
 python main.py courbes-graphique DOSSIER [--sortie FICHIER.html]
 ```
 
@@ -1315,6 +1316,8 @@ Détail : `docs/chantier_d_diagnostic.md`, `docs/chantier_d.md`, journal (étape
 | v2 : joueur LLM (GECKO-11) | l'arène ne lit ni le code, ni la démonstration, ni `demo_dorian`, ni aucun génome de l'évolution ; elle accepte n'importe quel modèle d'IA ; elle enregistre les tokens de chaque essai |
 | v2 : chaque camp joue 5 fois | 5 parties par manche pour le LLM (prolongation à 200 en manche 2, pour 2 parties sur 5), 5 graines d'évolution, 5 tirages de hasard ; duel à coût égal (spec) |
 | v2 : témoins | manche 1 : évolution à corps figé (`FROZEN_BODY`), runs `runs/corps_fige/S` ; hasard pur : graines 100 à 104 (`HASARD_GRAINES`), générateur de la génération 0 |
+| v2 : témoin à 50 et 200 essais | correction du 15 octobre 2026, avant toute partie : évolution à petit budget (10 lézards, 5 survivants, 200 évaluations, 5 graines par manche) ; la grande évolution reste la référence à 100 000 évaluations |
+| v2 : parties prolongées | désignées avant de jouer (2 sur 5, manche 2) ; `essai` devra faire respecter le budget de la partie (GECKO-11) |
 | v2 : exemple du génome | `genome --exemple` grimpe (+8,6 m) : jamais montré au joueur ; la fiche utilise `genome --exemple-neutre` |
 
 ---
@@ -1579,7 +1582,7 @@ meilleures et 50 créatures au hasard de la génération 200 :
 
 ## 14. Tests
 
-`pytest -q tests/` : 232 tests, cas paramétrés compris ; ≈ 4 à 6 min. Avec ffmpeg (ou `imageio-ffmpeg`) pour les
+`pytest -q tests/` : 233 tests, cas paramétrés compris ; ≈ 4 à 6 min. Avec ffmpeg (ou `imageio-ffmpeg`) pour les
 tests vidéo, sinon 2 sont sautés. Sur le runner (`mode=pytest`), tout passe. Sous Windows, les 3 cas de
 `test_local_runs_replay_with_their_own_flag` échouent, et c'est attendu (§3.5).
 
@@ -1603,7 +1606,7 @@ tests vidéo, sinon 2 sont sautés. Sur le runner (`mode=pytest`), tout passe. S
 | `test_genome_json.py` | 15 | v2 : génome JSON (exemple, exemple neutre qui ne grimpe pas, manche 1, messages d'erreur, tolérance des bornes, conversion, aller-retour, schéma, commande) |
 | `test_essai.py` | 9 | v2 : essai (partie, carnet, rapport, plateforme, recoupement batché, empreinte, refus, bascule de plateforme, vérification et intégration) |
 | `test_corps_fige.py` | 5 | v2 : corps figé (génération 0 au corps de référence, mutation sans les longueurs, mêmes autres tirages, drapeau absent = corps libre, mini-run) |
-| `test_courbes.py` | 8 | v2 : courbes (ordre et compte des évaluations, garde-fou au bit près, générateur du hasard, 5 graines, lectures à 50 et 200, coût, graphique) |
+| `test_courbes.py` | 9 | v2 : courbes (ordre et compte des évaluations, garde-fou au bit près, générateur du hasard, 5 graines, lectures à 50 et 200, coût, évolution à petit budget, graphique) |
 | `test_etats_replay.py` | 2 | v2 : `replay --export-etats` (même empreinte qu'un essai du même génome ; rejeu divergent jamais exporté) |
 | `test_tail_audit.py` | 14 | outils de C2 sur signaux construits et petit run : oscillation, étirement, pénétration et posture de la queue, verdict de repli, `--tail`, `--fallen`, `trace`, `diag-projection` (moteur rendu intact), `morpho`, `planche`, variantes du diagnostic du chantier D |
 

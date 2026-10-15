@@ -1,6 +1,7 @@
 # Gecko v2 : spécification du duel LLM contre évolution
 
-Version du 14 octobre 2026, révisée le même jour (chaque camp joue 5 fois ; duel à coût égal). Ce document fait foi pour la v2 ; toute modification des règles passe par Tom.
+Version du 14 octobre 2026, révisée le même jour (chaque camp joue 5 fois ; duel à coût égal), puis le 15 octobre 2026
+(évolution à petit budget), avant toute partie. Ce document fait foi pour la v2 ; toute modification des règles passe par Tom.
 
 ## Objet
 
@@ -10,20 +11,23 @@ Le budget n'est pas une règle qui désigne un vainqueur, c'est une mesure. On c
 
 ## Les joueurs
 
-Trois joueurs, sur le même moteur (moteur D, v1.1) et avec la même règle de victoire. Le hasard pur est l'arbitre : si le LLM ne le bat pas, sa réflexion ne sert à rien.
+Trois camps (LLM, évolution, hasard pur), sur le même moteur (moteur D, v1.1) et avec la même règle de victoire.
+L'évolution joue à deux échelles : à petit budget face au LLM à 50 et 200 essais, à grand budget comme référence à
+100 000 évaluations. Le hasard pur est l'arbitre : si le LLM ne le bat pas, sa réflexion ne sert à rien.
 
 | Joueur | Ce qu'il fait | Budget | Ce qu'il apprend d'un essai |
 | --- | --- | --- | --- |
 | LLM | Conçoit un génome, lit le rapport, corrige | 50 essais annoncés par partie ; en manche 2, prolongés jusqu'à 200 pour 2 parties sur 5 | Le rapport d'essai complet |
 | Évolution | 1000 lézards, les 500 meilleurs ont un enfant muté | 200 générations, environ 100 000 évaluations, 5 graines par manche | Le score seulement |
+| Évolution à petit budget | 10 lézards, les 5 meilleurs ont un enfant muté | 200 évaluations (38 générations), 5 graines par manche | Le score seulement |
 | Hasard pur | Tire des génomes aléatoires, garde le meilleur | 200 génomes par tirage (le budget maximal du LLM), 5 tirages par manche | Rien |
 
 ## Les deux manches
 
 | Manche | Ce que le joueur règle | Corps | Référence évolution |
 | --- | --- | --- | --- |
-| 1. Le chorégraphe | Période, 4 poses, prises, 8 forces (une par muscle, appliquée aux deux côtés) | Imposé : longueurs de référence | Run d'évolution témoin à corps figé (5 graines) |
-| 2. Le créateur | Tout le génome, longueurs des 7 os comprises | Libre, dans les bornes du génome | Les runs par défaut (moteur D, 5 graines) |
+| 1. Le chorégraphe | Période, 4 poses, prises, 8 forces (une par muscle, appliquée aux deux côtés) | Imposé : longueurs de référence | Évolution témoin à corps figé (5 graines) ; à petit budget, 10 lézards à corps figé (5 graines) |
+| 2. Le créateur | Tout le génome, longueurs des 7 os comprises | Libre, dans les bornes du génome | Les runs par défaut (moteur D, 5 graines) ; à petit budget, 10 lézards (5 graines) |
 
 ## Règles fixées à l'avance
 
@@ -38,6 +42,12 @@ Trois joueurs, sur le même moteur (moteur D, v1.1) et avec la même règle de v
 - **Critère de victoire, la « hauteur accrochée »** : hauteur du centre du torse au dernier instant où au moins une patte tient le tronc, sur 10 s. Un saut final ne rapporte rien (cas de la créature n°677 : la hauteur à 10 s récompensait une créature en chute).
 - **Départage** : l'énergie dépensée, la plus basse gagne.
 - **Équité** : les champions de l'évolution sont recalculés avec la hauteur accrochée, par rejeu.
+- **Témoin à 50 et 200 essais (correction du 15 octobre 2026, avant toute partie)** : la comparaison du LLM à 50 et à
+  200 essais se fait contre l'évolution à petit budget (même moteur, mêmes mutations, 10 lézards : 5 survivants et
+  5 enfants par génération ; corps figé en manche 1, génome complet en manche 2). La grande évolution reste la
+  référence à 100 000 évaluations. Raison : avec 1 000 lézards, l'évolution n'a évalué à 50 et 200 essais que sa
+  génération 0, un tirage au hasard ; elle s'y confond avec le hasard pur et ne mesure pas ce que vaut une évolution
+  avec ce budget (constaté sur les courbes des témoins, `docs/temoins/`).
 - **Répétitions** : chaque camp joue 5 fois par manche (décision de Tom et Dorian) : 5 parties pour le LLM, 5 graines
   pour l'évolution, 5 tirages pour le hasard pur. On montre la moyenne et l'écart, jamais la seule meilleure partie.
 - **Pas d'optimisation automatique** : le LLM écrit chaque génome à la main. Il ne lance aucun script de recherche ou d'optimisation.
@@ -75,6 +85,8 @@ Aucune comparaison avec l'évolution ni avec les autres parties.
 - Courbe par joueur : meilleure hauteur accrochée en fonction du nombre de lézards testés (échelle logarithmique, 1 à 100 000).
 - Taux de change : nombre d'évaluations dont l'évolution a besoin pour égaler la meilleure hauteur du LLM après 50, puis 200 essais.
 - Courbe de l'évolution : meilleure hauteur accrochée cumulée à chaque évaluation, recalculée sur les runs existants.
+- Évolution à petit budget : 5 graines par manche, 200 évaluations, courbes lues à 50 et à 200 essais ; c'est contre elle
+  que le LLM se compare à ces budgets.
 - Hasard pur : 5 tirages de 200 génomes aléatoires par manche, courbes lues à 50 et à 200 essais.
 - Par partie du LLM : journal complet (génome, rapport, hypothèse), champion rejoué et exporté.
 

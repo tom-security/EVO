@@ -218,3 +218,37 @@ coûts et graphique : `docs/temoins/` (README, `courbes_temoins.html`).
 corps figé 2,81 h (33,7 min, 20,0 ms), hasard 6,4 à 6,7 s par tirage de 200 (hors compilation numba).
 
 **Fin de GECKO-10** : arrêt pour validation ; rien n'est fusionné sur `main`.
+
+## Étape 7 : GECKO-10 validé ; évolution à petit budget (15 octobre 2026)
+
+**Décisions de Tom** :
+1. `main` avancée sur `claude/gecko-10-temoins` (`e768044`).
+2. « Parties prolongées désignées avant de jouer » : validé.
+3. Correction d'équité avant de jouer : à 50 et 200 essais, l'évolution à 1 000 lézards n'a évalué que sa génération 0
+   et se confond avec le hasard. Nouveau témoin, l'évolution à petit budget : même moteur et mêmes mutations, 10 lézards
+   (5 survivants, 5 enfants), corps figé en manche 1, génome complet en manche 2, 5 graines, 200 évaluations ; courbes
+   lues à 50 et 200 essais, ajoutées au graphique de `docs/temoins/`. Spec : la comparaison à 50 et 200 essais se fait
+   contre lui ; la grande évolution reste la référence à 100 000 évaluations.
+4. **Exigence de GECKO-11** (rien à coder maintenant) : `essai` doit faire respecter le budget de la partie (50, ou 200
+   pour les parties désignées comme prolongées).
+
+**Mise en œuvre** (commit `ca18b5b`) : `PETIT_BUDGET_POP = 10`, `PETIT_BUDGET_EVALUATIONS = 200` (10 à la génération 0,
+puis 5 enfants par génération : 38 générations) ; commande `petit-budget --manche M --graine S` (run dans
+`out/petit_budget/m<M>/<S>`, audit d'énergie du champion à chaque génération, erreur sur alerte, courbe vérifiée au bit
+près) ; graines 0 à 4, comme les grands runs (les 10 premiers lézards d'une graine sont donc ceux de la génération 0 du
+grand run de même graine).
+
+| Commit | `pytest` runner | `reproductibilite` | Runs à petit budget |
+|---|---|---|---|
+| `ca18b5b` | 233 passent (38760471248) | 16 champions gén. 200 identiques (38760476233) | 38760481447 : 10 runs, 39 audits chacun, courbes vérifiées au bit près |
+
+**Résultats** (moyenne des 5 graines ; détail et hypothèse : `docs/temoins/README.md`) :
+- à 50 essais : petit budget +0,59 m (manche 1) et +1,37 m (manche 2), contre +1,89 et +2,33 m pour le hasard ;
+- à 200 essais : +0,72 et +2,99 m, contre +2,72 et +2,86 m ;
+- énergie créée hors muscles : aucune alerte ; au plus 0,043 J (0,19 mm) chez un champion au score tombé à −4,31 m, et
+  0,0097 J (0,04 mm) chez un autre à −0,67 m : limite connue des créatures tombées du moteur D, sous le seuil d'audit ;
+  pas une condition d'arrêt selon les règles d'audit, signalé à Tom ;
+- hypothèse (non mesurée plus avant) : avec 10 lézards, la sélection au score retombe dans l'attracteur paresseux.
+
+Spec à jour (comparaison à 50 et 200 essais contre l'évolution à petit budget, raison et date) ; graphique de
+`docs/temoins/` à 4 joueurs. Arrêt pour validation ; rien n'est fusionné sur `main`.

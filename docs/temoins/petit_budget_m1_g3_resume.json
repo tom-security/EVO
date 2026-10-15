@@ -1,0 +1,51 @@
+{
+ "nom": "petit_budget_m1_g3",
+ "evaluations": 200,
+ "meilleure_hauteur_accrochee": 0.6871953623445695,
+ "atteinte_a_l_evaluation": 17,
+ "generation": 2,
+ "indice": 6,
+ "energie_du_meilleur": 14.29050673744466,
+ "hauteur_10s_du_meilleur": 0.6871953623445695,
+ "jamais_accrochees": 0,
+ "hauteur_accrochee_differente": 12,
+ "lectures": {
+  "50": 0.6871953623445695,
+  "200": 0.6871953623445695
+ },
+ "paliers": [
+  [
+   1,
+   -4.6910828482695806
+  ],
+  [
+   3,
+   -2.7306568068279766
+  ],
+  [
+   5,
+   0.5620748102924988
+  ],
+  [
+   12,
+   0.6340085365097856
+  ],
+  [
+   17,
+   0.6871953623445695
+  ]
+ ],
+ "source": "evolution",
+ "run": "out/petit_budget/m1/3",
+ "generations": 38,
+ "reevaluations_identiques": true,
+ "frozen_body": true,
+ "secondes": 10.7,
+ "cout_evaluation_s": 10.8,
+ "petit_budget": true,
+ "manche": 1,
+ "graine": 3,
+ "population": 10,
+ "audits": 39,
+ "energie_creee_max_m": 0.0
+}
